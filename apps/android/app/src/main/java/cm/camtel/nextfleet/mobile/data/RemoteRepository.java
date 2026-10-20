@@ -170,6 +170,86 @@ public final class RemoteRepository implements Repository {
                 l.optString("clientMessageId", ""));
     }
 
+    @Override
+    public List<Models.VehicleLive> fleetLive() {
+        try {
+            JSONArray a = new JSONArray(call("GET", "/api/v1/fleet/live", null, token()));
+            List<Models.VehicleLive> out = new ArrayList<>();
+            for (int i = 0; i < a.length(); i++) out.add(vehicleLive(a.getJSONObject(i)));
+            return out;
+        } catch (JSONException e) {
+            throw unreadable();
+        }
+    }
+
+    static Models.VehicleLive vehicleLive(JSONObject n) throws JSONException {
+        return new Models.VehicleLive(n.getString("vehicleId"), n.optString("registration", ""), n.optString("vehicleLabel", ""),
+                n.optString("missionRef", ""), n.optString("driverName", ""), n.optString("destination", ""),
+                n.optString("state", "SIGNAL_ANCIEN"), n.optString("stateLabel", ""), n.getDouble("lat"), n.getDouble("lon"),
+                n.isNull("speedKmh") || !n.has("speedKmh") ? null : n.getDouble("speedKmh"),
+                n.isNull("distanceKm") || !n.has("distanceKm") ? null : n.getDouble("distanceKm"), instant(n, "recordedAt"));
+    }
+
+    /** Canal WebSocket du serveur (OkHttp, déjà embarqué par MapLibre) avec reconnexion progressive. */
+    @Override
+    public AutoCloseable live(java.util.function.Consumer<Models.LiveEvent> onEvent, java.util.function.Consumer<Boolean> onConnection) {
+        String ws = apiUrl.replaceFirst("^http", "ws").replaceAll("/+$", "") + "/api/v1/live";
+        okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder().pingInterval(25, java.util.concurrent.TimeUnit.SECONDS).build();
+        java.util.concurrent.atomic.AtomicBoolean open = new java.util.concurrent.atomic.AtomicBoolean(true);
+        java.util.concurrent.atomic.AtomicReference<okhttp3.WebSocket> current = new java.util.concurrent.atomic.AtomicReference<>();
+        android.os.Handler retry = new android.os.Handler(android.os.Looper.getMainLooper());
+        long[] backoff = {1000};
+        Runnable[] connect = new Runnable[1];
+        connect[0] = () -> {
+            if (!open.get()) return;
+            okhttp3.Request req = new okhttp3.Request.Builder().url(ws).header("Authorization", "Bearer " + token()).build();
+            current.set(client.newWebSocket(req, new okhttp3.WebSocketListener() {
+                @Override
+                public void onOpen(okhttp3.WebSocket w, okhttp3.Response r) {
+                    backoff[0] = 1000;
+                    onConnection.accept(true);
+                }
+
+                @Override
+                public void onMessage(okhttp3.WebSocket w, String text) {
+                    try {
+                        JSONObject e = new JSONObject(text);
+                        if (!"position".equals(e.optString("type"))) return;
+                        onEvent.accept(new Models.LiveEvent(e.getString("vehicleId"), e.getDouble("lat"), e.getDouble("lon"),
+                                e.has("speedKmh") && !e.isNull("speedKmh") ? e.getDouble("speedKmh") : null, instant(e, "recordedAt")));
+                    } catch (JSONException | RuntimeException ignored) {
+                        // message illisible : ignoré
+                    }
+                }
+
+                @Override
+                public void onClosed(okhttp3.WebSocket w, int code, String reason) {
+                    reconnect();
+                }
+
+                @Override
+                public void onFailure(okhttp3.WebSocket w, Throwable t, okhttp3.Response r) {
+                    reconnect();
+                }
+
+                private void reconnect() {
+                    onConnection.accept(false);
+                    if (!open.get()) return;
+                    retry.postDelayed(connect[0], backoff[0]);
+                    backoff[0] = Math.min(backoff[0] * 2, 30_000);
+                }
+            }));
+        };
+        connect[0].run();
+        return () -> {
+            open.set(false);
+            retry.removeCallbacksAndMessages(null);
+            okhttp3.WebSocket w = current.get();
+            if (w != null) w.close(1000, "fermeture");
+            client.dispatcher().executorService().shutdown();
+        };
+    }
+
     static Instant instant(JSONObject o, String field) {
         if (o.isNull(field)) return null;
         String s = o.optString(field, null);

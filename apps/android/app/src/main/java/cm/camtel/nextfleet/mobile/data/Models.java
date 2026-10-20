@@ -104,4 +104,53 @@ public final class Models {
     public static List<String> demoLogins() {
         return List.of("conducteur", "gestionnaire", "maintenance", "controleur");
     }
+
+    /** Dernière position d'un véhicule en mission ; état calculé par le serveur (couleur toujours doublée d'un libellé). */
+    public static final class VehicleLive {
+        public final String vehicleId, registration, vehicleLabel, missionRef, driverName, destination, state, stateLabel;
+        public final double lat, lon;
+        public final Double speedKmh, distanceKm;
+        public final Instant recordedAt;
+
+        public VehicleLive(String vehicleId, String registration, String vehicleLabel, String missionRef, String driverName,
+                           String destination, String state, String stateLabel, double lat, double lon, Double speedKmh,
+                           Double distanceKm, Instant recordedAt) {
+            this.vehicleId = vehicleId;
+            this.registration = registration;
+            this.vehicleLabel = vehicleLabel;
+            this.missionRef = missionRef;
+            this.driverName = driverName;
+            this.destination = destination;
+            this.state = state;
+            this.stateLabel = stateLabel;
+            this.lat = lat;
+            this.lon = lon;
+            this.speedKmh = speedKmh;
+            this.distanceKm = distanceKm;
+            this.recordedAt = recordedAt;
+        }
+
+        public VehicleLive moved(double lat, double lon, Double speedKmh, Instant at) {
+            String st = "A_VERIFIER".equals(state) ? state : speedKmh != null && speedKmh >= 5.4 ? "EN_MOUVEMENT" : "ARRET";
+            String label = "A_VERIFIER".equals(st) ? stateLabel : "EN_MOUVEMENT".equals(st) ? "En mouvement" : "À l'arrêt";
+            return new VehicleLive(vehicleId, registration, vehicleLabel, missionRef, driverName, destination, st, label, lat, lon,
+                    speedKmh, distanceKm, at);
+        }
+    }
+
+    /** Position poussée par le canal temps réel. */
+    public static final class LiveEvent {
+        public final String vehicleId;
+        public final double lat, lon;
+        public final Double speedKmh;
+        public final Instant recordedAt;
+
+        public LiveEvent(String vehicleId, double lat, double lon, Double speedKmh, Instant recordedAt) {
+            this.vehicleId = vehicleId;
+            this.lat = lat;
+            this.lon = lon;
+            this.speedKmh = speedKmh;
+            this.recordedAt = recordedAt;
+        }
+    }
 }

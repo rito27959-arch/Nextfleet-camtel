@@ -87,6 +87,54 @@ public final class DemoRepository implements Repository {
         return s;
     }
 
+    // ------------------------------------------------------------------ carte de flotte (positions FICTIVES)
+
+    private static final double[][] MBALMAYO = {{3.8667, 11.5167}, {3.8410, 11.5098}, {3.8020, 11.5030}, {3.7560, 11.4990},
+            {3.7105, 11.4952}, {3.6680, 11.5010}, {3.6240, 11.5035}, {3.5790, 11.5012}, {3.5390, 11.4990}, {3.5172, 11.5003}};
+    private static final double[] KRIBI_PARKED = {2.6150, 9.8480};
+
+    @Override
+    public List<Models.VehicleLive> fleetLive() {
+        Session s = require();
+        if (!s.can(cm.camtel.nextfleet.domain.security.Permission.MISSION_MANAGE)
+                && !s.can(cm.camtel.nextfleet.domain.security.Permission.GPS_READ)) {
+            throw new RepositoryException(RepositoryException.Kind.FORBIDDEN, "La carte de flotte n'est pas ouverte à votre profil.");
+        }
+        Instant now = clock.instant();
+        List<Models.VehicleLive> out = new java.util.ArrayList<>();
+        Mission m = find("m-014");
+        if (m.status == MissionStatus.ACTIVE && m.startedAt != null) {
+            // 18 km en 90 min, position recalculée à chaque appel : le marqueur avance réellement en démonstration
+            double f = Math.min(1, Duration.between(m.startedAt, now).getSeconds() / 5400.0);
+            double[] p = along(MBALMAYO, f);
+            double speed = f >= 1 ? 0.0 : 31 + 9 * Math.sin(now.getEpochSecond() / 40.0);
+            out.add(new Models.VehicleLive("v-lt5520", m.registration, m.vehicleLabel, m.reference, m.driverName, m.destination,
+                    f >= 1 ? "ARRET" : "EN_MOUVEMENT", f >= 1 ? "À l'arrêt" : "En mouvement", p[0], p[1], Math.round(speed * 10) / 10.0,
+                    Math.round(f * 180) / 10.0, now.minusSeconds(4)));
+        }
+        out.add(new Models.VehicleLive("v-ce4210", "CE 4210 MK", "Toyota Hilux", "MIS-2026-013", "Lucie Abena", "Campo (direction)",
+                "ARRET", "À l'arrêt", KRIBI_PARKED[0], KRIBI_PARKED[1], 0.0, 41.6, now.minusSeconds(12)));
+        return out;
+    }
+
+    static double[] along(double[][] route, double fraction) {
+        double total = 0;
+        double[] cum = new double[route.length];
+        for (int i = 1; i < route.length; i++) {
+            total += Math.hypot(route[i][0] - route[i - 1][0], route[i][1] - route[i - 1][1]);
+            cum[i] = total;
+        }
+        double target = total * Math.max(0, Math.min(1, fraction));
+        for (int i = 1; i < route.length; i++) {
+            if (cum[i] >= target) {
+                double seg = cum[i] - cum[i - 1];
+                double k = seg == 0 ? 0 : (target - cum[i - 1]) / seg;
+                return new double[]{route[i - 1][0] + k * (route[i][0] - route[i - 1][0]), route[i - 1][1] + k * (route[i][1] - route[i - 1][1])};
+            }
+        }
+        return route[route.length - 1];
+    }
+
     // ------------------------------------------------------------------ missions
 
     private void seed() {

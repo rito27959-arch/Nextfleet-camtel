@@ -13,4 +13,8 @@ interface Page {
     default void onShow() { }
 
     default void onHide() { }
+
+    default void onDestroy() { }
+
+    default void onLowMemory() { }
 }

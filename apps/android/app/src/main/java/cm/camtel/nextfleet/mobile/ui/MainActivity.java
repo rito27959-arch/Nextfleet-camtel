@@ -48,6 +48,7 @@ public final class MainActivity extends Activity {
         content = new FrameLayout(this);
         boolean field = s.can(Permission.MISSION_DRIVE) || s.can(Permission.MISSION_MANAGE) || s.can(Permission.GPS_READ);
         if (field) pages.add(new MissionsPage(this));
+        if (s.can(Permission.MISSION_MANAGE) || s.can(Permission.GPS_READ)) pages.add(new MapPage(this));
         if (s.can(Permission.MISSION_DRIVE)) pages.add(new TrackPage(this));
         if (s.can(Permission.CHAT_USE)) pages.add(new MessagesPage(this));
         pages.add(new CataloguePage(this));
@@ -92,6 +93,18 @@ public final class MainActivity extends Activity {
         TrackingService.drain(this);   // points de la mission précédente encore en tampon
         if (TrackingState.of(this).active() && NexFleetApp.get().session() != null) TrackingService.start(this);
         if (current >= 0) pages.get(current).onShow();
+    }
+
+    @Override
+    protected void onDestroy() {
+        for (Page p : pages) p.onDestroy();
+        super.onDestroy();
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        for (Page p : pages) p.onLowMemory();
     }
 
     @Override
