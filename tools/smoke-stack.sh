@@ -55,6 +55,7 @@ DEV=$(curl -fs -u "service@nexfleet.local:$TU" "http://127.0.0.1:8082/api/device
 [ "$DEV" = 1 ] || fail "appareil absent de Traccar"
 echo "OK téléphone déclaré automatiquement dans Traccar par l'API"
 curl -fs -X POST -H "Authorization: Bearer $DRV" "http://127.0.0.1:8080/api/v1/missions/$MID/finish" | jq -e '.status=="FINISHED"' >/dev/null || fail "clôture"
+sleep 2   # horodatage à la seconde : un point de la même seconde que la clôture est légitimement antérieur
 R2=$(curl -fs -H "Authorization: Mission $TOKEN" -H 'Content-Type: application/json' \
   -d "{\"fixes\":[{\"clientFixId\":\"ci-2\",\"recordedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"lat\":3.87,\"lon\":11.52,\"accuracyM\":5}]}" \
   http://127.0.0.1:8090/gps/android/fixes)

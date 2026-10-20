@@ -134,7 +134,7 @@ final class MapPage implements Page {
                 PropertyFactory.circleStrokeColor("#FFFFFF"), PropertyFactory.circleStrokeWidth(2.5f)));
         style.addLayer(new SymbolLayer("nf-vehicle-label", SRC).withProperties(
                 PropertyFactory.textField(Expression.get("label")), PropertyFactory.textFont(new String[]{"Noto Sans Bold"}),
-                PropertyFactory.textSize(12f), PropertyFactory.textOffset(new Float[]{0f, 1.6f}), PropertyFactory.textAnchor("top"),
+                PropertyFactory.textSize(12f), PropertyFactory.textOffset(new Float[]{0f, 1.6f}), PropertyFactory.textAnchor(org.maplibre.android.style.layers.Property.TEXT_ANCHOR_TOP),
                 PropertyFactory.textColor("#102631"), PropertyFactory.textHaloColor("#FFFFFF"), PropertyFactory.textHaloWidth(1.6f),
                 PropertyFactory.textAllowOverlap(true)));
         render();
