@@ -76,33 +76,27 @@ public final class DemoFleetGateway implements FleetGateway {
         String l = login == null ? "" : login.strip().toLowerCase(Locale.ROOT);
         boolean ok = DEMO_PASSWORD.equals(new String(password));
         java.util.Arrays.fill(password, '\0');
-        List<String> roles = switch (l) {
-            case "gestionnaire" -> List.of("FLEET_MANAGER");
-            case "controleur" -> List.of("CONTROLLER");
-            case "auditeur" -> List.of("AUDITOR");
-            default -> null;
-        };
-        if (!ok || roles == null) {
+        String[] account = DemoOperations.ACCOUNTS.get(l);
+        if (!ok || account == null) {
             throw new GatewayException(GatewayException.Kind.UNAUTHORIZED, "Identifiants invalides ou compte indisponible.");
         }
-        String name = switch (l) {
-            case "gestionnaire" -> "Gestionnaire (démo)";
-            case "controleur" -> "Contrôleur (démo)";
-            default -> "Auditeur (démo)";
-        };
+        List<String> roles = List.of(account[1]);
+        String name = account[0];
         session = new Session("demo-" + UUID.randomUUID(), name, l, roles, true);
+        ops().record(session, "LOGIN", "Session", "Connexion au poste bureau (démo)");
         return session;
     }
 
     @Override
     public void logout() {
+        if (session != null) ops().record(session, "LOGOUT", "Session", "Session révoquée");
         session = null;
     }
 
     @Override
     public DashboardData dashboard() {
         pause();
-        requireSession();
+        require(cm.camtel.nextfleet.domain.security.Permission.COST_READ);
         YearMonth current = YearMonth.now(clock.withZone(DOUALA));
         List<Vehicle> vehicles = this.vehicles.stream().filter(v -> v.status() != VehicleStatus.ARCHIVED).toList();
         int active = (int) vehicles.stream().filter(v -> v.status() == VehicleStatus.IN_SERVICE
@@ -126,7 +120,7 @@ public final class DemoFleetGateway implements FleetGateway {
     @Override
     public Page<Vehicle> vehicles(String query, VehicleStatus status, int page, int size) {
         pause();
-        requireSession();
+        require(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_READ);
         String q = query == null ? "" : query.strip().toLowerCase(Locale.ROOT);
         String qn = q.replaceAll("[^a-z0-9]", "").toUpperCase(Locale.ROOT);
         List<Vehicle> filtered = vehicles.stream()
@@ -146,7 +140,7 @@ public final class DemoFleetGateway implements FleetGateway {
     @Override
     public Vehicle vehicle(UUID id) {
         pause();
-        requireSession();
+        require(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_READ);
         return vehicles.stream().filter(v -> v.id().equals(id)).findFirst()
                 .orElseThrow(() -> new GatewayException(GatewayException.Kind.NOT_FOUND, "Véhicule introuvable."));
     }
@@ -155,7 +149,7 @@ public final class DemoFleetGateway implements FleetGateway {
     public Vehicle createVehicle(VehicleDraft d) {
         pause();
         Session s = requireSession();
-        if (!s.has("FLEET_MANAGER")) {
+        if (!s.can(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_WRITE)) {
             throw new GatewayException(GatewayException.Kind.FORBIDDEN, "Vous n'avez pas les droits nécessaires pour cette action.");
         }
         RegistrationNumber reg = RegistrationNumber.of(d.registration());
@@ -166,6 +160,7 @@ public final class DemoFleetGateway implements FleetGateway {
         Vehicle v = new Vehicle(UUID.randomUUID(), reg.raw().toUpperCase(Locale.ROOT), d.make(), d.model(), d.modelYear(),
                 d.energy(), VehicleStatus.AVAILABLE, null, null, null, null, d.tankCapacityLiters(), null, d.category(), 0);
         vehicles.add(v);
+        ops().record(s, "VEHICLE_CREATED", v.registration(), v.label());
         return v;
     }
 
@@ -321,7 +316,7 @@ public final class DemoFleetGateway implements FleetGateway {
 
     @Override
     public List<Models.NotificationItem> notifications() {
-        requireSession();
+        require(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_READ);
         Instant now = clock.instant();
         List<Models.NotificationItem> out = new ArrayList<>();
         int i = 0;
@@ -364,7 +359,7 @@ public final class DemoFleetGateway implements FleetGateway {
     public Vehicle archiveVehicle(UUID id, long expectedVersion, String reason) {
         pause();
         Session s = requireSession();
-        if (!s.has("FLEET_MANAGER")) {
+        if (!s.can(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_ARCHIVE)) {
             throw new GatewayException(GatewayException.Kind.FORBIDDEN, "Vous n'avez pas les droits nécessaires pour cette action.");
         }
         Vehicle v = vehicle(id);
@@ -376,6 +371,7 @@ public final class DemoFleetGateway implements FleetGateway {
                 VehicleStatus.ARCHIVED, v.driverName(), v.fuelLevelPercent(), v.lastKnownPlace(), v.odometerKm(),
                 v.tankCapacityLiters(), v.nextMaintenance(), v.category(), v.version() + 1);
         vehicles.replaceAll(x -> x.id().equals(id) ? archived : x);
+        ops().record(s, "VEHICLE_ARCHIVED", v.registration(), "Motif : " + reason);
         return archived;
     }
 
@@ -384,7 +380,7 @@ public final class DemoFleetGateway implements FleetGateway {
     @Override
     public List<Models.Driver> drivers(String query) {
         pause();
-        requireSession();
+        require(cm.camtel.nextfleet.domain.security.Permission.DRIVER_READ);
         String q = query == null ? "" : query.strip().toLowerCase(Locale.ROOT);
         return drivers.stream().filter(d -> q.isEmpty() || d.fullName().toLowerCase(Locale.ROOT).contains(q)
                         || d.staffNumber().toLowerCase(Locale.ROOT).contains(q))
@@ -393,14 +389,15 @@ public final class DemoFleetGateway implements FleetGateway {
 
     @Override
     public List<Models.DueItem> dueDates(int thresholdDays) {
-        requireSession();
+        Session s = require(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_READ);
+        boolean people = s.can(cm.camtel.nextfleet.domain.security.Permission.DRIVER_READ);   // permis et CNI : données personnelles réservées
         LocalDate today = LocalDate.now(clock.withZone(DOUALA));
         List<Models.DueItem> out = new ArrayList<>();
         for (Vehicle v : vehicles) {
             if (v.status() == VehicleStatus.ARCHIVED) continue;
             out.addAll(vehicleDue(v, today, thresholdDays));
         }
-        for (Models.Driver d : drivers) {
+        for (Models.Driver d : people ? drivers : List.<Models.Driver>of()) {
             out.add(due(Models.DueKind.PERMIS, d.fullName(), "Permis " + d.licenseNumber(), false, d.licenseExpiresOn(), today, thresholdDays));
             if (d.idCardExpiresOn() != null) {
                 out.add(due(Models.DueKind.CNI, d.fullName(), "Matricule " + d.staffNumber(), false, d.idCardExpiresOn(), today, thresholdDays));
@@ -413,7 +410,7 @@ public final class DemoFleetGateway implements FleetGateway {
     @Override
     public List<Models.DueItem> vehicleDueDates(UUID vehicleId) {
         pause();
-        requireSession();
+        require(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_READ);
         LocalDate today = LocalDate.now(clock.withZone(DOUALA));
         return vehicle(vehicleId) == null ? List.of() : vehicleDue(vehicle(vehicleId), today, 30);
     }
@@ -446,6 +443,118 @@ public final class DemoFleetGateway implements FleetGateway {
 
     private static BigDecimal sum(java.util.Collection<BigDecimal> values) {
         return values.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    // ------------------------------------------------------------------ lot 2 (démo) : délégation à DemoOperations
+
+    private volatile DemoOperations ops;
+
+    private DemoOperations ops() {
+        DemoOperations o = ops;
+        if (o == null) {
+            synchronized (this) {
+                if (ops == null) ops = new DemoOperations(this, clock);
+                o = ops;
+            }
+        }
+        return o;
+    }
+
+    List<Vehicle> allVehicles() {
+        return List.copyOf(vehicles);
+    }
+
+    List<FuelFillRecord> fillsOf(UUID id) {
+        return fills.getOrDefault(id, List.of());
+    }
+
+    @Override
+    public List<Ops.Mission> missions() {
+        pause();
+        return ops().missions(requireSession());
+    }
+
+    @Override
+    public List<cm.camtel.nextfleet.domain.gps.GpsFix> missionTrack(UUID missionId) {
+        pause();
+        return ops().track(requireSession(), missionId);
+    }
+
+    @Override
+    public Ops.Mission startMission(UUID missionId, String noticeVersion) {
+        pause();
+        return ops().start(requireSession(), missionId, noticeVersion);
+    }
+
+    @Override
+    public Ops.Mission finishMission(UUID missionId) {
+        pause();
+        return ops().finish(requireSession(), missionId);
+    }
+
+    @Override
+    public List<Ops.Conversation> conversations() {
+        pause();
+        return ops().conversations(requireSession());
+    }
+
+    @Override
+    public List<Ops.ChatLine> messages(String conversationId) {
+        pause();
+        return ops().messages(requireSession(), conversationId);
+    }
+
+    @Override
+    public Ops.ChatLine sendMessage(String conversationId, String clientMessageId, String body) {
+        pause();
+        return ops().send(requireSession(), conversationId, clientMessageId, body);
+    }
+
+    @Override
+    public void markConversationRead(String conversationId) {
+        ops().markRead(requireSession(), conversationId);
+    }
+
+    @Override
+    public cm.camtel.nextfleet.domain.assistant.AssistantActivation.State assistantState() {
+        requireSession();
+        return ops().assistantState();
+    }
+
+    @Override
+    public cm.camtel.nextfleet.domain.assistant.FleetAssistant.Answer askAssistant(String question) {
+        pause();
+        return ops().ask(requireSession(), question);
+    }
+
+    @Override
+    public cm.camtel.nextfleet.domain.assistant.AssistantActivation.State decideAssistant(boolean enable, String reviewRef,
+                                                                                         String approvedBy, String reason) {
+        pause();
+        return ops().decide(requireSession(), enable, reviewRef, approvedBy, reason);
+    }
+
+    @Override
+    public List<cm.camtel.nextfleet.domain.assistant.AssistantActivation.State> assistantDecisions() {
+        return ops().decisions(requireSession());
+    }
+
+    @Override
+    public List<Ops.UserAccount> users() {
+        pause();
+        return ops().users(requireSession());
+    }
+
+    @Override
+    public List<Ops.AuditEntry> auditTrail() {
+        pause();
+        return ops().audit(requireSession());
+    }
+
+    private Session require(cm.camtel.nextfleet.domain.security.Permission p) {
+        Session s = requireSession();
+        if (!s.can(p)) throw new GatewayException(GatewayException.Kind.FORBIDDEN, "Vous n'avez pas les droits nécessaires pour cette action.");
+        return s;
     }
 
     private Session requireSession() {

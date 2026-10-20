@@ -44,6 +44,21 @@ public final class Icons {
     public static final String LOCK = "M6 11 H18 V20 H6 Z M8.5 11 V8 A3.5 3.5 0 0 1 15.5 8 V11";
     public static final String MOON = "M19.5 14.5 A8 8 0 1 1 9.5 4.5 A6.5 6.5 0 0 0 19.5 14.5 Z";
     public static final String GAUGE = "M4.5 17 A8 8 0 1 1 19.5 17 M12 13 L15.5 9";
+    // lot 2
+    public static final String BUBBLE = "M5 5.5 H19 C19.8 5.5 20.5 6.2 20.5 7 V15 C20.5 15.8 19.8 16.5 19 16.5 H10 L6 20 V16.5 H5 C4.2 16.5 3.5 15.8 3.5 15 V7 C3.5 6.2 4.2 5.5 5 5.5 Z";
+    public static final String SPARK = "M12 3.5 L13.6 9.2 L19.5 11 L13.6 12.8 L12 18.5 L10.4 12.8 L4.5 11 L10.4 9.2 Z M18.5 16 L19.2 18 L21 18.6 L19.2 19.3 L18.5 21 L17.8 19.3 L16 18.6 L17.8 18 Z";
+    public static final String ROUTE = "M6 19 A2 2 0 1 0 6 15 A2 2 0 1 0 6 19 Z M18 9 A2 2 0 1 0 18 5 A2 2 0 1 0 18 9 Z M8 17 H15 A3 3 0 0 0 15 11 H9 A3 3 0 0 1 9 5 H16";
+    public static final String USERS = "M9 11.5 A3.5 3.5 0 1 0 9 4.5 A3.5 3.5 0 1 0 9 11.5 Z M2.5 19.5 C3 16.3 5.6 14 9 14 C12.4 14 15 16.3 15.5 19.5 M15.5 4.8 A3.3 3.3 0 0 1 15.5 11.2 M17.5 14.3 C19.6 15 21 16.9 21.5 19.5";
+    public static final String LIST = "M8.5 7 H20 M8.5 12 H20 M8.5 17 H20 M4.5 7 H4.6 M4.5 12 H4.6 M4.5 17 H4.6";
+    public static final String SEND = "M12 18.5 V6 M6.5 11 L12 5.5 L17.5 11";
+    public static final String PLAY = "M8 5.5 L18.5 12 L8 18.5 Z";
+    public static final String STOP = "M7 7 H17 V17 H7 Z";
+    public static final String LOCATION = "M12 21 C12 21 18.5 14.8 18.5 10 A6.5 6.5 0 0 0 5.5 10 C5.5 14.8 12 21 12 21 Z M12 12.5 A2.5 2.5 0 1 0 12 7.5 A2.5 2.5 0 1 0 12 12.5 Z";
+    public static final String CLOCK = "M12 20.5 A8.5 8.5 0 1 0 12 3.5 A8.5 8.5 0 1 0 12 20.5 Z M12 7.5 V12 L15 14";
+    public static final String KEY = "M8 15.5 A3.5 3.5 0 1 0 8 8.5 A3.5 3.5 0 1 0 8 15.5 Z M11.5 12 H20.5 M17.5 12 V15 M20.5 12 V14.5";
+    public static final String GRID = "M4.5 4.5 H10.5 V10.5 H4.5 Z M13.5 4.5 H19.5 V10.5 H13.5 Z M4.5 13.5 H10.5 V19.5 H4.5 Z M13.5 13.5 H19.5 V19.5 H13.5 Z";
+    public static final String CHAIN = "M10 14 L14 10 M8.5 11.5 L6.5 13.5 A3 3 0 0 0 10.5 17.5 L12.5 15.5 M15.5 12.5 L17.5 10.5 A3 3 0 0 0 13.5 6.5 L11.5 8.5";
+    public static final String EYE = "M2.5 12 C4.8 7.8 8.2 5.5 12 5.5 C15.8 5.5 19.2 7.8 21.5 12 C19.2 16.2 15.8 18.5 12 18.5 C8.2 18.5 4.8 16.2 2.5 12 Z M12 15 A3 3 0 1 0 12 9 A3 3 0 1 0 12 15 Z";
 
     /** Pictogramme au trait, couleur pilotée par le CSS (classe {@code icon}) ; encapsulé pour des dimensions exactes. */
     public static Node icon(String path, double size) {

@@ -16,6 +16,19 @@ public final class Models {
         public boolean has(String role) {
             return roles.contains(role);
         }
+
+        /** Permissions effectives : union des rôles (matrice du noyau, identique à la base). L'API revérifie tout. */
+        public java.util.Set<cm.camtel.nextfleet.domain.security.Permission> permissions() {
+            return cm.camtel.nextfleet.domain.security.Role.union(roles);
+        }
+
+        public boolean can(cm.camtel.nextfleet.domain.security.Permission p) {
+            return permissions().contains(p);
+        }
+
+        public cm.camtel.nextfleet.domain.security.Role primaryRole() {
+            return roles.isEmpty() ? null : cm.camtel.nextfleet.domain.security.Role.ofCode(roles.get(0)).orElse(null);
+        }
     }
 
     public enum VehicleStatus {

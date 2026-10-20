@@ -61,4 +61,79 @@ public interface FleetGateway {
 
     /** Échéances d'un véhicule donné. */
     java.util.List<Models.DueItem> vehicleDueDates(UUID vehicleId);
+
+    // ------------------------------------------------------------------ lot 2 : missions et GPS
+    // Côté serveur, ces services passent par l'API (non compilée à ce jour) : en mode serveur, le client le dit
+    // explicitement au lieu de simuler.
+
+    default java.util.List<Ops.Mission> missions() {
+        throw notYet("Les missions");
+    }
+
+    /** Positions ACCEPTÉES de la mission (jamais hors période de mission). */
+    default java.util.List<cm.camtel.nextfleet.domain.gps.GpsFix> missionTrack(UUID missionId) {
+        throw notYet("Les trajets");
+    }
+
+    /** Démarrage par le conducteur affecté, après information explicite (notice GPS versionnée). */
+    default Ops.Mission startMission(UUID missionId, String noticeVersion) {
+        throw notYet("Le démarrage de mission");
+    }
+
+    default Ops.Mission finishMission(UUID missionId) {
+        throw notYet("La clôture de mission");
+    }
+
+    // ------------------------------------------------------------------ lot 2 : messagerie
+
+    default java.util.List<Ops.Conversation> conversations() {
+        throw notYet("La messagerie");
+    }
+
+    default java.util.List<Ops.ChatLine> messages(String conversationId) {
+        throw notYet("La messagerie");
+    }
+
+    /** Envoi idempotent : même {@code clientMessageId} = même message, jamais de doublon. */
+    default Ops.ChatLine sendMessage(String conversationId, String clientMessageId, String body) {
+        throw notYet("La messagerie");
+    }
+
+    default void markConversationRead(String conversationId) {
+        throw notYet("La messagerie");
+    }
+
+    // ------------------------------------------------------------------ lot 2 : assistant (lecture seule)
+
+    default cm.camtel.nextfleet.domain.assistant.AssistantActivation.State assistantState() {
+        throw notYet("L'assistant");
+    }
+
+    default cm.camtel.nextfleet.domain.assistant.FleetAssistant.Answer askAssistant(String question) {
+        throw notYet("L'assistant");
+    }
+
+    default cm.camtel.nextfleet.domain.assistant.AssistantActivation.State decideAssistant(boolean enable, String reviewRef,
+                                                                                          String approvedBy, String reason) {
+        throw notYet("L'activation de l'assistant");
+    }
+
+    default java.util.List<cm.camtel.nextfleet.domain.assistant.AssistantActivation.State> assistantDecisions() {
+        throw notYet("L'historique des décisions");
+    }
+
+    // ------------------------------------------------------------------ lot 2 : administration et audit
+
+    default java.util.List<Ops.UserAccount> users() {
+        throw notYet("La gestion des comptes");
+    }
+
+    default java.util.List<Ops.AuditEntry> auditTrail() {
+        throw notYet("Le journal d'audit");
+    }
+
+    static GatewayException notYet(String what) {
+        return new GatewayException(GatewayException.Kind.SERVER, what + " passe par l'API du lot 2, qui n'est pas encore "
+                + "compilée. Cette fonction est disponible en mode démonstration.");
+    }
 }

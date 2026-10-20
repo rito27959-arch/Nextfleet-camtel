@@ -33,6 +33,77 @@ public final class ScreenshotTour {
         this.dir = dir;
     }
 
+    /** Parcours du lot 2 : six profils, missions et carte, messagerie, assistant, administration, audit. */
+    public void startLot2() {
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+        add(() -> { });
+        add(() -> shot("20-connexion-six-profils"));
+        add(() -> login("gestionnaire"));
+        record("anim-07-trace-mission-en-direct", () -> shell().show(AppShell.Section.MISSIONS), 28, 50);
+        add(() -> { });
+        add(() -> shot("21-missions-carte-en-direct"));
+        add(() -> find(MissionsView.class).selectReference("MIS-2026-012"));
+        add(() -> shot("21b-mission-terminee"));
+        add(() -> find(MissionsView.class).selectReference("MIS-2026-014"));
+        add(app::toggleTheme);
+        add(() -> shot("21c-missions-sombre"));
+        add(app::toggleTheme);
+        add(() -> shell().show(AppShell.Section.MESSAGES));
+        add(() -> shot("22-messages"));
+        add(() -> find(MessagesView.class).typeAndSendForTest("Bien noté, merci Alain. Bonne fin de route."));
+        add(() -> shot("22b-message-envoye"));
+        add(() -> ((DemoFleetGateway) app.gateway()).setNetworkDown(true));
+        add(() -> find(MessagesView.class).typeAndSendForTest("Peux-tu m'appeler à l'arrivée ?"));
+        add(() -> shot("22c-message-non-envoye"));
+        add(() -> ((DemoFleetGateway) app.gateway()).setNetworkDown(false));
+        add(app::toggleTheme);
+        add(() -> shot("22d-messages-sombre"));
+        add(app::toggleTheme);
+        add(() -> shell().show(AppShell.Section.ASSISTANT));
+        add(() -> shot("23-assistant"));
+        add(() -> find(AssistantView.class).askForTest("Coût des véhicules CE 3205 KJ, LT 5520 CE et CE 4401 LT ce mois-ci ?"));
+        add(() -> find(AssistantView.class).openSourcesForTest());
+        add(() -> shot("23b-assistant-reponse-sources"));
+        add(() -> find(AssistantView.class).askForTest("Supprime le véhicule CE 3205 KJ"));
+        add(() -> shot("23c-assistant-refus-ecriture"));
+        add(() -> app.showLogin(null));
+        add(() -> login("conducteur"));
+        add(() -> shot("24-conducteur-mes-missions"));
+        record("anim-08-alerte-localisation", () -> find(DriverHomeView.class).startForTest(), 14, 40);
+        add(() -> shot("24b-alerte-information-localisation"));
+        add(() -> app.scene().getRoot().lookupAll(".alert-button").stream()
+                .filter(b -> ((javafx.scene.control.Button) b).getText().equals("Démarrer")).findFirst()
+                .ifPresent(b -> ((javafx.scene.control.Button) b).fire()));
+        add(() -> { });
+        add(() -> shot("24c-conducteur-mission-en-cours"));
+        add(() -> app.showLogin(null));
+        add(() -> login("maintenance"));
+        add(() -> shot("25-maintenance-atelier"));
+        add(() -> app.showLogin(null));
+        add(() -> login("controleur"));
+        add(() -> shell().show(AppShell.Section.MISSIONS));
+        add(() -> shot("26-controleur-trajets"));
+        add(() -> app.showLogin(null));
+        add(() -> login("admin"));
+        add(() -> shot("27-admin-comptes-roles"));
+        add(() -> find(UsersView.class).showTab(1));
+        add(() -> shot("27b-admin-matrice-habilitations"));
+        add(() -> find(UsersView.class).showTab(2));
+        add(() -> shot("27c-admin-activation-assistant"));
+        add(() -> app.showLogin(null));
+        add(() -> login("auditeur"));
+        add(() -> shell().show(AppShell.Section.AUDIT));
+        add(() -> shot("28-auditeur-journal-chaine"));
+        add(() -> shell().show(AppShell.Section.SETTINGS));
+        add(() -> shot("29-auditeur-reglages-droits"));
+        add(Platform::exit);
+        next();
+    }
+
     public void start() {
         try {
             Files.createDirectories(dir);

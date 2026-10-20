@@ -57,7 +57,9 @@ public class NextfleetDesktopApp extends Application {
         stage.show();
 
         if (shots != null) {
-            new ScreenshotTour(this, java.nio.file.Path.of(shots)).start();
+            ScreenshotTour tour = new ScreenshotTour(this, java.nio.file.Path.of(shots));
+            if ("lot2".equals(args.get("tour"))) tour.startLot2();
+            else tour.start();
         }
     }
 

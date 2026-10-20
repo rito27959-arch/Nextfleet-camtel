@@ -477,3 +477,115 @@
 .sparkline { -fx-stroke: -nf-brand; -fx-stroke-width: 2; -fx-fill: transparent; -fx-stroke-line-cap: round; -fx-stroke-line-join: round; }
 .toast { -fx-background-color: -nf-navy; -fx-background-radius: 14; -fx-padding: 12 16; -fx-spacing: 10; }
 .toast .label { -fx-text-fill: white; }
+
+/* ===================================================================== LOT 2 — MESSAGERIE (iMessage : bulles, regroupement, état sous la dernière bulle) */
+.split-list { -fx-background-color: -nf-surface; -fx-border-color: transparent -nf-separator transparent transparent; -fx-pref-width: 330; -fx-min-width: 280; }
+.split-list-header { -fx-padding: 22 18 10 18; -fx-spacing: 10; }
+.conv-row { -fx-padding: 10 14; -fx-spacing: 12; -fx-alignment: center-left; -fx-background-radius: 12; -fx-cursor: hand; }
+.conv-row:hover { -fx-background-color: -nf-fill; }
+.conv-row.selected { -fx-background-color: -nf-accent; }
+.conv-row.selected .label, .conv-row.selected .muted { -fx-text-fill: white; }
+.conv-title { -fx-font-size: 14px; -fx-font-weight: 600; }
+.conv-preview { -fx-font-size: 13px; -fx-text-fill: -nf-muted; }
+.conv-time { -fx-font-size: 12px; -fx-text-fill: -nf-muted; }
+.unread-count { -fx-background-color: -nf-blue; -fx-background-radius: 999; -fx-min-width: 20; -fx-min-height: 20; -fx-padding: 0 6;
+                -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: bold; -fx-alignment: center; }
+.thread { -fx-background-color: -nf-surface; }
+.thread-header { -fx-background-color: -nf-material; -fx-border-color: transparent transparent -nf-separator transparent; -fx-padding: 12 20; -fx-spacing: 12; -fx-alignment: center-left; }
+.thread-body { -fx-padding: 16 20 8 20; -fx-spacing: 2; }
+.bubble { -fx-background-radius: 18; -fx-padding: 8 13; -fx-font-size: 14px; -fx-wrap-text: true; }
+.bubble-out { -fx-background-color: -nf-accent; -fx-text-fill: white; }
+.bubble-in { -fx-background-color: -nf-gray5; -fx-text-fill: -nf-text; }
+.root.dark .bubble-in { -fx-background-color: #2C2C2E; }
+.bubble-pending { -fx-opacity: 0.62; }
+.bubble-failed { -fx-background-color: -nf-red-tint; -fx-text-fill: -nf-red-text; }
+.bubble-sender { -fx-font-size: 11px; -fx-text-fill: -nf-muted; -fx-padding: 8 0 2 13; }
+.bubble-meta { -fx-font-size: 11px; -fx-text-fill: -nf-muted; -fx-padding: 2 4 6 0; }
+.bubble-meta.failed { -fx-text-fill: -nf-red-text; -fx-font-weight: 600; }
+.time-separator { -fx-font-size: 11px; -fx-text-fill: -nf-muted; -fx-font-weight: 600; -fx-padding: 14 0 6 0; }
+.composer { -fx-background-color: -nf-material; -fx-border-color: -nf-separator transparent transparent transparent; -fx-padding: 10 16; -fx-spacing: 10; -fx-alignment: center; }
+.composer-field { -fx-background-color: transparent; -fx-border-color: -nf-gray4; -fx-border-radius: 18; -fx-background-radius: 18; -fx-border-width: 1;
+                  -fx-padding: 7 14; -fx-min-height: 36; }
+.root.dark .composer-field { -fx-border-color: #48484A; }
+.composer-field:focused { -fx-background-color: transparent; -fx-border-color: -nf-accent; }
+.send-button { -fx-background-color: -nf-accent; -fx-background-radius: 999; -fx-min-width: 32; -fx-min-height: 32; -fx-pref-width: 32; -fx-pref-height: 32; -fx-padding: 0; }
+.send-button:hover { -fx-background-color: -nf-accent-hover; }
+.send-button:disabled { -fx-background-color: -nf-gray3; -fx-opacity: 1; }
+.kind-mission { -fx-background-color: linear-gradient(to bottom, #00B8A3, #009B87); }
+
+/* ===================================================================== LOT 2 — MISSIONS ET CARTE */
+.mission-card { -fx-background-color: -nf-surface; -fx-background-radius: 14; -fx-padding: 12 14; -fx-spacing: 6; -fx-cursor: hand;
+                -fx-border-color: -nf-border; -fx-border-radius: 14; }
+.mission-card:hover { -fx-background-color: -nf-surface-2; }
+.mission-card.selected { -fx-border-color: -nf-accent; -fx-border-width: 2; -fx-background-color: -nf-accent-tint; }
+.mission-ref { -fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: -nf-muted; }
+.map-card { -fx-background-color: #EEF2F0; -fx-background-radius: 16; -fx-border-color: -nf-border; -fx-border-radius: 16; }
+.root.dark .map-card { -fx-background-color: #151C1F; }
+.map-grid { -fx-stroke: rgba(16, 36, 52, 0.06); -fx-stroke-width: 1; }
+.root.dark .map-grid { -fx-stroke: rgba(255, 255, 255, 0.05); }
+.track-halo { -fx-stroke: rgba(0, 155, 135, 0.22); -fx-stroke-width: 9; -fx-fill: transparent; -fx-stroke-line-cap: round; -fx-stroke-line-join: round; }
+.track-line { -fx-stroke: -nf-brand; -fx-stroke-width: 3.5; -fx-fill: transparent; -fx-stroke-line-cap: round; -fx-stroke-line-join: round; }
+.marker-start { -fx-fill: white; -fx-stroke: -nf-green; -fx-stroke-width: 3; }
+.marker-end { -fx-fill: -nf-navy; -fx-stroke: white; -fx-stroke-width: 2.5; }
+.marker-live { -fx-fill: -nf-blue; -fx-stroke: white; -fx-stroke-width: 3; }
+.marker-live-halo { -fx-fill: rgba(0, 136, 255, 0.22); }
+.marker-stop { -fx-fill: -nf-orange; -fx-stroke: white; -fx-stroke-width: 2; }
+.map-chip { -fx-background-color: -nf-overlay-surface; -fx-background-radius: 999; -fx-padding: 4 10; -fx-font-size: 11px; -fx-font-weight: 600;
+            -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.12), 8, 0, 0, 2); }
+.map-scale-bar { -fx-background-color: -nf-text; -fx-min-height: 3; -fx-max-height: 3; -fx-background-radius: 2; }
+.map-note { -fx-font-size: 11px; -fx-text-fill: -nf-muted; }
+.stat-tile { -fx-background-color: -nf-surface; -fx-background-radius: 14; -fx-padding: 12 14; -fx-spacing: 2; -fx-border-color: -nf-border; -fx-border-radius: 14; }
+.stat-value { -fx-font-family: "Inter Display"; -fx-font-size: 22px; -fx-font-weight: bold; }
+.stat-unit { -fx-font-size: 12px; -fx-text-fill: -nf-muted; -fx-font-weight: 500; }
+.live-dot { -fx-fill: -nf-green; }
+.privacy-note { -fx-background-color: -nf-blue-tint; -fx-background-radius: 12; -fx-padding: 10 14; -fx-spacing: 10; -fx-alignment: center-left; }
+.privacy-note .label { -fx-text-fill: -nf-text; -fx-font-size: 12px; }
+
+/* conducteur : carte de mission en héros */
+.hero-card { -fx-background-color: linear-gradient(to bottom right, #163241, -nf-navy); -fx-background-radius: 22; -fx-padding: 26 28; -fx-spacing: 10;
+             -fx-effect: dropshadow(gaussian, rgba(16, 38, 49, 0.28), 24, 0, 0, 8); }
+.hero-card .label { -fx-text-fill: white; }
+.hero-card .muted { -fx-text-fill: -nf-on-navy-muted; }
+.hero-active { -fx-background-color: linear-gradient(to bottom right, #00A08B, #006B5E); -fx-effect: dropshadow(gaussian, rgba(0, 120, 105, 0.35), 26, 0, 0, 8); }
+.hero-active .muted { -fx-text-fill: rgba(255, 255, 255, 0.78); }
+.btn-on-dark { -fx-background-color: white; -fx-text-fill: -nf-navy; }
+.btn-on-dark:hover { -fx-background-color: #E9EEF1; }
+.btn-on-dark .label { -fx-text-fill: -nf-navy; }
+.btn-glass { -fx-background-color: rgba(255, 255, 255, 0.18); -fx-text-fill: white; }
+.btn-glass:hover { -fx-background-color: rgba(255, 255, 255, 0.26); }
+
+/* ===================================================================== LOT 2 — ASSISTANT */
+.assistant-q { -fx-background-color: -nf-accent; -fx-text-fill: white; -fx-background-radius: 18; -fx-padding: 9 14; -fx-font-size: 14px; -fx-wrap-text: true; }
+.answer-card { -fx-background-color: -nf-surface; -fx-background-radius: 18; -fx-padding: 16 18; -fx-spacing: 10; -fx-border-color: -nf-border; -fx-border-radius: 18;
+               -fx-effect: dropshadow(gaussian, rgba(16, 36, 52, 0.05), 14, 0, 0, 3); }
+.answer-card.refused { -fx-background-color: -nf-surface-2; }
+.answer-text { -fx-font-size: 14px; -fx-wrap-text: true; -fx-line-spacing: 2; }
+.figure-row { -fx-padding: 7 0; -fx-spacing: 12; -fx-alignment: center-left; -fx-border-color: transparent transparent -nf-separator transparent; }
+.figure-label { -fx-font-size: 13px; }
+.figure-value { -fx-font-size: 13px; -fx-font-weight: 600; }
+.meta-chip { -fx-background-color: -nf-fill; -fx-background-radius: 6; -fx-padding: 2 8; -fx-font-size: 11px; -fx-text-fill: -nf-muted; -fx-font-weight: 500; }
+.source-row { -fx-font-size: 12px; -fx-text-fill: -nf-muted; -fx-font-family: "Inter"; }
+.suggestion { -fx-background-color: -nf-surface; -fx-border-color: -nf-separator; -fx-border-radius: 999; -fx-background-radius: 999; -fx-padding: 0 14;
+              -fx-min-height: 32; -fx-font-size: 13px; -fx-font-weight: 500; -fx-text-fill: -nf-text; }
+.suggestion:hover { -fx-background-color: -nf-fill; }
+.readonly-pill { -fx-background-color: -nf-green-tint; -fx-text-fill: -nf-green-text; -fx-background-radius: 999; -fx-padding: 2 9; -fx-font-size: 11px; -fx-font-weight: bold; }
+
+/* ===================================================================== LOT 2 — ADMINISTRATION, AUDIT, PROFILS */
+.role-tile { -fx-background-color: -nf-surface; -fx-background-radius: 16; -fx-padding: 14 16; -fx-spacing: 8; -fx-border-color: -nf-border; -fx-border-radius: 16; -fx-pref-width: 170; }
+.matrix-head { -fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: -nf-muted; -fx-alignment: center; }
+.matrix-perm { -fx-font-size: 12px; }
+.matrix-cell { -fx-alignment: center; -fx-min-height: 30; }
+.matrix-row:hover { -fx-background-color: -nf-fill; }
+.matrix-yes { -fx-fill: -nf-accent; }
+.role-pill { -fx-background-color: -nf-accent-tint; -fx-text-fill: -nf-accent-text; -fx-background-radius: 6; -fx-padding: 2 8; -fx-font-size: 11px; -fx-font-weight: 600; }
+.role-pill.delegation { -fx-background-color: -nf-orange-tint; -fx-text-fill: -nf-orange-text; }
+.audit-row { -fx-padding: 10 14; -fx-spacing: 14; -fx-alignment: center-left; }
+.audit-row:hover { -fx-background-color: -nf-fill; }
+.audit-action { -fx-font-size: 13px; -fx-font-weight: 600; }
+.mono { -fx-font-family: "monospace"; -fx-font-size: 11px; -fx-text-fill: -nf-muted; }
+.chain-ok { -fx-background-color: -nf-green-tint; -fx-background-radius: 12; -fx-padding: 10 14; -fx-spacing: 10; -fx-alignment: center-left; }
+.chain-ok .label { -fx-text-fill: -nf-green-text; -fx-font-size: 13px; -fx-font-weight: 600; }
+.demo-account { -fx-padding: 0 12; -fx-spacing: 12; -fx-min-height: 50; -fx-alignment: center-left; -fx-cursor: hand; }
+.demo-account:hover { -fx-background-color: -nf-fill; }
+.demo-account .role-label { -fx-font-size: 13px; -fx-font-weight: 600; }
+.demo-account .role-summary { -fx-font-size: 11px; -fx-text-fill: -nf-muted; }

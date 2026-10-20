@@ -1,0 +1,363 @@
+openapi: 3.0.3
+info:
+  title: NexFleet CAMTEL API — lot 2 (missions et GPS, messagerie, assistant, administration, audit)
+  version: 0.2.0-lot2
+  description: |
+    Complète openapi.yaml (lot 1). Horodatages UTC ; affichage Africa/Douala.
+    STATUT : la passerelle GPS (/gps/...) et la messagerie WebSocket sont IMPLÉMENTÉES et testées contre PostgreSQL
+    (services/gps-traccar-adapter, services/chat-realtime). Les chemins /api/v1/... de ce fichier sont un contrat de
+    conception pour l'API Spring Boot, pas encore compilée ; le client bureau les sert en mode démonstration.
+    Messagerie temps réel : protocole JSON décrit dans docs/LOT2_GPS_CHAT_IA_PROFILS.md (section 3).
+servers:
+  - url: https://nextfleet.example.invalid
+    description: API — adresse à définir par la DSIR
+  - url: https://gps-gateway.example.invalid
+    description: Passerelle GPS interne (jamais exposée aux postes bureau)
+security:
+  - bearer: []
+tags:
+  - name: Missions et GPS
+  - name: Passerelle GPS
+  - name: Messagerie
+  - name: Assistant
+  - name: Administration
+  - name: Audit
+paths:
+  /api/v1/missions:
+    get:
+      tags: [Missions et GPS]
+      summary: 'Missions du périmètre (mission:manage ou gps:read) ou missions affectées (mission:drive)'
+      responses:
+        '200': { description: Liste, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Mission' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/missions/{id}/track:
+    get:
+      tags: [Missions et GPS]
+      summary: 'Positions ACCEPTÉES de la mission (jamais hors période)'
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Trace, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TrackPoint' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/missions/{id}/start:
+    post:
+      tags: [Missions et GPS]
+      summary: 'Démarrage par le conducteur affecté après information explicite ; renvoie le jeton de mission éphémère'
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IfMatch' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [noticeVersion, deviceId]
+              properties:
+                noticeVersion: { type: string, example: NOTICE-GPS-v1 }
+                deviceId: { type: string, pattern: '^[A-Za-z0-9._-]{3,64}$', example: AND-7F3K }
+      responses:
+        '200':
+          description: 'Mission en cours ; collecte autorisée pour cet émetteur'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mission: { $ref: '#/components/schemas/Mission' }
+                  missionToken: { type: string, description: 'HMAC-SHA256, lié à (mission, émetteur), expire' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: 'Mission non autorisée, déjà démarrée ou version périmée' }
+  /api/v1/missions/{id}/finish:
+    post:
+      tags: [Missions et GPS]
+      summary: 'Clôture : révoque immédiatement l''autorisation de collecte'
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IfMatch' }]
+      responses:
+        '200': { description: Mission terminée, content: { application/json: { schema: { $ref: '#/components/schemas/Mission' } } } }
+        '409': { description: 'Mission non en cours' }
+  /gps/traccar/positions:
+    post:
+      tags: [Passerelle GPS]
+      summary: 'Réception du forward.type=json de Traccar ({position, device})'
+      description: |
+        Authentification par l'en-tête défini dans forward.header (Authorization: Bearer …).
+        Un refus métier répond 200 avec outcome=REJECTED : Traccar réessaie toute réponse non 2xx.
+        503 quand la base est indisponible (Traccar réessaiera).
+      security: [{ traccarForward: [] }]
+      servers: [{ url: https://gps-gateway.example.invalid }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TraccarPositionData' }
+      responses:
+        '200': { description: Décision, content: { application/json: { schema: { $ref: '#/components/schemas/IngestOutcome' } } } }
+        '400': { description: 'Message Traccar incomplet' }
+        '401': { description: 'Secret absent ou invalide' }
+        '503': { description: 'Base indisponible' }
+  /gps/android/fixes:
+    post:
+      tags: [Passerelle GPS]
+      summary: 'Lot de positions du téléphone (500 au plus), authentifié par le jeton de mission'
+      description: Seuls les points acceptés sont relayés à Traccar (protocole OsmAnd).
+      security: [{ missionToken: [] }]
+      servers: [{ url: https://gps-gateway.example.invalid }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fixes]
+              properties:
+                fixes:
+                  type: array
+                  maxItems: 500
+                  items: { $ref: '#/components/schemas/AndroidFix' }
+      responses:
+        '200':
+          description: Résultat par point
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      allOf:
+                        - { $ref: '#/components/schemas/IngestOutcome' }
+                        - { type: object, properties: { clientFixId: { type: string } } }
+                  relayedToTraccar: { type: integer }
+                  relayFailures: { type: integer }
+        '401': { description: 'Jeton de mission refusé (signature, expiration)' }
+        '503': { description: 'Base indisponible ; le téléphone conserve son tampon' }
+  /api/v1/conversations:
+    get:
+      tags: [Messagerie]
+      summary: 'Conversations dont l''utilisateur est participant actif (chat:use)'
+      responses:
+        '200': { description: Liste, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Conversation' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/conversations/{id}/messages:
+    get:
+      tags: [Messagerie]
+      summary: 'Historique ; reprise après coupure avec afterSeq'
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { name: afterSeq, in: query, schema: { type: integer, format: int64, minimum: 0 } }
+      responses:
+        '200': { description: Messages, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Message' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Messagerie]
+      summary: 'Envoi idempotent : même clientMessageId = même message, aucun doublon'
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clientMessageId, body]
+              properties:
+                clientMessageId: { type: string, maxLength: 80 }
+                body: { type: string, minLength: 1, maxLength: 8000 }
+      responses:
+        '200': { description: 'Accusé après persistance', content: { application/json: { schema: { $ref: '#/components/schemas/Ack' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/assistant/query:
+    post:
+      tags: [Assistant]
+      summary: 'Question en lecture seule (assistant:use) ; réponse chiffrée avec période, filtres et sources'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [question], properties: { question: { type: string, maxLength: 2000 } } }
+      responses:
+        '200': { description: 'Réponse ou refus motivé', content: { application/json: { schema: { $ref: '#/components/schemas/AssistantAnswer' } } } }
+  /api/v1/assistant/activation:
+    get:
+      tags: [Assistant]
+      summary: 'Historique des décisions (admin:settings ou audit:read)'
+      responses:
+        '200': { description: Décisions, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AssistantDecision' } } } } }
+    post:
+      tags: [Assistant]
+      summary: 'Nouvelle décision (admin:settings) ; activer exige une validation de sécurité et un signataire distinct'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled, reason]
+              properties:
+                enabled: { type: boolean }
+                securityReviewRef: { type: string, example: DS-2026-041 }
+                approvedBy: { type: string }
+                reason: { type: string, minLength: 5 }
+      responses:
+        '201': { description: Décision enregistrée (ajout seul), content: { application/json: { schema: { $ref: '#/components/schemas/AssistantDecision' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: 'Référence ou signataire manquant, signataire identique à l''administrateur' }
+  /api/v1/admin/users:
+    get:
+      tags: [Administration]
+      summary: 'Comptes, rôles et périmètres (admin:users)'
+      responses:
+        '200': { description: Comptes, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/UserAccount' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/audit:
+    get:
+      tags: [Audit]
+      summary: 'Journal chaîné (audit:read) ; jamais le contenu des messages'
+      responses:
+        '200': { description: Événements, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AuditEvent' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer, description: 'Jeton de session opaque (stocké haché SHA-256)' }
+    traccarForward: { type: http, scheme: bearer, description: 'Secret partagé configuré dans traccar.xml (forward.header)' }
+    missionToken: { type: apiKey, in: header, name: Authorization, description: 'Mission <jeton> — HMAC-SHA256 (mission, émetteur, expiration)' }
+  parameters:
+    Id: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    IfMatch: { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Version attendue (verrou optimiste)' }
+  responses:
+    Forbidden: { description: Droits insuffisants, content: { application/problem+json: { schema: { type: object } } } }
+  schemas:
+    Mission:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        reference: { type: string, example: MIS-2026-014 }
+        purpose: { type: string }
+        origin: { type: string }
+        destination: { type: string }
+        registration: { type: string }
+        driverName: { type: string }
+        status: { type: string, enum: [DRAFT, AUTHORIZED, ACTIVE, FINISHED, CANCELLED] }
+        plannedStart: { type: string, format: date-time }
+        plannedEnd: { type: string, format: date-time }
+        startedAt: { type: string, format: date-time, nullable: true }
+        finishedAt: { type: string, format: date-time, nullable: true }
+        deviceId: { type: string, nullable: true }
+        noticeVersion: { type: string, nullable: true }
+        conversationId: { type: string, nullable: true }
+        version: { type: integer, format: int64 }
+    TrackPoint:
+      type: object
+      properties:
+        clientFixId: { type: string }
+        recordedAt: { type: string, format: date-time }
+        lat: { type: number }
+        lon: { type: number }
+        accuracyM: { type: number }
+        speedMps: { type: number, nullable: true }
+    AndroidFix:
+      type: object
+      required: [clientFixId, recordedAt, lat, lon, accuracyM]
+      properties:
+        clientFixId: { type: string, maxLength: 80 }
+        recordedAt: { type: string, format: date-time }
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lon: { type: number, minimum: -180, maximum: 180 }
+        accuracyM: { type: number, minimum: 0 }
+        speedMps: { type: number, minimum: 0 }
+        bearingDeg: { type: number }
+    TraccarPositionData:
+      type: object
+      description: 'PositionData de Traccar (source : org.traccar.forward.PositionForwarderJson) ; champs utilisés'
+      required: [position, device]
+      properties:
+        position:
+          type: object
+          required: [id, fixTime, latitude, longitude]
+          properties:
+            id: { type: integer, format: int64 }
+            protocol: { type: string }
+            fixTime: { type: string, format: date-time }
+            valid: { type: boolean }
+            latitude: { type: number }
+            longitude: { type: number }
+            speed: { type: number, description: 'NŒUDS (unité interne de Traccar)' }
+            course: { type: number }
+            accuracy: { type: number }
+        device:
+          type: object
+          required: [uniqueId]
+          properties:
+            uniqueId: { type: string }
+    IngestOutcome:
+      type: object
+      properties:
+        outcome: { type: string, enum: [ACCEPTED, DUPLICATE, REJECTED] }
+        reason: { type: string, enum: [SOURCE_INCONNUE, AUCUNE_MISSION_ACTIVE, HORS_PERIODE, AUTORISATION_REVOQUEE, DONNEE_INVALIDE] }
+        mission: { type: string }
+    Conversation:
+      type: object
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [DIRECT, MISSION, VEHICLE, SERVICE] }
+        title: { type: string }
+        lastAt: { type: string, format: date-time }
+        unread: { type: integer }
+    Message:
+      type: object
+      properties:
+        serverSeq: { type: integer, format: int64 }
+        senderId: { type: string }
+        clientMessageId: { type: string }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+        state: { type: string, enum: [ENVOYE, DISTRIBUE, LU], description: 'Pour les messages de l''utilisateur seulement' }
+    Ack:
+      type: object
+      properties:
+        clientMessageId: { type: string }
+        serverSeq: { type: integer, format: int64 }
+        duplicate: { type: boolean }
+    AssistantAnswer:
+      type: object
+      properties:
+        intent: { type: string, enum: [COUT, ECHEANCES, MISSIONS, CONSOMMATION, DISPONIBILITE, ECRITURE_INTERDITE, AIDE] }
+        refused: { type: boolean }
+        text: { type: string }
+        figures: { type: array, items: { type: object, properties: { label: { type: string }, value: { type: string } } } }
+        period: { type: string, nullable: true }
+        filters: { type: array, items: { type: string } }
+        sources: { type: array, items: { type: object, properties: { ref: { type: string }, description: { type: string } } } }
+    AssistantDecision:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        securityReviewRef: { type: string, nullable: true }
+        approvedBy: { type: string, nullable: true }
+        decidedBy: { type: string }
+        decidedAt: { type: string, format: date-time }
+        reason: { type: string }
+    UserAccount:
+      type: object
+      properties:
+        login: { type: string }
+        displayName: { type: string }
+        status: { type: string, enum: [ACTIVE, SUSPENDED, DISABLED] }
+        grants:
+          type: array
+          items:
+            type: object
+            properties:
+              role: { type: string, enum: [FLEET_MANAGER, DRIVER, MAINTENANCE, CONTROLLER, ADMIN, AUDITOR] }
+              scope: { type: string }
+              until: { type: string, format: date, nullable: true }
+              delegation: { type: boolean }
+    AuditEvent:
+      type: object
+      properties:
+        seq: { type: integer, format: int64 }
+        at: { type: string, format: date-time }
+        actor: { type: string }
+        action: { type: string }
+        object: { type: string }
+        detail: { type: string }
+        hash: { type: string, description: 'SHA-256(précédent | contenu)' }
+        previousHash: { type: string }

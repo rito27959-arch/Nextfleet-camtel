@@ -95,6 +95,11 @@ public final class Controls {
         public int selected() {
             return selected.get();
         }
+
+        /** Sélection par programme : identique à un clic (déclenche l'action, la pastille glisse). */
+        public void select(int i) {
+            if (i >= 0 && i < buttons.size()) buttons.get(i).fire();
+        }
     }
 
     /** Interrupteur (HIG « Toggles ») 46×28 : piste verte quand activé, pastille blanche qui glisse en ressort. */

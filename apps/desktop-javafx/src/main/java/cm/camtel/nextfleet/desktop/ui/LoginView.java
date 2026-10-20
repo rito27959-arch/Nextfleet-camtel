@@ -101,19 +101,14 @@ public final class LoginView extends StackPane {
             form.getChildren().add(4, b);
         }
         if (gateway.isDemo()) {
-            Label d = new Label("Mode démonstration — données fictives. Comptes : gestionnaire, controleur, auditeur ; "
-                    + "mot de passe : demo.");
-            d.setWrapText(true);
-            VBox demo = new VBox(d);
-            demo.getStyleClass().add("demo-hint");
-            form.getChildren().add(demo);
+            form.getChildren().add(demoAccounts());
         }
         Label sso = Ui.label("Connexion fédérée CAMTEL (OIDC) disponible après accord DSIR.", "footnote", "muted");
         sso.setWrapText(true);
         form.getChildren().add(sso);
         form.getStyleClass().add("login-card");
-        form.setMaxWidth(360);
-        form.setPrefWidth(360);
+        form.setMaxWidth(380);
+        form.setPrefWidth(380);
         form.setMaxHeight(Region.USE_PREF_SIZE);
 
         StackPane right = new StackPane(form);
@@ -129,6 +124,46 @@ public final class LoginView extends StackPane {
         Motion.enter(form, javafx.util.Duration.millis(80), 18);
         Motion.stagger(List.of(brandRow, pitch, sub));
         Motion.pressable(submit);
+    }
+
+    /** Six comptes fictifs, un par profil de la matrice des habilitations ; un clic remplit le formulaire. */
+    private Node demoAccounts() {
+        String[][] accounts = {{"gestionnaire", "FLEET_MANAGER"}, {"conducteur", "DRIVER"}, {"maintenance", "MAINTENANCE"},
+                {"controleur", "CONTROLLER"}, {"admin", "ADMIN"}, {"auditeur", "AUDITOR"}};
+        VBox list = new VBox();
+        list.getStyleClass().add("inset-group");
+        for (int i = 0; i < accounts.length; i++) {
+            cm.camtel.nextfleet.domain.security.Role r = cm.camtel.nextfleet.domain.security.Role.valueOf(accounts[i][1]);
+            String login = accounts[i][0];
+            VBox text = new VBox(1, Ui.label(r.label, "role-label"), Ui.label(RoleUi.space(r), "role-summary"));
+            Label id = Ui.label(login, "footnote", "muted");
+            id.setMinWidth(Region.USE_PREF_SIZE);
+            text.setMinWidth(0);
+            HBox.setHgrow(text, javafx.scene.layout.Priority.ALWAYS);
+            HBox row = new HBox(12, RoleUi.symbol(r), text, id);
+            row.getStyleClass().add("demo-account");
+            row.setOnMouseClicked(e -> {
+                prefill(login, "demo");
+                submit.requestFocus();
+            });
+            row.setAccessibleText("Compte de démonstration " + r.label + ", identifiant " + login);
+            if (i > 0) {
+                Region sep = new Region();
+                sep.getStyleClass().add("row-separator");
+                VBox.setMargin(sep, new Insets(0, 0, 0, 56));
+                list.getChildren().add(sep);
+            }
+            list.getChildren().add(row);
+        }
+        javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle();
+        clip.setArcWidth(24);
+        clip.setArcHeight(24);
+        clip.widthProperty().bind(list.widthProperty());
+        clip.heightProperty().bind(list.heightProperty());
+        list.setClip(clip);
+        Label head = Ui.label("COMPTES DE DÉMONSTRATION · MOT DE PASSE « demo »", "section-header");
+        head.setPadding(new Insets(8, 0, 6, 4));
+        return new VBox(head, list);
     }
 
     private void attempt(FleetGateway gateway, Consumer<Session> onLogin) {

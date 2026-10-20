@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE properties SYSTEM 'http://java.sun.com/dtd/properties.dtd'>
+<!--
+  NexFleet CAMTEL — configuration Traccar Server (environnement LOCAL de développement).
+  Clés vérifiées dans le code source de Traccar (org.traccar.config.Keys, commit 0745a8c du 19/10/2026).
+  STATUT : non exécutée ici (binaire Traccar indisponible dans l'environnement de réalisation).
+  Le secret n'est JAMAIS écrit dans ce fichier : remplacer ${NF_TRACCAR_FORWARD_SECRET} au déploiement
+  (gabarit traité par l'outillage DSIR) ; ne pas versionner le fichier rendu.
+-->
+<properties>
+    <!-- Base interne de Traccar (séparée de la base NexFleet, règle cardinale 3). -->
+    <entry key='database.driver'>org.h2.Driver</entry>
+    <entry key='database.url'>jdbc:h2:./data/database</entry>
+    <entry key='database.user'>sa</entry>
+    <entry key='database.password'></entry>
+
+    <!-- Protocole OsmAnd (téléphones, relais de la passerelle) sur 5055 ; vitesse attendue en nœuds (défaut). -->
+    <entry key='osmand.port'>5055</entry>
+
+    <!-- Transmission de CHAQUE position à NexFleet, au format JSON {position, device}.
+         Activée par la seule présence de forward.url (MainModule de Traccar). -->
+    <entry key='forward.type'>json</entry>
+    <entry key='forward.url'>http://gps-gateway:8090/gps/traccar/positions</entry>
+    <entry key='forward.header'>Authorization: Bearer ${NF_TRACCAR_FORWARD_SECRET}</entry>
+    <entry key='forward.retry.enable'>true</entry>
+    <entry key='forward.retry.delay'>1000</entry>
+    <entry key='forward.retry.count'>8</entry>
+    <entry key='forward.retry.limit'>1000</entry>
+
+    <!-- Pas de géocodage externe ni de service tiers par défaut (protection des données). -->
+    <entry key='geocoder.enable'>false</entry>
+</properties>

@@ -27,7 +27,10 @@ import javafx.scene.shape.Circle;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+
+import static cm.camtel.nextfleet.domain.security.Permission.*;
 
 /**
  * Coquille de l'application bureau (maquette p. 17) : navigation latérale bleu nuit avec indicateur qui glisse,
@@ -37,9 +40,12 @@ import java.util.Map;
 public final class AppShell extends StackPane {
 
     public enum Section {
-        OVERVIEW("Vue d'ensemble", Icons.HOME), VEHICLES("Véhicules", Icons.CAR), DUE("Échéances", Icons.CALENDAR),
-        DRIVERS("Conducteurs", Icons.USER), MAINTENANCE("Entretiens", Icons.WRENCH), FUEL("Carburant", Icons.FUEL),
-        COSTS("Coûts", Icons.CHART), REPORTS("Rapports", Icons.REPORT), SETTINGS("Paramètres", Icons.GEAR);
+        MY_MISSIONS("Mes missions", Icons.ROUTE), WORKSHOP("Atelier", Icons.WRENCH), USERS("Comptes et rôles", Icons.USERS),
+        OVERVIEW("Vue d'ensemble", Icons.HOME), MISSIONS("Missions", Icons.ROUTE), MESSAGES("Messages", Icons.BUBBLE),
+        ASSISTANT("Assistant", Icons.SPARK), VEHICLES("Véhicules", Icons.CAR), DUE("Échéances", Icons.CALENDAR),
+        DRIVERS("Conducteurs", Icons.USER), AUDIT("Journal d'audit", Icons.LIST), MAINTENANCE("Entretiens", Icons.WRENCH),
+        FUEL("Carburant", Icons.FUEL), COSTS("Coûts", Icons.CHART), REPORTS("Rapports", Icons.REPORT),
+        SETTINGS("Réglages", Icons.GEAR);
 
         final String label;
         final String icon;
@@ -62,6 +68,7 @@ public final class AppShell extends StackPane {
     private final Pane indicatorLayer = new Pane(indicator);
     private final Toasts toasts = new Toasts();
     private final Label dueBadge = Ui.label("", "nav-count", "nav-count-alert");
+    private final Label messagesBadge = Ui.label("", "nav-count");
     private Node current;
     private Section currentSection;
 
@@ -86,17 +93,85 @@ public final class AppShell extends StackPane {
         sceneProperty().addListener((o, a, scene) -> {
             if (scene != null) {
                 scene.getAccelerators().put(new KeyCodeCombination(KeyCode.K, KeyCombination.SHORTCUT_DOWN), search::requestFocus);
-                Section[] order = {Section.OVERVIEW, Section.VEHICLES, Section.DUE, Section.DRIVERS};
-                KeyCode[] keys = {KeyCode.DIGIT1, KeyCode.DIGIT2, KeyCode.DIGIT3, KeyCode.DIGIT4};
-                for (int i = 0; i < order.length; i++) {
-                    Section s = order[i];
+                List<Section> order = sections(false);
+                KeyCode[] keys = {KeyCode.DIGIT1, KeyCode.DIGIT2, KeyCode.DIGIT3, KeyCode.DIGIT4, KeyCode.DIGIT5};
+                for (int i = 0; i < Math.min(order.size(), keys.length); i++) {
+                    Section s = order.get(i);
                     scene.getAccelerators().put(new KeyCodeCombination(keys[i], KeyCombination.SHORTCUT_DOWN), () -> show(s));
                 }
             }
         });
-        refreshDueBadge();
-        refreshBellBadge();
-        show(Section.OVERVIEW);
+        if (session.can(VEHICLE_READ)) {
+            refreshDueBadge();
+            refreshBellBadge();
+        }
+        refreshMessagesBadge();
+        show(home());
+    }
+
+    // ------------------------------------------------------------------ profils : navigation selon les permissions
+
+    /** Visibilité d'une section pour la session ; le serveur revérifie chaque appel (masquage ≠ sécurité). */
+    public boolean visible(Section s) {
+        return visibleFor(s, session);
+    }
+
+    /** Règle de navigation pure (testée sans interface) : section visible pour une session donnée. */
+    public static boolean visibleFor(Section s, Session session) {
+        return switch (s) {
+            case MY_MISSIONS -> session.can(MISSION_DRIVE) && !session.can(MISSION_MANAGE);
+            case WORKSHOP -> session.can(MAINTENANCE_WRITE);
+            case USERS -> session.can(ADMIN_USERS);
+            case OVERVIEW -> session.can(VEHICLE_READ) && session.can(COST_READ);
+            case MISSIONS -> session.can(MISSION_MANAGE) || session.can(GPS_READ);
+            case MESSAGES -> session.can(CHAT_USE);
+            case ASSISTANT -> session.can(ASSISTANT_USE);
+            case VEHICLES, DUE -> session.can(VEHICLE_READ);
+            case DRIVERS -> session.can(DRIVER_READ);
+            case AUDIT -> session.can(AUDIT_READ);
+            case MAINTENANCE -> session.can(VEHICLE_WRITE);
+            case FUEL -> session.can(FUEL_ORDER_CREATE) || session.can(FUEL_ORDER_APPROVE) || session.can(FUEL_FILL_CREATE);
+            case COSTS -> session.can(COST_READ);
+            case REPORTS -> session.can(REPORT_EXPORT);
+            case SETTINGS -> true;
+        };
+    }
+
+    private static boolean upcoming(Section s) {
+        return s == Section.MAINTENANCE || s == Section.FUEL || s == Section.COSTS || s == Section.REPORTS;
+    }
+
+    /** Sections livrées (ou à venir) visibles pour ce profil, dans l'ordre de la barre latérale. */
+    public List<Section> sections(boolean upcomingOnes) {
+        return sectionsFor(session, upcomingOnes);
+    }
+
+    public static List<Section> sectionsFor(Session session, boolean upcomingOnes) {
+        return java.util.Arrays.stream(Section.values())
+                .filter(s -> s != Section.SETTINGS && visibleFor(s, session) && upcoming(s) == upcomingOnes).toList();
+    }
+
+    public Section home() {
+        List<Section> l = sections(false);
+        return l.isEmpty() ? Section.SETTINGS : l.get(0);
+    }
+
+    public Session session() {
+        return session;
+    }
+
+    public FleetGateway gateway() {
+        return gateway;
+    }
+
+    public void refreshMessagesBadge() {
+        if (!session.can(CHAT_USE)) return;
+        Ui.async(gateway::conversations, list -> {
+            long n = list.stream().mapToLong(cm.camtel.nextfleet.desktop.data.Ops.Conversation::unread).sum();
+            messagesBadge.setText(String.valueOf(n));
+            messagesBadge.setVisible(n > 0);
+            messagesBadge.setAccessibleText(n + " messages non lus");
+        }, err -> messagesBadge.setVisible(false));
     }
 
     // ------------------------------------------------------------------ actions partagées (Réglages, alertes, notifications)
@@ -180,9 +255,17 @@ public final class AppShell extends StackPane {
         brand.setStyle("-fx-padding: 4 8 8 8;");
 
         VBox items = new VBox(4);
-        for (Section s : Section.values()) {
-            if (s == Section.SETTINGS) continue;
-            items.getChildren().add(navButton(s));
+        for (Section s : sections(false)) items.getChildren().add(navButton(s));
+        List<Section> later = sections(true);
+        if (!later.isEmpty()) {
+            Label soon = Ui.label("À VENIR", "section-title");
+            soon.setStyle("-fx-padding: 14 12 4 12;");
+            items.getChildren().add(soon);
+            for (Section s : later) {
+                ToggleButton b = navButton(s);
+                b.setOpacity(0.62);
+                items.getChildren().add(b);
+            }
         }
         indicator.getStyleClass().add("nav-indicator");
         indicator.setManaged(false);
@@ -194,7 +277,9 @@ public final class AppShell extends StackPane {
         VBox box = new VBox(brand, Ui.label("VOTRE ESPACE", "section-title"), navStack, Ui.spacer(), navButton(Section.SETTINGS));
         box.getStyleClass().add("sidebar");
         StackPane mark = Ui.symbolTile(Icons.GAUGE, "tile-mint");
-        VBox who = new VBox(Ui.label("CAMTEL", "w-700", "t-12"), Ui.label("Gestion de flotte", "muted", "t-12"));
+        cm.camtel.nextfleet.domain.security.Role role = session.primaryRole();
+        if (role != null) mark = RoleUi.symbol(role);
+        VBox who = new VBox(Ui.label("CAMTEL", "w-700", "t-12"), Ui.label(role == null ? "Gestion de flotte" : role.label, "muted", "t-12"));
         HBox footer = new HBox(10, mark, who);
         footer.setAlignment(Pos.CENTER_LEFT);
         footer.getStyleClass().add("sidebar-footer");
@@ -215,18 +300,23 @@ public final class AppShell extends StackPane {
             if (!b.isSelected()) b.setSelected(true);
             show(s);
         });
-        if (s == Section.DUE) {
+        if (s == Section.DUE || s == Section.MESSAGES) {
+            Label badge = s == Section.DUE ? dueBadge : messagesBadge;
             b.setContentDisplay(javafx.scene.control.ContentDisplay.LEFT);
-            HBox g = new HBox(12, Icons.icon(s.icon, 18), Ui.label(s.label), Ui.spacer(), dueBadge);
+            HBox g = new HBox(12, Icons.icon(s.icon, 18), Ui.label(s.label), Ui.spacer(), badge);
             g.setAlignment(Pos.CENTER_LEFT);
             g.setMaxWidth(Double.MAX_VALUE);
             g.prefWidthProperty().bind(b.widthProperty().subtract(26));
             ((Label) g.getChildren().get(1)).textFillProperty().bind(b.textFillProperty());
             b.setText(null);
             b.setGraphic(g);
-            dueBadge.setVisible(false);
+            badge.setVisible(false);
         }
         Motion.pressable(b);
+        // l'indicateur se recale dès que la largeur réelle du bouton est connue (premier affichage)
+        b.widthProperty().addListener((o, w0, w1) -> {
+            if (b.isSelected()) Platform.runLater(this::moveIndicator);
+        });
         nav.put(s, b);
         return b;
     }
@@ -243,6 +333,10 @@ public final class AppShell extends StackPane {
         }
         nav.values().forEach(b -> b.setStyle(null));
         Bounds bb = sel.getBoundsInParent();
+        if (bb.getWidth() < 60) {   // mise en page pas encore terminée
+            Platform.runLater(this::moveIndicator);
+            return;
+        }
         indicator.resizeRelocate(0, 0, bb.getWidth(), bb.getHeight());
         Motion.slideTo(indicator, bb.getMinY());
     }
@@ -269,7 +363,7 @@ public final class AppShell extends StackPane {
         searchBox.getChildren().get(1).setMouseTransparent(true);
         search.setOnAction(e -> openVehicles(search.getText()));
 
-        HBox bar = new HBox(searchBox, Ui.spacer());
+        HBox bar = session.can(VEHICLE_READ) ? new HBox(searchBox, Ui.spacer()) : new HBox(Ui.spacer());
         bar.getStyleClass().add("topbar");
         if (gateway.isDemo()) {
             Label demo = Ui.label("DÉMO", "badge-demo");
@@ -305,18 +399,28 @@ public final class AppShell extends StackPane {
         user.setOnAction(e -> show(Section.SETTINGS));
         user.setStyle("-fx-text-fill: -nf-text; -fx-font-size: 13px; -fx-font-weight: 500;");
         for (Node n : new Node[]{theme, bell, user}) Motion.pressable(n);
-        bar.getChildren().addAll(theme, bellBox, user);
+        bar.getChildren().add(theme);
+        if (session.can(VEHICLE_READ)) bar.getChildren().add(bellBox);
+        bar.getChildren().add(user);
         return bar;
     }
 
     // ------------------------------------------------------------------ navigation
 
-    public void show(Section s) {
+    public void show(Section requested) {
         closeSidePanelNow();
+        Section s = visible(requested) ? requested : home();
         ToggleButton b = nav.get(s);
         if (b != null) b.setSelected(true);
         currentSection = s;
         Node view = switch (s) {
+            case MY_MISSIONS -> new DriverHomeView(this);
+            case WORKSHOP -> new WorkshopView(this);
+            case USERS -> new UsersView(this);
+            case MISSIONS -> new MissionsView(this);
+            case MESSAGES -> new MessagesView(this, null);
+            case ASSISTANT -> new AssistantView(this);
+            case AUDIT -> new AuditView(this);
             case OVERVIEW -> new DashboardView(gateway, session, this);
             case VEHICLES -> new VehiclesView(gateway, session, null, this);
             case DUE -> new DueDatesView(gateway, this);
@@ -327,7 +431,17 @@ public final class AppShell extends StackPane {
         setContent(view);
     }
 
+    /** Ouvre la messagerie sur une conversation donnée (depuis une mission). */
+    public void openConversation(String conversationId) {
+        if (!visible(Section.MESSAGES)) return;
+        closeSidePanelNow();
+        nav.get(Section.MESSAGES).setSelected(true);
+        currentSection = Section.MESSAGES;
+        setContent(new MessagesView(this, conversationId));
+    }
+
     public void openVehicles(String query) {
+        if (!visible(Section.VEHICLES)) return;
         closeSidePanelNow();
         nav.get(Section.VEHICLES).setSelected(true);
         currentSection = Section.VEHICLES;

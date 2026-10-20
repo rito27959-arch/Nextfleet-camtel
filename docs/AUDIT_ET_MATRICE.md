@@ -1,6 +1,6 @@
 # NexFleet CAMTEL — Audit initial et matrice de conformité
 
-**Date : 20 octobre 2026 · Lot 1 · Références : cahier des charges V4.0 (45 p.), document d'architecture V5.0, maquettes p. 17 et p. 18, planche de 15 écrans.**
+**Date : 20 octobre 2026 · Lots 1 et 2 · Références : cahier des charges V4.0 (45 p.), document d'architecture V5.0, maquettes p. 17 et p. 18, planche de 15 écrans.**
 
 ## 1. Constat d'audit
 
@@ -26,7 +26,7 @@
 | Exigence | Existant | Base de données | Noyau métier | API | Bureau JavaFX | Android | Lot cible |
 |---|---|---|---|---|---|---|---|
 | NF-01 Sessions et connexion | ❓ | 🟢 sessions hachées, révocation | — | 🟡 login/logout/me | ✅ écran 01, erreur générique, session expirée | ⬜ | 1 / 2 |
-| NF-02 Comptes et permissions | ❓ | 🟢 pas d'auto-attribution, délégation bornée | ✅ `AccessPolicy` | 🟡 `AccessService` | ✅ masquage « Ajouter » (auditeur) | ⬜ | 1 / 2 |
+| NF-02 Comptes et permissions (6 profils) | ❓ | 🟢 matrice V1+V5, pas d'auto-attribution, délégation bornée, `nf_has_permission` | ✅ `Role`/`Permission` = base (test de parité), `AccessPolicy` | 🟡 `AccessService` ; contrat `/admin/users` | ✅ navigation et écrans par profil, comptes et matrice (lot 2) | ⬜ | 2 |
 | NF-03 Paramètres | ❓ | ⬜ | — | ⬜ | ✅ module signalé non disponible | ⬜ | 2 |
 | NF-04 Démonstration séparée | ❓ | 🟢 refus en PRODUCTION | — | 🟡 propriété d'environnement | ✅ badge DÉMO permanent | ⬜ | 1 |
 | NF-10 Véhicules | ❓ | 🟢 unicité normalisée, archivage, pas de suppression | ✅ `RegistrationNumber` | 🟡 CRUD, If-Match, audit | ✅ liste, recherche, filtres, pagination, fiche, ajout étape 1 | ⬜ | 1 |
@@ -59,9 +59,9 @@
 | NF-51 Hébergement et dépôt | — | — | — | — | — | — | décision DSIR |
 | NF-52 Documentation et transfert | — | — | — | — | — | — | continu |
 | NF-53 Journal probant | — | 🟢 chaînage SHA-256, modification refusée | — | 🟡 | — | — | 1 |
-| NF-60 à NF-64 Chat | — | 🟢 participants, séquence, anti-doublon | ⬜ | ⬜ WebSocket | ⬜ | ⬜ | 3 |
-| NF-70 à NF-74 GPS de mission | — | 🟢 collecte refusée hors mission / après clôture / appareil non autorisé ; rejeu sans doublon | ✅ qualification, distance, arrêts, « direct » honnête | ⬜ | ⬜ carte MapLibre | ⬜ collecteur | 3 |
-| NF-80 à NF-84 IA | — | 🟢 règles et revues tracées | ✅ moteur déterministe | ⬜ | ⬜ | — | 4 |
+| NF-60 à NF-64 Chat | — | 🟢 participants, chat:use, séquence sans trou, réémission ignorée, curseurs distribué/lu | ✅ `Chat`, `Outbox`, magasin de référence | ✅ passerelle WebSocket pilote testée sur PostgreSQL ; 🟡 cible Spring WebSocket | ✅ Messages (démo) | ⬜ | 2 / 3 |
+| NF-70 à NF-74 GPS de mission | — | 🟢 + registre des sources, rejets journalisés sans position | ✅ `MissionTrackingGate`, analyse de trace | ✅ passerelle Traccar (forward JSON, lots Android à jeton de mission, relais OsmAnd) testée sur PostgreSQL ; Traccar réel non exécuté | ✅ Missions, Mes missions, tracé (démo, sans fond de carte) | ⬜ collecteur | 2 / 3 |
+| NF-80 à NF-84 IA | — | 🟢 règles et revues tracées ; activation et interrogations de l'assistant en ajout seul | ✅ moteur de règles + assistant lecture seule `RULES_FR_V1` | 🟡 contrat `/assistant/*` | ✅ Assistant et activation (démo) | — | 2 / 4 |
 
 ## 4. Les 15 écrans du storyboard
 
@@ -80,7 +80,7 @@
 | 11 | Galerie réelle | ⬜ | ⬜ | Lot 4 |
 | 12 | Intérieur 3D | ⬜ | ⬜ | Seulement si actif intérieur licencié |
 | 13 | Maintenance 3D | ⬜ | ⬜ | Lot 4, après le module Maintenance (lot 2) |
-| 14 | Suivi GPS | ⬜ | ⬜ | Lot 3 ; règles base et noyau déjà testées |
+| 14 | Suivi GPS | ✅ démo | ⬜ | Lot 2 : écrans Missions / Mes missions ; fond de carte à décider (DSIR) |
 | 15 | Parcours Android | — | ⬜ | Bloqué tant que les dépôts Google/Gradle sont inaccessibles |
 
 ## 5. Critères de recette couverts par une preuve exécutée

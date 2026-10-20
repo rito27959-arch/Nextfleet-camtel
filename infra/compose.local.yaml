@@ -26,10 +26,42 @@ services:
     depends_on: [db]
 
   # Traccar : service distinct, non exposé aux clients (règle cardinale 3). Activation après décision D08.
+  # Il transmet chaque position à la passerelle NexFleet (forward.type=json) : voir infra/traccar/traccar.xml.
   traccar:
-    image: traccar/traccar:latest            # version à figer après qualification (nomenclature DSIR)
+    image: traccar/traccar:latest          # version à figer après qualification (nomenclature DSIR)
     profiles: ["gps"]
-    ports: ["127.0.0.1:8082:8082"]
+    environment:
+      NF_TRACCAR_FORWARD_SECRET: ${NF_TRACCAR_FORWARD_SECRET:?secret partagé Traccar → passerelle}
+    volumes:
+      - ./traccar/traccar.xml:/opt/traccar/conf/traccar.xml:ro
+    ports: ["127.0.0.1:8082:8082", "127.0.0.1:5055:5055"]   # 8082 : console d'admin ; 5055 : OsmAnd (relais passerelle)
+
+  # Passerelle GPS NexFleet : reçoit Traccar et les lots Android, applique la règle « mission uniquement ».
+  gps-gateway:
+    build: ../services/gps-traccar-adapter    # Dockerfile à écrire après le premier build Maven
+    profiles: ["gps"]
+    environment:
+      NF_DB_URL: jdbc:postgresql://db:5432/nextfleet
+      NF_DB_USER: nextfleet
+      NF_DB_PASSWORD: ${NF_DB_PASSWORD}
+      NF_TRACCAR_FORWARD_SECRET: ${NF_TRACCAR_FORWARD_SECRET}
+      NF_MISSION_TOKEN_KEY: ${NF_MISSION_TOKEN_KEY:?clé HMAC base64 de 32 octets et plus}
+      NF_TRACCAR_OSMAND_URL: http://traccar:5055
+      NF_GPS_BIND: 0.0.0.0:8090
+    ports: ["127.0.0.1:8090:8090"]
+    depends_on: [db]
+
+  # Messagerie pilote (WebSocket) ; derrière un frontal TLS (WSS) hors poste de développement.
+  chat:
+    build: ../services/chat-realtime
+    profiles: ["chat"]
+    environment:
+      NF_DB_URL: jdbc:postgresql://db:5432/nextfleet
+      NF_DB_USER: nextfleet
+      NF_DB_PASSWORD: ${NF_DB_PASSWORD}
+      NF_CHAT_BIND: 0.0.0.0:8091
+    ports: ["127.0.0.1:8091:8091"]
+    depends_on: [db]
 
 volumes:
   db-data:

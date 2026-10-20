@@ -3,20 +3,23 @@
 Plateforme de gestion du parc automobile CAMTEL : API Java 21 / Spring Boot, PostgreSQL + PostGIS, client bureau JavaFX
 (Windows, Linux) et application Android Java (à venir). Référence : cahier des charges V4.0 et document d'architecture V5.0.
 
-> **Statut : lot 1 — fondations.** Voir [`docs/ETAT_AVANCEMENT.md`](docs/ETAT_AVANCEMENT.md) pour ce qui est réellement prouvé.
+> **Statut : lot 2 — six profils, GPS Traccar, messagerie, assistant IA (lecture seule).** Voir [`docs/ETAT_AVANCEMENT.md`](docs/ETAT_AVANCEMENT.md) pour ce qui est réellement prouvé.
 > Document de conception et code en cours de réalisation : ni homologation, ni avis DSIR/DS, ni mise en production.
 
 ## Arborescence
 
 ```
-apps/desktop-javafx/       Client bureau JavaFX (connexion, tableau de bord, véhicules, échéances, conducteurs) — compilé et testé
+apps/desktop-javafx/       Client bureau JavaFX : 6 profils, parc, échéances, missions et tracés, messagerie, assistant, comptes, audit — compilé et testé
 services/nextfleet-domain/ Noyau métier sans dépendance (plein-à-plein, bons, règles CAR, GPS, accès) — compilé et testé
 services/nextfleet-api/    API Spring Boot (identité, parc, carburant, audit) — écrite, NON compilée
-shared/api-contract/       Contrat OpenAPI 3 du lot 1 — validé
+services/gps-traccar-adapter/ Passerelle GPS : forward JSON de Traccar, lots Android à jeton de mission, relais OsmAnd — testée sur PostgreSQL
+services/chat-realtime/    Messagerie temps réel pilote (WebSocket) — testée sur PostgreSQL
+shared/api-contract/       Contrats OpenAPI 3 des lots 1 et 2 — validés
 shared/ui-tokens/          Jetons du design system (p. 17 / p. 18)
-infra/db/migrations/       Migrations Flyway V1–V4 — testées sur PostgreSQL 16 + PostGIS
-infra/db/tests/            Campagne de tests de la base (43 tests + concurrence)
-infra/compose.local.yaml   PostGIS, API, Traccar en local (non exécuté)
+infra/db/migrations/       Migrations Flyway V1–V5 — testées sur PostgreSQL 16 + PostGIS
+infra/db/tests/            Campagne de tests de la base (62 tests + concurrence) et jeu fictif d'intégration
+infra/compose.local.yaml   PostGIS, API, Traccar, passerelles GPS et messagerie en local (non exécuté)
+infra/traccar/             Configuration Traccar (forward JSON vers NexFleet)
 docs/                      Audit, registre de parité avec l'ancien NexFleet, design et mouvement, état d'avancement, captures et GIF
 tools/                     Construction hors ligne, captures, contrôle des contrastes
 ```
@@ -25,7 +28,8 @@ tools/                     Construction hors ligne, captures, contrôle des cont
 
 ```bash
 infra/db/tests/run_db_tests.sh      # base : migrations + tests
-tools/build-offline.sh              # noyau + bureau : compilation + tests
+tools/build-offline.sh              # noyau, passerelles, bureau : compilation + tests
+tools/run-integration-tests.sh      # GPS et messagerie de bout en bout sur PostgreSQL
 tools/screenshots.sh                # parcours visuel et captures
 ```
 
@@ -44,3 +48,16 @@ Détails et paquets DEB/MSI/EXE : [`docs/BUILD.md`](docs/BUILD.md).
 ## Licences tierces embarquées
 
 Police Inter (SIL OFL 1.1) : `apps/desktop-javafx/src/main/resources/cm/camtel/nextfleet/desktop/fonts/OFL-1.1-Inter.txt`.
+
+## Mode démonstration : six comptes
+
+Lancer le client bureau sans `--api=` ouvre le mode démonstration (données fictives, badge DÉMO). Mot de passe commun : `demo`.
+
+| Identifiant | Profil | Espace d'accueil |
+|---|---|---|
+| `gestionnaire` | Gestionnaire flotte | Vue d'ensemble, missions, messages, assistant |
+| `conducteur` | Agent ou conducteur | Mes missions (démarrage avec information sur la localisation) |
+| `maintenance` | Maintenance | Atelier |
+| `controleur` | Contrôleur | Vue d'ensemble, trajets, assistant |
+| `admin` | Administrateur technique | Comptes et rôles (aucune donnée métier) |
+| `auditeur` | Auditeur | Journal d'audit chaîné (lecture seule) |

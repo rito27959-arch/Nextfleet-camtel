@@ -26,13 +26,8 @@ public final class SettingsView extends ScrollPane {
         col.setMaxWidth(640);
 
         // Compte
-        String role = session.roles().isEmpty() ? "—" : switch (session.roles().get(0)) {
-            case "FLEET_MANAGER" -> "Gestionnaire de flotte";
-            case "CONTROLLER" -> "Contrôleur";
-            case "AUDITOR" -> "Auditeur (lecture seule)";
-            case "DRIVER" -> "Conducteur";
-            default -> session.roles().get(0);
-        };
+        cm.camtel.nextfleet.domain.security.Role primary = session.primaryRole();
+        String role = primary == null ? "—" : primary.label;
         StackPane avatar = Ui.avatar(initials(session.displayName()), 0);
         VBox who = new VBox(2, Ui.label(session.displayName(), "title3"), Ui.label(role + " · " + session.login(), "subhead", "muted"));
         HBox profile = new HBox(14, avatar, who);
@@ -42,6 +37,17 @@ public final class SettingsView extends ScrollPane {
         Node signOut = Ui.listRow(null, "Se déconnecter", null, new javafx.scene.layout.Region(), shell::confirmLogout);
         ((Label) ((HBox) signOut).getChildren().get(0)).getStyleClass().add("destructive");
         col.getChildren().add(Ui.insetGroup(null, List.of(profile, signOut), null));
+
+        // Profil et droits (matrice des habilitations)
+        if (primary != null) {
+            List<Node> rights = new java.util.ArrayList<>();
+            rights.add(Ui.listRow(RoleUi.symbol(primary), primary.label, null, null, null));
+            for (cm.camtel.nextfleet.domain.security.Permission p : session.permissions()) {
+                rights.add(Ui.listRow(null, p.label, null, Icons.stroke(Icons.CHECK, 14, "-nf-accent-text"), null));
+            }
+            col.getChildren().add(Ui.insetGroup("Vos droits", rights, primary.summary
+                    + " Le serveur vérifie chaque action, quel que soit l'affichage."));
+        }
 
         // Apparence
         Controls.Segmented theme = new Controls.Segmented(List.of("Clair", "Sombre"), shell.isDark() ? 1 : 0,
@@ -65,12 +71,12 @@ public final class SettingsView extends ScrollPane {
         col.getChildren().add(Ui.insetGroup("Données", List.of(
                 Ui.listRow(Ui.symbolTile(Icons.SHIELD, gateway.isDemo() ? "tile-orange" : "tile-green"), "Environnement",
                         gateway.isDemo() ? "Démonstration" : "Serveur NexFleet", null, null),
-                Ui.listRow(Ui.symbolTile(Icons.GEAR, "tile-gray"), "Paramètres métier", "Lot 2", null, null)),
+                Ui.listRow(Ui.symbolTile(Icons.GEAR, "tile-gray"), "Paramètres métier", "Lot 3", null, null)),
                 gateway.isDemo() ? "Données fictives, refusées en production (NF-04)." : null));
 
         // À propos
         col.getChildren().add(Ui.insetGroup("À propos", List.of(
-                Ui.listRow(Ui.symbolTile(Icons.DOC, "tile-navy"), "Version", "0.1.2 · lot 1.2", null, null),
+                Ui.listRow(Ui.symbolTile(Icons.DOC, "tile-navy"), "Version", "0.2.0 · lot 2", null, null),
                 Ui.listRow(Ui.symbolTile(Icons.REPORT, "tile-mint"), "Référence", "Cahier des charges V4.0", null, null),
                 Ui.listRow(Ui.symbolTile(Icons.ID_CARD, "tile-gray"), "Police", "Inter · SIL OFL 1.1", null, null)),
                 "Design inspiré des Human Interface Guidelines d'Apple, sans reprise d'éléments propriétaires."));

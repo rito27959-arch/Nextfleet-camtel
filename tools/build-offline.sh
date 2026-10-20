@@ -21,6 +21,20 @@ javac --release 21 -d "$OUT/domain-test" -cp "$OUT/domain:$JUNIT" $(find "$DOM/s
 java -Dstdout.encoding=UTF-8 -jar "$JUNIT" execute --class-path "$OUT/domain:$OUT/domain-test" --scan-class-path \
      --details=tree --disable-banner --disable-ansi-colors --reports-dir "$OUT/test-reports/domain"
 
+JACKSON="$JAVA_LIBS/jackson-databind.jar:$JAVA_LIBS/jackson-core.jar:$JAVA_LIBS/jackson-annotations.jar"
+PG="$JAVA_LIBS/postgresql.jar"
+WS=${JAVA_WEBSOCKET_JAR:-$JAVA_LIBS/java_websocket.jar}
+for MOD in gps-traccar-adapter chat-realtime; do
+  M="$ROOT/services/$MOD"
+  [[ -d "$M/src/main/java" ]] || continue
+  echo "== $MOD : compilation"
+  javac --release 21 -Xlint:all -Werror -d "$OUT/$MOD" -cp "$OUT/domain:$JACKSON:$PG:$WS" $(find "$M/src/main/java" -name '*.java')
+  echo "== $MOD : tests unitaires (les tests d'intégration exigent tools/run-integration-tests.sh)"
+  javac --release 21 -d "$OUT/$MOD-test" -cp "$OUT/domain:$OUT/$MOD:$JACKSON:$PG:$WS:$JUNIT" $(find "$M/src/test/java" -name '*.java')
+  java -Dstdout.encoding=UTF-8 -jar "$JUNIT" execute --class-path "$OUT/domain:$OUT/$MOD:$OUT/$MOD-test:$JACKSON:$PG:$WS" \
+       --scan-class-path --details=tree --disable-banner --disable-ansi-colors --reports-dir "$OUT/test-reports/$MOD"
+done
+
 if [[ "${SKIP_DESKTOP:-0}" != "1" && -d "$ROOT/apps/desktop-javafx/src/main/java" ]]; then
   echo "== desktop-javafx : compilation"
   DESK="$ROOT/apps/desktop-javafx"

@@ -72,6 +72,20 @@ SELECT pg_temp.expect_error('Délégation sans date de fin refusée',
    VALUES ('00000000-0000-0000-0000-000000000003','CONTROLLER','00000000-0000-0000-0000-0000000000a1',true,'00000000-0000-0000-0000-000000000001')$$,
  'ck_delegation_has_end');
 
+-- Comptes fictifs des six profils (V5) et attributions accordées par un tiers.
+INSERT INTO app_user(id, login, display_name, org_unit_id, password_hash, is_demo) VALUES
+ ('00000000-0000-0000-0000-000000000005','maintenance','Atelier fictif','00000000-0000-0000-0000-0000000000a1','x',true),
+ ('00000000-0000-0000-0000-000000000006','admin','Admin technique fictif','00000000-0000-0000-0000-0000000000a1','x',true),
+ ('00000000-0000-0000-0000-000000000007','auditeur','Auditeur fictif','00000000-0000-0000-0000-0000000000a1','x',true);
+INSERT INTO user_role_grant(user_id, role_code, scope_org_id, granted_by) VALUES
+ ('00000000-0000-0000-0000-000000000001','FLEET_MANAGER','00000000-0000-0000-0000-0000000000a1','00000000-0000-0000-0000-000000000006'),
+ ('00000000-0000-0000-0000-000000000002','CONTROLLER','00000000-0000-0000-0000-0000000000a1','00000000-0000-0000-0000-000000000006'),
+ ('00000000-0000-0000-0000-000000000003','DRIVER','00000000-0000-0000-0000-0000000000a1','00000000-0000-0000-0000-000000000006'),
+ ('00000000-0000-0000-0000-000000000004','DRIVER','00000000-0000-0000-0000-0000000000a2','00000000-0000-0000-0000-000000000006'),
+ ('00000000-0000-0000-0000-000000000005','MAINTENANCE','00000000-0000-0000-0000-0000000000a1','00000000-0000-0000-0000-000000000006'),
+ ('00000000-0000-0000-0000-000000000006','ADMIN','00000000-0000-0000-0000-0000000000a1','00000000-0000-0000-0000-000000000001'),
+ ('00000000-0000-0000-0000-000000000007','AUDITOR','00000000-0000-0000-0000-0000000000a1','00000000-0000-0000-0000-000000000006');
+
 -- ------------------------------------------------------------------ affectations sans chevauchement
 INSERT INTO vehicle_assignment(vehicle_id, driver_id, org_unit_id, period) VALUES
  ('00000000-0000-0000-0000-0000000000b1','00000000-0000-0000-0000-0000000000c1','00000000-0000-0000-0000-0000000000a1',
@@ -207,14 +221,83 @@ INSERT INTO message(conversation_id, sender_id, client_message_id, body) VALUES
  ('00000000-0000-0000-0000-000000000301','00000000-0000-0000-0000-000000000003','c-1','Reçu envoyé.');
 SELECT pg_temp.expect_true('NF-61 séquence serveur stable 1,2',
  (SELECT array_agg(server_seq ORDER BY server_seq) = ARRAY[1,2]::bigint[] FROM message));
-SELECT pg_temp.expect_error('REC-CHAT-02 réémission du même message refusée',
- $$INSERT INTO message(conversation_id, sender_id, client_message_id, body)
-   VALUES ('00000000-0000-0000-0000-000000000301','00000000-0000-0000-0000-000000000003','c-1','Reçu envoyé.')$$,
- 'message_sender_id_client_message_id_key');
+INSERT INTO message(conversation_id, sender_id, client_message_id, body)
+VALUES ('00000000-0000-0000-0000-000000000301','00000000-0000-0000-0000-000000000003','c-1','Reçu envoyé.');
+SELECT pg_temp.expect_true('REC-CHAT-02 réémission ignorée : aucun doublon, aucun numéro consommé',
+ (SELECT count(*) = 2 FROM message) AND (SELECT last_seq = 2 FROM conversation WHERE id = '00000000-0000-0000-0000-000000000301'));
+INSERT INTO message(conversation_id, sender_id, client_message_id, body)
+VALUES ('00000000-0000-0000-0000-000000000301','00000000-0000-0000-0000-000000000001','c-2','Bien reçu, merci.');
+SELECT pg_temp.expect_true('NF-61 séquence sans trou après une réémission (3)',
+ (SELECT max(server_seq) = 3 FROM message));
 SELECT pg_temp.expect_error('REC-SEC-01 non-participant d''une autre entité ne peut écrire',
  $$INSERT INTO message(conversation_id, sender_id, client_message_id, body)
    VALUES ('00000000-0000-0000-0000-000000000301','00000000-0000-0000-0000-000000000004','x-1','intrusion')$$,
  'pas participant');
+
+-- ------------------------------------------------------------------ V5 : six profils
+SELECT pg_temp.expect_true('PROFILS administrateur technique sans aucun pouvoir métier',
+ NOT EXISTS (SELECT 1 FROM role_permission WHERE role_code = 'ADMIN' AND permission_code NOT LIKE 'admin:%'));
+SELECT pg_temp.expect_true('PROFILS auditeur sans écriture ni messagerie',
+ NOT EXISTS (SELECT 1 FROM role_permission WHERE role_code = 'AUDITOR'
+   AND (permission_code ~ '(write|create|approve|archive|manage|drive|review|validate)$' OR permission_code IN ('chat:use','admin:users','admin:settings'))));
+SELECT pg_temp.expect_true('PROFILS six profils, aucun sans permission',
+ (SELECT count(DISTINCT role_code) = 6 FROM role_permission) AND (SELECT count(*) = 6 FROM role));
+INSERT INTO conversation_participant(conversation_id, user_id) VALUES
+ ('00000000-0000-0000-0000-000000000301','00000000-0000-0000-0000-000000000007');
+SELECT pg_temp.expect_error('PROFILS auditeur participant ne peut pas écrire (chat:use absent)',
+ $$INSERT INTO message(conversation_id, sender_id, client_message_id, body)
+   VALUES ('00000000-0000-0000-0000-000000000301','00000000-0000-0000-0000-000000000007','a-1','x')$$, 'chat:use');
+UPDATE conversation_participant SET left_at = now()
+ WHERE conversation_id = '00000000-0000-0000-0000-000000000301' AND user_id = '00000000-0000-0000-0000-000000000007';
+
+-- ------------------------------------------------------------------ V5 : états de remise du chat
+UPDATE conversation_participant SET last_read_seq = 2
+ WHERE conversation_id = '00000000-0000-0000-0000-000000000301' AND user_id = '00000000-0000-0000-0000-000000000003';
+SELECT pg_temp.expect_true('NF-62 « lu » implique « distribué »',
+ (SELECT last_delivered_seq = 2 AND last_read_seq = 2 FROM conversation_participant
+   WHERE conversation_id = '00000000-0000-0000-0000-000000000301' AND user_id = '00000000-0000-0000-0000-000000000003'));
+UPDATE conversation_participant SET last_read_seq = 1, last_delivered_seq = 0
+ WHERE conversation_id = '00000000-0000-0000-0000-000000000301' AND user_id = '00000000-0000-0000-0000-000000000003';
+SELECT pg_temp.expect_true('NF-62 un accusé ne recule jamais',
+ (SELECT last_delivered_seq = 2 AND last_read_seq = 2 FROM conversation_participant
+   WHERE conversation_id = '00000000-0000-0000-0000-000000000301' AND user_id = '00000000-0000-0000-0000-000000000003'));
+SELECT pg_temp.expect_error('NF-62 accusé au-delà du dernier message refusé',
+ $$UPDATE conversation_participant SET last_delivered_seq = 99
+   WHERE conversation_id = '00000000-0000-0000-0000-000000000301' AND user_id = '00000000-0000-0000-0000-000000000001'$$, 'au-delà');
+
+-- ------------------------------------------------------------------ V5 : GPS Traccar
+SELECT pg_temp.expect_error('GPS un boîtier est rattaché à un véhicule',
+ $$INSERT INTO tracking_source(unique_id, kind, label, registered_by) VALUES ('TRK-001','TRACKER','Boîtier','00000000-0000-0000-0000-000000000001')$$,
+ 'tracking_source_check');
+INSERT INTO gps_ingest_rejection(source_device_id, recorded_at, channel, reason_code)
+VALUES ('DEV-1', now(), 'TRACCAR_FORWARD', 'AUCUNE_MISSION_ACTIVE');
+SELECT pg_temp.expect_true('NF-70 un rejet ne conserve aucune position',
+ NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'gps_ingest_rejection'
+   AND (udt_name IN ('geography','geometry') OR column_name ~ '(lat|lon|lng|position)')));
+SELECT pg_temp.expect_error('NF-70 journal des rejets en ajout seul', $$DELETE FROM gps_ingest_rejection$$, 'ajout seul');
+
+-- ------------------------------------------------------------------ V5 : assistant IA
+SELECT pg_temp.expect_true('IA désactivée par défaut', NOT nf_assistant_enabled());
+SELECT pg_temp.expect_error('IA aucune réponse servie tant que désactivée',
+ $$INSERT INTO assistant_run(user_id, question, intent, refused) VALUES ('00000000-0000-0000-0000-000000000001','Coût ?','COUT',false)$$, 'désactivé');
+SELECT pg_temp.expect_error('IA activation sans référence de validation sécurité refusée',
+ $$INSERT INTO assistant_activation(enabled, decided_by, reason) VALUES (true,'00000000-0000-0000-0000-000000000006','Pilote BUT')$$,
+ 'ck_activation_requires_review');
+SELECT pg_temp.expect_error('IA activation par un profil métier refusée',
+ $$INSERT INTO assistant_activation(enabled, security_review_ref, approved_by_name, decided_by, reason)
+   VALUES (true,'DS-2026-041','RSSI fictif','00000000-0000-0000-0000-000000000001','Pilote BUT')$$, 'administration technique');
+SELECT pg_temp.expect_error('IA signataire distinct de l''administrateur',
+ $$INSERT INTO assistant_activation(enabled, security_review_ref, approved_by_name, decided_by, reason)
+   VALUES (true,'DS-2026-041','Admin technique fictif','00000000-0000-0000-0000-000000000006','Pilote BUT')$$, 'distinct');
+INSERT INTO assistant_activation(enabled, security_review_ref, approved_by_name, decided_by, reason)
+VALUES (true,'DS-2026-041','RSSI fictif','00000000-0000-0000-0000-000000000006','Pilote BUT Yaoundé');
+INSERT INTO assistant_run(user_id, question, intent, refused, source_refs)
+VALUES ('00000000-0000-0000-0000-000000000001','Coût des véhicules ce mois-ci ?','COUT',false, ARRAY['fuel_fill:1']);
+SELECT pg_temp.expect_true('IA activée après validation : réponse journalisée avec sources',
+ nf_assistant_enabled() AND (SELECT source_refs = ARRAY['fuel_fill:1'] FROM assistant_run WHERE NOT refused));
+SELECT pg_temp.expect_error('IA réponse refusée sans permission assistant:use (auditeur)',
+ $$INSERT INTO assistant_run(user_id, question, intent, refused) VALUES ('00000000-0000-0000-0000-000000000007','Coût ?','COUT',false)$$, 'assistant:use');
+SELECT pg_temp.expect_error('IA journal des interrogations en ajout seul', $$UPDATE assistant_run SET question = 'x'$$, 'ajout seul');
 
 -- ------------------------------------------------------------------ anomalies : pas de verdict de fraude
 INSERT INTO anomaly_rule(rule_id, rule_version, label) VALUES ('CAR-07',1,'Écart facture / plein');

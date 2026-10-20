@@ -1,69 +1,59 @@
-# État réel d'avancement — Lot 1.2
+# État réel d'avancement — Lot 2
 
-**20 octobre 2026 (mis à jour après l'audit de l'ancien dépôt et la refonte du design).** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
+**20 octobre 2026.** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
 Aucune autorisation CAMTEL, aucun avis DSIR ou DS et aucune mise en production ne sont revendiqués.
 
 ## Ce qui fonctionne réellement (preuves exécutées)
 
 | Élément | Commande | Résultat obtenu |
 |---|---|---|
-| Migrations SQL V1–V4 sur PostgreSQL 16 + PostGIS 3.4 | `infra/db/tests/run_db_tests.sh` | 4 migrations appliquées sur base vierge (V4 = parité avec l'ancien NexFleet) |
-| Tests d'intégrité de la base | idem | **43 tests réussis** : contrôle 12 points, clôture de maintenance, vidange sans double coût, historique des pneus, échéances unifiées, budget, réimport sans doublon ; unicité, démo interdite en production, révocation des sessions, auto-attribution refusée, chevauchements, bons (auto-validation, transitions, solde, reçu répété, montant), facture 55 L / reçu 50 L, GPS hors mission, rejeu GPS, chat (séquence, doublon, intrus), pas de statut « fraude », licence 3D, journal chaîné et immuable |
-| Concurrence sur un bon (CAR-01) | idem | Deux sessions simultanées 40 L et 30 L sur un bon de 60 L : **un seul plein accepté**, solde jamais dépassé |
-| Noyau métier Java 21 (sans dépendance) | `tools/build-offline.sh` | Compilation `-Xlint:all -Werror` ; **27 tests JUnit 5 réussis** |
-| Client JavaFX | idem | Compilation ; **9 tests réussis** (passerelle démo, échéances unifiées, conducteurs, validation du formulaire, client HTTP contre faux serveur local) |
-| Parcours visuel | `tools/screenshots.sh` | **16 captures** 1440×900 et **4 GIF d'animation** dans `docs/design-reference/captures-lot1/` |
-| Ancien dépôt `rito27959-arch/nexfleet` | `pytest` (backend Flask) | **78 tests réussis** ; registre de parité : `docs/REGISTRE_PARITE.md` |
-| Contrastes | `python3 tools/check_contrast.py` | 13 couples conformes |
-| Contrat OpenAPI lot 1 | `openapi-spec-validator` | Valide (11 chemins, 14 schémas) |
+| Migrations SQL V1–V5 sur PostgreSQL 16 + PostGIS 3.4 | `infra/db/tests/run_db_tests.sh` | 5 migrations appliquées sur base vierge (V5 = profils, GPS Traccar, chat, assistant) |
+| Tests d'intégrité de la base | idem | **62 tests réussis**. Lot 1 : 12 points, maintenance, bons, sessions, journal chaîné, licence 3D… Lot 2 : six profils, admin sans pouvoir métier, auditeur sans écriture ni chat, chat sans doublon ni trou, curseurs monotones, rejets GPS sans position, activation de l'assistant sous conditions, interrogations journalisées |
+| Concurrence sur un bon (CAR-01) | idem | Un seul plein accepté sur deux simultanés ; solde jamais dépassé |
+| Noyau métier Java 21 | `tools/build-offline.sh` | `-Xlint:all -Werror` ; **42 tests JUnit 5 réussis** |
+| Passerelle GPS Traccar | idem + `tools/run-integration-tests.sh` | **9 tests** dont 5 de bout en bout sur PostgreSQL |
+| Messagerie temps réel (WebSocket pilote) | `tools/run-integration-tests.sh` | **4 tests de bout en bout** sur PostgreSQL avec de vrais clients WebSocket |
+| Client JavaFX | `tools/build-offline.sh` | **17 tests réussis** (lot 1 + profils, missions, messagerie, assistant, journal chaîné) |
+| Parcours visuels | `tools/screenshots.sh` (lot 1) ; `NF_TOUR=lot2 tools/screenshots.sh …` | Lot 1 : 23 captures, 6 GIF. Lot 2 : **21 captures, 2 GIF** dans `docs/design-reference/captures-lot2/` |
+| Contrats OpenAPI | `openapi-spec-validator` | `openapi.yaml` (lot 1) et `openapi-lot2.yaml` (12 chemins) valides |
+| Contrastes | `python3 tools/check_contrast.py` | 16 couples conformes |
+| Ancien dépôt `rito27959-arch/nexfleet` | `pytest` | 78 tests réussis ; registre de parité : `docs/REGISTRE_PARITE.md` |
+
+Détail du lot 2 : **`docs/LOT2_GPS_CHAT_IA_PROFILS.md`**.
 
 ## Ce qui est écrit mais pas encore prouvé
 
 | Élément | Statut | Condition pour le déclarer livré |
 |---|---|---|
-| API Spring Boot (auth, véhicules, carburant, audit, accès par entité) | **Non compilée** : Maven Central bloqué. Seule l'analyse syntaxique Java a été faite. | `mvn verify` vert, y compris `ApiIntegrationTest` (Testcontainers) |
-| `HttpFleetGateway` contre la vraie API | Testé contre un faux serveur local seulement | Test de bout en bout bureau ↔ API |
+| API Spring Boot (lot 1 + contrat lot 2) | **Non compilée** : Maven Central bloqué | `mvn verify` vert, y compris Testcontainers |
+| Traccar Server réel | Configuration `infra/traccar/traccar.xml` écrite et clés vérifiées dans le code source ; **binaire non exécuté** | Traccar démarré, position d'un téléphone de test reçue par la passerelle |
+| Messagerie dans l'API (Spring WebSocket) | Protocole et stockage prouvés par la passerelle pilote | Portage dans l'API, WSS derrière le frontal DSIR |
 | `infra/compose.local.yaml`, `infra/ci/pipeline.yml` | Non exécutés (Docker et CI indisponibles) | Exécution sur le poste DSIR |
 | Paquets DEB / MSI / EXE | Procédure documentée, aucun paquet produit | `docs/BUILD.md` §3 sur chaque OS |
 
-## Nouveautés du lot 1.2 — refonte selon les Human Interface Guidelines d'Apple
-
-- Recherche documentée et correspondance règle par règle : `docs/DESIGN_HIG.md` (typographie, couleurs, boutons, alertes, notifications).
-- Nouveau design system : échelle Dynamic Type, Inter / Inter Display (SF Pro non redistribuable), couleurs système Apple harmonisées avec la marque.
-- **Arbitrage de contraste résolu** : boutons pleins sur la menthe accessible d'Apple #008575 (blanc 4,55:1) ; 16 couples vérifiés conformes.
-- Nouveaux composants : alertes modales, bannières, **centre de notifications**, contrôle segmenté, interrupteurs, listes groupées inset.
-- Nouveaux écrans et parcours : **Réglages**, centre de notifications, **archivage de véhicule** confirmé par alerte (gestion du conflit de version), « Mot de passe oublié », confirmation de déconnexion.
-- 11 tests du client bureau (dont notifications et archivage) ; 23 captures et 6 GIF.
-
-## Nouveautés du lot 1.1
-
-- Écrans **Échéances** (assurance, vignette, contrôle technique, permis, CNI ; compte à rebours) et **Conducteurs** (matricule, permis, CNI, véhicule affecté), repris de l'ancien NexFleet.
-- Fiche véhicule en feuille latérale à ressort, avec ses échéances ; toasts ; badge du nombre d'échéances dans la navigation.
-- Système de mouvement complet et réduction de mouvement : `docs/DESIGN_ET_MOUVEMENT.md`.
-
 ## Ce qui n'est pas commencé
 
-Application Android (bloquée par l'accès réseau), chat WebSocket, collecte et carte GPS, module carburant côté écrans,
-maintenance/vidanges/pneus/conducteurs, budget et rapports, catalogue et vues 3D, photo/détourage/reconnaissance, assistant IA,
-intégrations OIDC/RH. Leur répartition est dans `docs/AUDIT_ET_MATRICE.md`.
+Application Android et collecteur GPS (bloqués par l'accès réseau), pièces jointes du chat, écrans carburant / maintenance /
+budget / rapports, catalogue et vues 3D, photo / détourage / reconnaissance, modèle de langage local pour l'assistant,
+intégrations OIDC / RH. Répartition : `docs/AUDIT_ET_MATRICE.md`.
 
-## Différences avec la maquette p. 17 (choix assumés)
+## Décisions attendues
 
-- Données fictives différentes de la maquette (12 véhicules) ; la consommation affichée est **calculée** plein-à-plein, pas recopiée.
-- « Dernière position » devient « Dernière position (déclarée) » : sans module GPS, aucune position n'est présentée comme suivie (NF-19).
-- « Exporter », « Tout voir » et « Voir les entretiens » sont visibles mais **inactifs**, avec infobulle indiquant le lot : aucun faux bouton.
-- Niveau de carburant absent affiché « Non renseigné », jamais 0 % (RG-07).
-- Couleur d'alerte assombrie à #B83232 pour atteindre 4,5:1 sur fond rosé.
+| Décision | Qui | Impact |
+|---|---|---|
+| Serveur de tuiles (interne ou OpenStreetMap selon licence) | DSIR | Fond de carte des écrans Missions |
+| Seuils GPS (précision, saut, arrêt, « en direct ») | Métier + DS | Remplacent `TrackPolicy.demoDefaults()` |
+| Texte de la notice d'information GPS (`NOTICE-GPS-v1`) | DS + juridique | Affichée avant chaque démarrage de mission |
+| Validation de sécurité de l'assistant | DS / RSSI | Référence exigée pour l'activer |
+| Version figée de Traccar et de Java-WebSocket | DSIR (nomenclature) | Compose et pom |
+| Marque « NexFleet » / « Nextfleet » | BUT | Libellés |
 
-## Point d'arbitrage design
+L'arbitrage de contraste du lot 1 est **résolu** (lot 1.2 : boutons pleins sur la menthe accessible #008575, 4,55:1).
 
-Le texte blanc sur le vert imposé #009B87 atteint **3,48:1**. C'est conforme pour un grand texte, pas pour le texte courant (objectif 4,5:1 du cahier).
-Options : conserver #009B87 (fidélité maquette) ou utiliser #007A6A pour le fond des boutons (5,3:1). **Décision à prendre par le BUT.**
+## Prochain lot proposé (lot 3), dans l'ordre
 
-## Prochain lot proposé (lot 2), dans l'ordre
-
-1. Ouvrir les domaines Maven/Google/Gradle, puis `mvn verify` et correction de l'API jusqu'au vert.
-2. Obtenir le dépôt existant : registre de parité réel (NF-01 à NF-29, Flutter NF-29).
-3. Squelette Android Java (connexion, tableau de bord, véhicules) aux jetons p. 18.
-4. Conducteurs, affectations, maintenance, vidanges (API + bureau).
-5. Agrégat tableau de bord côté API (le client ne calcule plus rien en mode réel).
+1. Ouvrir les domaines Maven, Google et Gradle, puis lancer `mvn verify` et corriger l'API jusqu'à ce que tout passe.
+2. Porter missions, GPS, messagerie et assistant dans l'API (même stockage, mêmes règles).
+3. Application Android Java : connexion, Mes missions, collecteur GPS à tampon chiffré, messagerie.
+4. Démarrer Traccar réel avec un téléphone de test (scénario B complet).
+5. Écrans carburant et maintenance (tables déjà prêtes en base).

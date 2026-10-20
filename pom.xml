@@ -12,6 +12,8 @@
     <modules>
         <module>services/nextfleet-domain</module>
         <module>services/nextfleet-api</module>
+        <module>services/gps-traccar-adapter</module>
+        <module>services/chat-realtime</module>
         <module>apps/desktop-javafx</module>
     </modules>
 
@@ -22,6 +24,8 @@
         <junit.version>5.11.4</junit.version>
         <javafx.version>21.0.6</javafx.version>
         <jackson.version>2.18.2</jackson.version>
+        <postgresql.version>42.7.2</postgresql.version>
+        <java-websocket.version>1.5.7</java-websocket.version>
     </properties>
 
     <dependencyManagement>

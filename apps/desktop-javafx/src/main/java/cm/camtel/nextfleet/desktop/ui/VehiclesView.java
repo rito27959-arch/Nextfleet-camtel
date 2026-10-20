@@ -73,7 +73,7 @@ public final class VehiclesView extends BorderPane {
         h.setAlignment(Pos.BOTTOM_LEFT);
         Button add = new Button("Nouveau véhicule", Icons.stroke(Icons.PLUS, 15, "white"));
         add.getStyleClass().add("btn-primary");
-        if (session.has("FLEET_MANAGER")) {
+        if (session.can(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_WRITE)) {
             add.setOnAction(e -> openForm());
             h.getChildren().add(add);
         } else {
@@ -171,7 +171,7 @@ public final class VehiclesView extends BorderPane {
         VehicleSheet sheet = new VehicleSheet(v, gateway, () -> {
             closeOverlay();
             table.getSelectionModel().clearSelection();
-        }, session.has("FLEET_MANAGER") ? () -> confirmArchive(v) : null);
+        }, session.can(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_ARCHIVE) ? () -> confirmArchive(v) : null);
         showOverlay(sheet, 420);
     }
 
