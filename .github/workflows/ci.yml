@@ -89,6 +89,11 @@ jobs:
   images:
     name: Images Docker (API, passerelle GPS, Traccar)
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io/rito27959-arch
     steps:
       - uses: actions/checkout@v5
       - name: Construire les trois images
@@ -98,6 +103,17 @@ jobs:
             && docker build -q -f infra/docker/gateway.Dockerfile -t nexfleet-gps-gateway . \
             && docker build -q -f infra/docker/traccar.Dockerfile -t nexfleet-traccar . ; } 2>&1 | tee build.log
           echo "::notice title=Images Docker::$(docker images --format '{{.Repository}} {{.Size}}' | grep nexfleet | tr '\n' ' ')"
+      - name: Publier sur GitHub Container Registry (branche main)
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          for img in nexfleet-api nexfleet-gps-gateway nexfleet-traccar; do
+            for tag in "$APP_VERSION" "sha-${GITHUB_SHA::7}" latest; do
+              docker tag "$img" "$REGISTRY/$img:$tag"
+              docker push -q "$REGISTRY/$img:$tag"
+            done
+          done
+          echo "::notice title=Images publiées::$REGISTRY/{nexfleet-api,nexfleet-gps-gateway,nexfleet-traccar}:$APP_VERSION (+ latest, sha-${GITHUB_SHA::7})"
       - name: Annotations d'échec
         if: failure()
         run: tools/ci-annotate.sh build.log Docker
