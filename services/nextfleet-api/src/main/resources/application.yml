@@ -1,0 +1,48 @@
+# NexFleet API — configuration. Aucun secret ici : tout passe par variables d'environnement ou coffre (SEC-04).
+spring:
+  application:
+    name: nextfleet-api
+  datasource:
+    url: ${NF_DB_URL:jdbc:postgresql://localhost:5432/nextfleet}
+    username: ${NF_DB_USER:nextfleet}
+    password: ${NF_DB_PASSWORD}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # Les extensions (postgis, btree_gist, pgcrypto) sont créées par le DBA avant la première migration.
+  jackson:
+    time-zone: UTC                # RG-05 : stockage et échange en UTC ; affichage Africa/Douala côté clients
+    default-property-inclusion: non_null
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: ${NF_PORT:8080}
+  error:
+    include-stacktrace: never
+    include-message: never
+
+nextfleet:
+  environment: ${NF_ENVIRONMENT:DEV}        # DEV | TEST | DEMO | PREPROD | PRODUCTION (NF-04)
+  session:
+    ttl: ${NF_SESSION_TTL:PT8H}
+    max-failed-logins: 5
+    lockout: PT15M
+  cors:
+    allowed-origins: ""                     # clients natifs : pas de CORS par défaut
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+springdoc:
+  api-docs:
+    path: /api/v1/openapi
+  swagger-ui:
+    enabled: ${NF_SWAGGER_UI:false}

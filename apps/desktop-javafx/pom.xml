@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Client JavaFX. Compilé et testé hors Maven par tools/build-offline.sh ; build Maven à confirmer dès l'accès à Maven Central. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>cm.camtel.nextfleet</groupId>
+        <artifactId>nextfleet-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+    <artifactId>nextfleet-desktop</artifactId>
+    <name>NexFleet — client bureau JavaFX (Windows, Linux)</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>cm.camtel.nextfleet</groupId>
+            <artifactId>nextfleet-domain</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency><groupId>org.openjfx</groupId><artifactId>javafx-controls</artifactId><version>${javafx.version}</version></dependency>
+        <dependency><groupId>org.openjfx</groupId><artifactId>javafx-swing</artifactId><version>${javafx.version}</version></dependency>
+        <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId><version>${jackson.version}</version></dependency>
+        <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <mainClass>cm.camtel.nextfleet.desktop.NextfleetDesktopApp</mainClass>
+                </configuration>
+            </plugin>
+            <plugin>
+                <!-- Copie des dépendances pour jpackage (voir docs/BUILD.md) -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.8.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-libs</id>
+                        <phase>package</phase>
+                        <goals><goal>copy-dependencies</goal></goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/libs</outputDirectory>
+                            <includeScope>runtime</includeScope>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

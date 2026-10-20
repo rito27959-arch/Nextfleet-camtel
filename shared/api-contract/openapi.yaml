@@ -1,0 +1,309 @@
+openapi: 3.0.3
+info:
+  title: NexFleet CAMTEL API
+  version: 0.1.0-lot1
+  description: |
+    Contrat du lot 1 (identité, parc, carburant). Horodatages en UTC (RG-05) ; montants en XAF décimaux (RG-06).
+    Erreurs au format RFC 9457 (application/problem+json) avec propriété `code`, et `rule` pour les règles métier.
+    STATUT : contrat de conception ; l'implémentation Spring Boot correspondante n'a pas encore été compilée.
+servers:
+  - url: https://nextfleet.example.invalid
+    description: Adresse à définir par la DSIR
+security:
+  - bearer: []
+tags:
+  - name: Identité
+  - name: Parc
+  - name: Carburant
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [Identité]
+      security: []
+      summary: Ouvrir une session (NF-01)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { description: 'Session ouverte', content: { application/json: { schema: { $ref: '#/components/schemas/LoginResponse' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /api/v1/auth/logout:
+    post:
+      tags: [Identité]
+      summary: Révoquer la session courante
+      responses:
+        '204': { description: Session révoquée }
+        '401': { $ref: '#/components/responses/Problem' }
+  /api/v1/me:
+    get:
+      tags: [Identité]
+      summary: Profil et rôles de l'utilisateur courant
+      responses:
+        '200': { description: 'Profil', content: { application/json: { schema: { $ref: '#/components/schemas/Me' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /api/v1/vehicles:
+    get:
+      tags: [Parc]
+      summary: Rechercher les véhicules du périmètre (NF-10)
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 60 }, description: 'Immatriculation (normalisée), marque ou modèle' }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/VehicleStatus' } }
+        - { name: includeArchived, in: query, schema: { type: boolean, default: false } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 25 } }
+      responses:
+        '200': { description: 'Page de véhicules', content: { application/json: { schema: { $ref: '#/components/schemas/VehiclePage' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [Parc]
+      summary: Créer un véhicule
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/VehicleCreate' } } }
+      responses:
+        '201': { description: 'Créé', content: { application/json: { schema: { $ref: '#/components/schemas/Vehicle' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { description: 'Immatriculation ou châssis déjà enregistré', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+  /api/v1/vehicles/{id}:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    get:
+      tags: [Parc]
+      summary: Détail d'un véhicule (ETag = version)
+      responses:
+        '200': { description: 'Véhicule', content: { application/json: { schema: { $ref: '#/components/schemas/Vehicle' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    patch:
+      tags: [Parc]
+      summary: Corriger un véhicule (RG-01 motif, RG-03 If-Match)
+      parameters:
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/VehiclePatch' } } }
+      responses:
+        '200': { description: 'Corrigé', content: { application/json: { schema: { $ref: '#/components/schemas/Vehicle' } } } }
+        '409': { description: 'Version obsolète (STALE_VERSION)', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+  /api/v1/vehicles/{id}/archive:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    post:
+      tags: [Parc]
+      summary: Archiver (RG-04, aucune suppression physique)
+      parameters:
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+        - { name: reason, in: query, required: true, schema: { type: string, minLength: 5, maxLength: 500 } }
+      responses:
+        '200': { description: 'Archivé', content: { application/json: { schema: { $ref: '#/components/schemas/Vehicle' } } } }
+  /api/v1/vehicles/{id}/consumption:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    get:
+      tags: [Carburant]
+      summary: Consommation plein-à-plein (NF-42) — entrées exposées ou « données insuffisantes »
+      responses:
+        '200': { description: 'Résultat', content: { application/json: { schema: { $ref: '#/components/schemas/Consumption' } } } }
+  /api/v1/fuel-orders:
+    post:
+      tags: [Carburant]
+      summary: Demander un bon carburant (NF-40)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/FuelOrderCreate' } } }
+      responses:
+        '201': { description: 'Bon créé (brouillon)', content: { application/json: { schema: { $ref: '#/components/schemas/FuelOrder' } } } }
+  /api/v1/fuel-orders/{id}/submit:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    post:
+      tags: [Carburant]
+      summary: Soumettre le bon
+      responses:
+        '200': { description: 'Soumis', content: { application/json: { schema: { $ref: '#/components/schemas/FuelOrder' } } } }
+  /api/v1/fuel-orders/{id}/approve:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    post:
+      tags: [Carburant]
+      summary: Valider le bon — valideur distinct du demandeur
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { comment: { type: string, maxLength: 500 } } } } }
+      responses:
+        '200': { description: 'Approuvé', content: { application/json: { schema: { $ref: '#/components/schemas/FuelOrder' } } } }
+        '422': { description: 'Règle NF-40 (auto-validation) ou transition interdite', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+  /api/v1/fuel-fills:
+    post:
+      tags: [Carburant]
+      summary: Saisir un plein (NF-41) — solde du bon consommé atomiquement (CAR-01)
+      parameters:
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 8, maxLength: 80 } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/FuelFillCreate' } } }
+      responses:
+        '201': { description: 'Enregistré', content: { application/json: { schema: { $ref: '#/components/schemas/FuelFill' } } } }
+        '200': { description: 'Rejeu de la même clé — aucun doublon', content: { application/json: { schema: { $ref: '#/components/schemas/FuelFill' } } } }
+        '409': { description: 'Reçu déjà saisi (CAR-02)', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+        '422': { description: 'Solde dépassé, bon expiré ou non approuvé (CAR-01)', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer, description: Jeton de session opaque }
+  parameters:
+    Id: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    Problem:
+      description: Erreur
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+  schemas:
+    Problem:
+      type: object
+      properties:
+        status: { type: integer }
+        title: { type: string }
+        detail: { type: string }
+        code: { type: string, example: ACCESS_DENIED }
+        rule: { type: string, example: CAR-01 }
+        fields: { type: object, additionalProperties: { type: string } }
+    LoginRequest:
+      type: object
+      required: [login, password, clientKind]
+      properties:
+        login: { type: string, maxLength: 120 }
+        password: { type: string, format: password, maxLength: 256 }
+        clientKind: { type: string, enum: [DESKTOP, ANDROID, API] }
+    LoginResponse:
+      type: object
+      properties:
+        token: { type: string }
+        expiresAt: { type: string, format: date-time }
+        user: { $ref: '#/components/schemas/Me' }
+    Me:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        login: { type: string }
+        displayName: { type: string }
+        orgUnitId: { type: string, format: uuid }
+        roles:
+          type: array
+          items:
+            type: object
+            properties:
+              role: { type: string, enum: [FLEET_MANAGER, DRIVER, MAINTENANCE, CONTROLLER, ADMIN, AUDITOR] }
+              scopeOrgId: { type: string, format: uuid }
+              validUntil: { type: string, format: date-time, nullable: true }
+    VehicleStatus: { type: string, enum: [AVAILABLE, IN_SERVICE, ON_MISSION, MAINTENANCE, OUT_OF_SERVICE, ARCHIVED] }
+    Vehicle:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        registration: { type: string, example: CE 4401 LT }
+        registrationNormalized: { type: string, example: CE4401LT }
+        vin: { type: string, nullable: true }
+        make: { type: string }
+        model: { type: string }
+        modelYear: { type: integer, nullable: true }
+        vehicleType: { type: string, nullable: true }
+        energy: { type: string, nullable: true }
+        tankCapacityLiters: { type: number, nullable: true }
+        tankCapacityVerified: { type: boolean }
+        status: { $ref: '#/components/schemas/VehicleStatus' }
+        orgUnitId: { type: string, format: uuid }
+        modelAssetStatus: { type: string, enum: [EXACT, APPROXIMATE, GENERIC, NONE] }
+        archivedAt: { type: string, format: date-time, nullable: true }
+        version: { type: integer, format: int64 }
+    VehiclePage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Vehicle' } }
+        page: { type: integer }
+        size: { type: integer }
+        total: { type: integer, format: int64 }
+    VehicleCreate:
+      type: object
+      required: [registration, make, model, orgUnitId]
+      properties:
+        registration: { type: string, maxLength: 20 }
+        vin: { type: string, maxLength: 32 }
+        make: { type: string, maxLength: 60 }
+        model: { type: string, maxLength: 60 }
+        modelYear: { type: integer, minimum: 1950, maximum: 2100 }
+        vehicleType: { type: string }
+        energy: { type: string, enum: [DIESEL, ESSENCE, HYBRIDE, ELECTRIQUE, GPL, AUTRE] }
+        tankCapacityLiters: { type: number, minimum: 1 }
+        tankCapacityVerified: { type: boolean }
+        orgUnitId: { type: string, format: uuid }
+    VehiclePatch:
+      type: object
+      required: [reason]
+      properties:
+        make: { type: string }
+        model: { type: string }
+        modelYear: { type: integer }
+        status: { $ref: '#/components/schemas/VehicleStatus' }
+        tankCapacityLiters: { type: number }
+        tankCapacityVerified: { type: boolean }
+        reason: { type: string, minLength: 5, maxLength: 500 }
+    FuelOrderCreate:
+      type: object
+      required: [vehicleId, supplierId, authorizedLiters, authorizedAmountXaf, validUntil]
+      properties:
+        vehicleId: { type: string, format: uuid }
+        supplierId: { type: string, format: uuid }
+        authorizedLiters: { type: number, minimum: 0.01 }
+        authorizedAmountXaf: { type: number, minimum: 1 }
+        validUntil: { type: string, format: date }
+        reason: { type: string, maxLength: 500 }
+    FuelOrder:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        orderNumber: { type: string }
+        vehicleId: { type: string, format: uuid }
+        requestedBy: { type: string, format: uuid }
+        approvedBy: { type: string, format: uuid, nullable: true }
+        authorizedLiters: { type: number }
+        authorizedAmountXaf: { type: number }
+        deliveredLiters: { type: number }
+        deliveredAmountXaf: { type: number }
+        validUntil: { type: string, format: date }
+        status: { type: string, enum: [DRAFT, SUBMITTED, APPROVED, PARTIALLY_CONSUMED, SETTLED, CANCELLED, EXPIRED] }
+        version: { type: integer, format: int64 }
+    FuelFillCreate:
+      type: object
+      required: [vehicleId, supplierId, filledAt, liters, unitPriceXaf, fullTank, receiptReference]
+      properties:
+        fuelOrderId: { type: string, format: uuid, nullable: true }
+        exceptionReason: { type: string, description: Obligatoire si aucun bon }
+        vehicleId: { type: string, format: uuid }
+        driverId: { type: string, format: uuid }
+        supplierId: { type: string, format: uuid }
+        filledAt: { type: string, format: date-time }
+        odometerKm: { type: number }
+        liters: { type: number, minimum: 0.01 }
+        unitPriceXaf: { type: number, minimum: 0.01 }
+        fullTank: { type: boolean }
+        receiptReference: { type: string, maxLength: 60 }
+    FuelFill:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        fuelOrderId: { type: string, format: uuid, nullable: true }
+        vehicleId: { type: string, format: uuid }
+        filledAt: { type: string, format: date-time }
+        odometerKm: { type: number, nullable: true }
+        liters: { type: number }
+        unitPriceXaf: { type: number }
+        amountXaf: { type: number }
+        fullTank: { type: boolean }
+        receiptReference: { type: string }
+    Consumption:
+      type: object
+      properties:
+        status: { type: string, enum: [CALCULATED, INSUFFICIENT_DATA] }
+        litersPer100Km: { type: number, nullable: true }
+        litersCounted: { type: number, nullable: true }
+        distanceKm: { type: number, nullable: true }
+        startFillId: { type: string, nullable: true }
+        endFillId: { type: string, nullable: true }
+        countedFillIds: { type: array, items: { type: string } }
+        explanation: { type: string }

@@ -1,0 +1,372 @@
+/*
+ * Design system NexFleet — client JavaFX (cahier V4, chap. 15 et 40 ; maquette p. 17).
+ * Jetons : bleu nuit #102631, vert #009B87, fond #F6F9FC, texte #102434 ; grille 4/8 ; rayons 12–20 ; ombres minimales.
+ * Source des jetons : shared/ui-tokens/tokens.json (à garder synchronisé).
+ */
+
+/* ============================================================ JETONS — thème clair */
+.root {
+    -nf-navy: #102631;
+    -nf-navy-2: #17323F;
+    -nf-green: #009B87;
+    -nf-green-strong: #007A6A;       /* texte vert sur fond clair : contraste ≥ 4,5:1 */
+    -nf-green-soft: #E3F5F2;
+    -nf-bg: #F6F9FC;
+    -nf-surface: #FFFFFF;
+    -nf-surface-2: #F1F5F9;
+    -nf-text: #102434;
+    -nf-muted: #5A6B79;
+    -nf-border: #E2E8EE;
+    -nf-danger: #B83232;
+    -nf-danger-soft: #FDECEC;
+    -nf-warning: #B7791F;
+    -nf-warning-bar: #F2B33D;
+    -nf-warning-soft: #FEF5E6;
+    -nf-info: #2457C5;
+    -nf-info-soft: #E8F0FD;
+    -nf-neutral-soft: #EEF1F4;
+    -nf-on-navy: #FFFFFF;
+    -nf-on-navy-muted: #A9BAC5;
+    -nf-focus: #00B39C;
+
+    -fx-font-family: "Inter";
+    -fx-font-size: 14px;
+    -fx-background-color: -nf-bg;
+    -fx-text-fill: -nf-text;
+    -fx-focus-color: -nf-focus;
+    -fx-faint-focus-color: transparent;
+    -fx-accent: -nf-green;
+    -fx-base: -nf-surface;
+}
+
+/* ============================================================ JETONS — thème sombre */
+.root.dark {
+    -nf-navy: #0B1A22;
+    -nf-navy-2: #12262F;
+    -nf-green: #12B39D;
+    -nf-green-strong: #3CCFB8;
+    -nf-green-soft: #12352F;
+    -nf-bg: #0E1820;
+    -nf-surface: #15232C;
+    -nf-surface-2: #1B2C37;
+    -nf-text: #E7EEF3;
+    -nf-muted: #9FB1BE;
+    -nf-border: #263844;
+    -nf-danger: #F07575;
+    -nf-danger-soft: #3A1E22;
+    -nf-warning: #F2B95A;
+    -nf-warning-soft: #3A2E17;
+    -nf-info: #7FA8F5;
+    -nf-info-soft: #1B2A47;
+    -nf-neutral-soft: #22323D;
+    -fx-base: -nf-surface;
+}
+
+.label { -fx-text-fill: -nf-text; }
+.muted { -fx-text-fill: -nf-muted; }
+.tabular { -fx-font-family: "Inter"; }   /* chiffres tabulaires : Inter « tnum » non exposé par JavaFX ; alignement par colonne */
+
+/* Échelle typographique 12 / 14 / 16 / 20 / 28 / 36 */
+.t-12 { -fx-font-size: 12px; }
+.t-14 { -fx-font-size: 14px; }
+.t-16 { -fx-font-size: 16px; }
+.t-20 { -fx-font-size: 20px; }
+.t-28 { -fx-font-size: 28px; }
+.t-36 { -fx-font-size: 36px; }
+.w-500 { -fx-font-weight: 500; }
+.w-600 { -fx-font-weight: 600; }
+.w-700 { -fx-font-weight: bold; }
+.overline { -fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: -nf-muted; }
+.h1 { -fx-font-size: 30px; -fx-font-weight: bold; -fx-text-fill: -nf-text; }
+.h2 { -fx-font-size: 16px; -fx-font-weight: 600; -fx-text-fill: -nf-text; }
+
+/* ============================================================ ÉCRAN DE CONNEXION */
+.login-root { -fx-background-color: -nf-bg; }
+.login-brand {
+    -fx-background-color: linear-gradient(to bottom right, -nf-navy, -nf-navy-2);
+    -fx-padding: 48;
+}
+.login-brand .label { -fx-text-fill: -nf-on-navy; }
+.login-brand .muted { -fx-text-fill: -nf-on-navy-muted; }
+.login-card {
+    -fx-background-color: -nf-surface;
+    -fx-background-radius: 20;
+    -fx-border-color: -nf-border;
+    -fx-border-radius: 20;
+    -fx-padding: 40;
+    -fx-effect: dropshadow(gaussian, rgba(16, 38, 49, 0.08), 24, 0, 0, 6);
+}
+.demo-hint {
+    -fx-background-color: -nf-warning-soft;
+    -fx-background-radius: 12;
+    -fx-padding: 12;
+}
+.demo-hint .label { -fx-text-fill: -nf-text; -fx-font-size: 12px; }
+
+/* ============================================================ CHAMPS */
+.text-field, .password-field, .combo-box {
+    -fx-background-color: -nf-surface;
+    -fx-background-radius: 12;
+    -fx-border-color: -nf-border;
+    -fx-border-radius: 12;
+    -fx-padding: 10 12;
+    -fx-text-fill: -nf-text;
+    -fx-prompt-text-fill: -nf-muted;
+    -fx-highlight-fill: -nf-green-soft;
+    -fx-highlight-text-fill: -nf-text;
+}
+.combo-box { -fx-padding: 2 4; }
+.combo-box .list-cell { -fx-text-fill: -nf-text; -fx-background-color: transparent; }
+.text-field:focused, .password-field:focused, .combo-box:focused {
+    -fx-border-color: -nf-focus;
+    -fx-border-width: 2;
+}
+.text-field.field-error, .password-field.field-error, .combo-box.field-error { -fx-border-color: -nf-danger; }
+.error-text { -fx-text-fill: -nf-danger; -fx-font-size: 12px; }
+.field-label { -fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: -nf-text; }
+
+/* ============================================================ BOUTONS (cibles ≥ 40 px bureau) */
+.button {
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-padding: 10 18;
+    -fx-font-weight: 600;
+    -fx-cursor: hand;
+    -fx-min-height: 40;
+}
+.btn-primary { -fx-background-color: -nf-green; -fx-text-fill: white; }
+.btn-primary .label { -fx-text-fill: white; }
+.btn-primary:hover { -fx-background-color: -nf-green-strong; }
+.root.dark .btn-primary { -fx-text-fill: #04201C; }
+.btn-secondary {
+    -fx-background-color: -nf-surface;
+    -fx-text-fill: -nf-text;
+    -fx-border-color: -nf-border;
+}
+.btn-secondary:hover { -fx-background-color: -nf-surface-2; }
+.btn-ghost { -fx-background-color: transparent; -fx-text-fill: -nf-green-strong; -fx-padding: 6 8; -fx-min-height: 32; }
+.btn-ghost:hover { -fx-background-color: -nf-green-soft; }
+.button:focus-visible { -fx-border-color: -nf-focus; -fx-border-width: 2; }
+.button:disabled { -fx-opacity: 0.5; }
+.icon-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 20;
+    -fx-padding: 8;
+    -fx-min-width: 40; -fx-min-height: 40;
+}
+.icon-button:hover { -fx-background-color: -nf-surface-2; }
+
+/* ============================================================ COQUILLE : BARRE LATÉRALE */
+.sidebar {
+    -fx-background-color: -nf-navy;
+    -fx-padding: 20 12 16 12;
+    -fx-spacing: 4;
+    -fx-pref-width: 236;
+    -fx-min-width: 236;
+}
+.sidebar .brand-name { -fx-text-fill: -nf-on-navy; -fx-font-size: 20px; -fx-font-weight: bold; }
+.sidebar .section-title { -fx-text-fill: -nf-on-navy-muted; -fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 16 12 6 12; }
+.nav-item {
+    -fx-background-color: transparent;
+    -fx-background-radius: 12;
+    -fx-text-fill: #D5E1E8;
+    -fx-font-size: 13px;
+    -fx-font-weight: 500;
+    -fx-alignment: center-left;
+    -fx-padding: 10 12;
+    -fx-graphic-text-gap: 12;
+    -fx-min-height: 40;
+    -fx-cursor: hand;
+}
+.nav-item .icon { -fx-fill: transparent; -fx-stroke: #A9BAC5; -fx-stroke-width: 1.6; }
+.nav-item:hover { -fx-background-color: rgba(255, 255, 255, 0.06); }
+.nav-item:selected { -fx-background-color: -nf-green; -fx-text-fill: white; -fx-font-weight: 600; }
+.nav-item:selected .icon { -fx-stroke: white; }
+.nav-item:focus-visible { -fx-border-color: -nf-focus; -fx-border-radius: 12; -fx-border-width: 2; }
+.nav-item.unavailable { -fx-text-fill: #7E93A0; }
+.sidebar-footer {
+    -fx-border-color: rgba(255, 255, 255, 0.08) transparent transparent transparent;
+    -fx-padding: 12 4 0 4;
+}
+.sidebar-footer .label { -fx-text-fill: -nf-on-navy; }
+.sidebar-footer .muted { -fx-text-fill: -nf-on-navy-muted; }
+
+/* ============================================================ BARRE SUPÉRIEURE */
+.topbar {
+    -fx-background-color: -nf-surface;
+    -fx-border-color: transparent transparent -nf-border transparent;
+    -fx-padding: 12 28;
+    -fx-spacing: 12;
+    -fx-alignment: center-left;
+}
+.search-field {
+    -fx-background-color: -nf-surface-2;
+    -fx-border-color: transparent;
+    -fx-pref-width: 360;
+    -fx-padding: 9 12 9 36;
+}
+.badge-demo {
+    -fx-background-color: -nf-green-soft;
+    -fx-text-fill: -nf-green-strong;
+    -fx-background-radius: 999;
+    -fx-padding: 4 10;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+.avatar {
+    -fx-background-color: -nf-navy;
+    -fx-background-radius: 999;
+    -fx-min-width: 32; -fx-min-height: 32; -fx-max-width: 32; -fx-max-height: 32;
+    -fx-alignment: center;
+}
+.avatar .label { -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: bold; }
+.notif-dot { -fx-fill: -nf-danger; }
+
+/* ============================================================ CONTENU ET CARTES */
+.content { -fx-background-color: -nf-bg; -fx-padding: 24 28 28 28; }
+.scroll-pane, .scroll-pane > .viewport { -fx-background-color: -nf-bg; -fx-background: -nf-bg; }
+.scroll-pane { -fx-padding: 0; -fx-background-insets: 0; }
+.card {
+    -fx-background-color: -nf-surface;
+    -fx-background-radius: 16;
+    -fx-border-color: -nf-border;
+    -fx-border-radius: 16;
+    -fx-padding: 18 20;
+    -fx-effect: dropshadow(gaussian, rgba(16, 38, 49, 0.04), 10, 0, 0, 2);
+}
+.card-dark {
+    -fx-background-color: -nf-navy;
+    -fx-background-radius: 16;
+    -fx-padding: 18 20;
+}
+.root.dark .card-dark { -fx-background-color: #12313B; -fx-border-color: #1F4A55; -fx-border-radius: 16; }
+.card-dark .label { -fx-text-fill: white; }
+.card-dark .muted { -fx-text-fill: -nf-on-navy-muted; }
+.kpi-value { -fx-font-size: 30px; -fx-font-weight: bold; }
+.kpi-unit { -fx-font-size: 15px; -fx-font-weight: 600; -fx-text-fill: -nf-muted; }
+.card-dark .kpi-unit { -fx-text-fill: -nf-on-navy-muted; }
+.kpi-icon-bubble { -fx-background-radius: 999; -fx-min-width: 36; -fx-min-height: 36; -fx-max-width: 36; -fx-max-height: 36; -fx-alignment: center; }
+.bubble-green { -fx-background-color: -nf-green-soft; }
+.bubble-danger { -fx-background-color: -nf-danger-soft; }
+.bubble-warning { -fx-background-color: -nf-warning-soft; }
+.bubble-info { -fx-background-color: -nf-info-soft; }
+.trend-good { -fx-text-fill: -nf-green-strong; -fx-font-size: 11px; -fx-font-weight: 600; }
+.trend-bad { -fx-text-fill: -nf-danger; -fx-font-size: 11px; -fx-font-weight: 600; }
+.card-dark .trend-good { -fx-text-fill: #5FE0CB; }
+.ring-track { -fx-stroke: rgba(255, 255, 255, 0.14); -fx-fill: transparent; }
+.ring-value { -fx-stroke: #3FD8C1; -fx-fill: transparent; }
+
+/* Segmenté 3M / 6M / 1A */
+.segmented { -fx-background-color: -nf-surface-2; -fx-background-radius: 10; -fx-padding: 3; -fx-spacing: 2; }
+.segment {
+    -fx-background-color: transparent; -fx-background-radius: 8; -fx-padding: 5 12; -fx-min-height: 28;
+    -fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: -nf-muted;
+}
+.segment:selected { -fx-background-color: -nf-green; -fx-text-fill: white; }
+
+/* Alertes « Votre attention » */
+.alert-row { -fx-padding: 10 4; -fx-spacing: 12; -fx-alignment: center-left; -fx-border-color: transparent transparent -nf-border transparent; }
+.alert-row:hover { -fx-background-color: -nf-surface-2; -fx-background-radius: 10; }
+.count-chip { -fx-background-color: -nf-danger-soft; -fx-text-fill: -nf-danger; -fx-background-radius: 999; -fx-padding: 1 8; -fx-font-size: 11px; -fx-font-weight: bold; }
+.due-danger { -fx-text-fill: -nf-danger; -fx-font-size: 12px; -fx-font-weight: 600; }
+.due-warning { -fx-text-fill: -nf-muted; -fx-font-size: 12px; }
+.due-info { -fx-text-fill: -nf-info; -fx-font-size: 12px; -fx-font-weight: 600; }
+
+/* ============================================================ BADGES DE STATUT (texte + point : pas de couleur seule) */
+.pill { -fx-background-radius: 999; -fx-padding: 3 10 3 8; -fx-font-size: 11px; -fx-font-weight: 600; -fx-graphic-text-gap: 6; }
+.pill-ok { -fx-background-color: -nf-green-soft; -fx-text-fill: -nf-green-strong; }
+.pill-info { -fx-background-color: -nf-info-soft; -fx-text-fill: -nf-info; }
+.pill-danger { -fx-background-color: -nf-danger-soft; -fx-text-fill: -nf-danger; }
+.pill-warning { -fx-background-color: -nf-warning-soft; -fx-text-fill: -nf-warning; }
+.pill-neutral { -fx-background-color: -nf-neutral-soft; -fx-text-fill: -nf-muted; }
+.dot-ok { -fx-fill: -nf-green; } .dot-info { -fx-fill: -nf-info; } .dot-danger { -fx-fill: -nf-danger; }
+.dot-warning { -fx-fill: -nf-warning; } .dot-neutral { -fx-fill: -nf-muted; }
+
+/* Filtres en puces (liste véhicules) */
+.chip {
+    -fx-background-color: -nf-surface; -fx-border-color: -nf-border; -fx-border-radius: 999; -fx-background-radius: 999;
+    -fx-padding: 6 14; -fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: -nf-muted; -fx-min-height: 32;
+}
+.chip:selected { -fx-background-color: -nf-green; -fx-border-color: -nf-green; -fx-text-fill: white; }
+.chip:focus-visible { -fx-border-color: -nf-focus; -fx-border-width: 2; }
+
+/* Barre de carburant */
+.fuel-bar { -fx-pref-height: 6; -fx-pref-width: 110; }
+.fuel-bar > .track { -fx-background-color: -nf-surface-2; -fx-background-radius: 999; -fx-background-insets: 0; }
+.fuel-bar > .bar { -fx-background-radius: 999; -fx-background-insets: 0; -fx-padding: 3; }
+.fuel-low > .bar { -fx-background-color: -nf-danger; }
+.fuel-mid > .bar { -fx-background-color: -nf-warning-bar; }
+.fuel-ok > .bar { -fx-background-color: -nf-green; }
+
+/* ============================================================ TABLE */
+.table-view {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-table-cell-border-color: transparent;
+    -fx-padding: 0;
+}
+.table-view .column-header-background { -fx-background-color: transparent; }
+.table-view .column-header, .table-view .filler {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent -nf-border transparent;
+    -fx-size: 36;
+}
+.table-view .column-header .label { -fx-text-fill: -nf-muted; -fx-font-size: 11px; -fx-font-weight: 600; -fx-alignment: center-left; }
+.table-row-cell {
+    -fx-background-color: -nf-surface;
+    -fx-border-color: transparent transparent -nf-border transparent;
+    -fx-cell-size: 48;
+}
+.table-row-cell:hover { -fx-background-color: -nf-surface-2; }
+.table-row-cell:selected { -fx-background-color: -nf-green-soft; }
+.table-row-cell:empty { -fx-border-color: transparent; -fx-background-color: transparent; }
+.table-cell { -fx-text-fill: -nf-text; -fx-font-size: 12px; -fx-padding: 0 8; -fx-alignment: center-left; }
+.table-view:focused .table-row-cell:focused { -fx-border-color: -nf-focus; -fx-border-width: 1.5; }
+.table-view .placeholder .label { -fx-text-fill: -nf-muted; }
+
+/* ============================================================ GRAPHIQUE */
+.chart { -fx-padding: 4 0 0 0; }
+.chart-plot-background { -fx-background-color: transparent; }
+.chart-vertical-grid-lines { -fx-stroke: transparent; }
+.chart-horizontal-grid-lines { -fx-stroke: -nf-border; -fx-stroke-dash-array: 3 4; }
+.chart-alternative-row-fill { -fx-fill: transparent; }
+.axis { -fx-tick-label-fill: -nf-muted; -fx-tick-label-font-size: 10px; }
+.axis:bottom, .axis:left { -fx-border-color: transparent; }
+.axis-tick-mark, .axis-minor-tick-mark { -fx-stroke: transparent; }
+.chart-series-area-line { -fx-stroke: -nf-green; -fx-stroke-width: 2.2px; }
+.chart-series-area-fill { -fx-fill: linear-gradient(to bottom, rgba(0, 155, 135, 0.22), rgba(0, 155, 135, 0.02)); }
+.chart-area-symbol { -fx-background-color: -nf-green, -nf-surface; -fx-background-insets: 0, 2; -fx-background-radius: 6px; -fx-padding: 4px; }
+
+/* ============================================================ ÉTATS : chargement, vide, erreur, droits */
+.skeleton { -fx-background-color: -nf-surface-2; -fx-background-radius: 10; }
+.state-panel { -fx-alignment: center; -fx-spacing: 10; -fx-padding: 40; }
+.state-title { -fx-font-size: 16px; -fx-font-weight: 600; }
+.banner-error {
+    -fx-background-color: -nf-danger-soft; -fx-background-radius: 12; -fx-padding: 12 16; -fx-spacing: 12; -fx-alignment: center-left;
+}
+.banner-error .label { -fx-text-fill: -nf-danger; }
+.banner-info { -fx-background-color: -nf-info-soft; -fx-background-radius: 12; -fx-padding: 10 14; }
+.banner-info .label { -fx-text-fill: -nf-info; -fx-font-size: 12px; }
+
+/* ============================================================ FICHE VÉHICULE (panneau latéral) */
+.sheet {
+    -fx-background-color: -nf-surface;
+    -fx-border-color: transparent transparent transparent -nf-border;
+    -fx-padding: 24;
+    -fx-spacing: 16;
+    -fx-pref-width: 400;
+    -fx-effect: dropshadow(gaussian, rgba(16, 38, 49, 0.12), 30, 0, -6, 0);
+}
+.vehicle-illustration { -fx-background-color: -nf-surface-2; -fx-background-radius: 16; -fx-padding: 16; }
+.info-tile { -fx-spacing: 2; }
+.info-tile .value { -fx-font-size: 13px; -fx-font-weight: 600; }
+.info-tile .caption { -fx-font-size: 11px; -fx-text-fill: -nf-muted; }
+
+/* ============================================================ ASSISTANT D'AJOUT (étapes) */
+.step { -fx-spacing: 8; -fx-alignment: center-left; }
+.step-number { -fx-background-color: -nf-surface-2; -fx-background-radius: 999; -fx-min-width: 26; -fx-min-height: 26; -fx-alignment: center; -fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: -nf-muted; }
+.step-active .step-number { -fx-background-color: -nf-green; -fx-text-fill: white; }
+.step-label { -fx-font-size: 12px; -fx-text-fill: -nf-muted; }
+.step-active .step-label { -fx-text-fill: -nf-text; -fx-font-weight: 600; }
+.step-unavailable .step-label { -fx-text-fill: -nf-muted; -fx-font-style: italic; }
+.step-line { -fx-background-color: -nf-border; -fx-pref-height: 1; -fx-max-height: 1; -fx-min-width: 24; }

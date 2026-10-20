@@ -1,0 +1,11 @@
+target/
+build-offline/
+build/
+.gradle/
+*.iml
+.idea/
+.vscode/
+.env
+*.keystore
+*.jks
+local.properties

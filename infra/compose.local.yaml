@@ -1,0 +1,35 @@
+# Environnement LOCAL de développement uniquement (jamais en production). Aucun secret réel.
+# docker compose -f infra/compose.local.yaml up -d
+# STATUT : non exécuté dans l'environnement de réalisation (Docker indisponible).
+name: nextfleet-local
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: nextfleet
+      POSTGRES_USER: nextfleet
+      POSTGRES_PASSWORD: ${NF_DB_PASSWORD:?définir NF_DB_PASSWORD dans un fichier .env local non versionné}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./db/init-extensions.sql:/docker-entrypoint-initdb.d/00-extensions.sql:ro
+
+  api:
+    build: ../services/nextfleet-api           # nécessite un Dockerfile après le premier build Maven réussi
+    profiles: ["api"]
+    environment:
+      NF_DB_URL: jdbc:postgresql://db:5432/nextfleet
+      NF_DB_USER: nextfleet
+      NF_DB_PASSWORD: ${NF_DB_PASSWORD}
+      NF_ENVIRONMENT: DEV
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on: [db]
+
+  # Traccar : service distinct, non exposé aux clients (règle cardinale 3). Activation après décision D08.
+  traccar:
+    image: traccar/traccar:latest            # version à figer après qualification (nomenclature DSIR)
+    profiles: ["gps"]
+    ports: ["127.0.0.1:8082:8082"]
+
+volumes:
+  db-data:

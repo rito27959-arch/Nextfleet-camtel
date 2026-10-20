@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+"""Vérifie les contrastes WCAG 2.2 des couples texte/fond du design system (objectif 4,5:1, cahier V4 chap. 16)."""
+import json
+import sys
+from pathlib import Path
+
+tokens = json.loads((Path(__file__).resolve().parent.parent / "shared/ui-tokens/tokens.json").read_text(encoding="utf-8"))
+
+
+def lum(hex_color):
+    h = hex_color.lstrip("#")
+    rgb = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    lin = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+def ratio(a, b):
+    la, lb = sorted((lum(a), lum(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+
+PAIRS = [  # (thème, texte, fond, seuil, usage)
+    ("light", "text", "background", 4.5, "texte courant"),
+    ("light", "text", "surface", 4.5, "texte sur carte"),
+    ("light", "muted", "surface", 4.5, "texte secondaire"),
+    ("light", "muted", "background", 4.5, "texte secondaire sur fond"),
+    ("light", "greenStrong", "surface", 4.5, "lien / tendance positive"),
+    ("light", "greenStrong", "greenSoft", 4.5, "badge « En service »"),
+    ("light", "danger", "dangerSoft", 4.5, "badge « Entretien requis »"),
+    ("light", "info", "infoSoft", 4.5, "badge « En déplacement »"),
+    ("light", "warning", "warningSoft", 3.0, "échéance (gras 12 px : seuil grand texte non atteint → à surveiller)"),
+    ("dark", "text", "background", 4.5, "texte courant sombre"),
+    ("dark", "muted", "surface", 4.5, "texte secondaire sombre"),
+    ("dark", "greenStrong", "surface", 4.5, "tendance positive sombre"),
+    ("dark", "danger", "surface", 4.5, "alerte sombre"),
+]
+
+failures = 0
+for theme, fg, bg, threshold, usage in PAIRS:
+    c = tokens["color"][theme]
+    r = ratio(c[fg], c[bg])
+    ok = r >= threshold
+    failures += not ok
+    print(f"{'OK ' if ok else 'ÉCHEC'} {theme:5} {fg:>12} sur {bg:<11} {r:5.2f}:1 (seuil {threshold}) — {usage}")
+
+white_on_green = ratio("#FFFFFF", tokens["color"]["light"]["green"])
+print(f"{'OK ' if white_on_green >= 3 else 'ÉCHEC'} blanc sur vert #009B87 (bouton, texte 14 px semi-gras) : {white_on_green:.2f}:1"
+      " — conforme grand texte seulement ; voir docs/ETAT_AVANCEMENT.md")
+sys.exit(1 if failures else 0)

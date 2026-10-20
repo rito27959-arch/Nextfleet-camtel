@@ -1,0 +1,201 @@
+package cm.camtel.nextfleet.desktop.ui;
+
+import cm.camtel.nextfleet.desktop.data.FleetGateway;
+import cm.camtel.nextfleet.desktop.data.FleetGateway.GatewayException;
+import cm.camtel.nextfleet.desktop.data.Models.Vehicle;
+import javafx.collections.FXCollections;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Control;
+import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
+
+import java.time.Year;
+import java.time.ZoneId;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.function.Consumer;
+
+/**
+ * Écran 04 — Ajout d'un véhicule, étape 1 « Informations » (lot 1).
+ * Les étapes Photos et Modèle 3D (écrans 05 à 09) sont signalées comme non disponibles, jamais simulées.
+ */
+final class VehicleFormView extends ScrollPane {
+
+    private final TextField registration = field("Ex. CE 3205 KJ");
+    private final TextField vin = field("17 caractères (facultatif)");
+    private final TextField make = field("Ex. Toyota");
+    private final TextField model = field("Ex. Hilux");
+    private final TextField year = field("Ex. 2022");
+    private final ComboBox<String> energy = new ComboBox<>(FXCollections.observableArrayList(
+            "DIESEL", "ESSENCE", "HYBRIDE", "ELECTRIQUE", "GPL", "AUTRE"));
+    private final TextField tank = field("Litres (facultatif)");
+    private final TextField category = field("Ex. Pick-up");
+    private final Map<String, Label> errorLabels = new LinkedHashMap<>();
+    private final Map<String, Control> controls = new LinkedHashMap<>();
+    private final Label globalError = Ui.label("", "error-text");
+    private final Button save = new Button("Enregistrer");
+
+    VehicleFormView(FleetGateway gateway, Consumer<Vehicle> onCreated, Runnable onCancel) {
+        VBox box = new VBox(10);
+        box.getStyleClass().add("sheet");
+        box.setPrefWidth(440);
+        setContent(box);
+        setFitToWidth(true);
+        setPrefWidth(460);
+        setHbarPolicy(ScrollBarPolicy.NEVER);
+
+        Button close = new Button(null, Icons.stroke(Icons.CLOSE, 16, "-nf-muted"));
+        close.getStyleClass().add("icon-button");
+        close.setAccessibleText("Fermer le formulaire");
+        close.setOnAction(e -> onCancel.run());
+        HBox title = new HBox(Ui.label("Ajouter un véhicule", "t-20", "w-700"), Ui.spacer(), close);
+        title.setAlignment(Pos.CENTER_LEFT);
+
+        HBox steps = new HBox(8, step("1", "Informations", "step-active"), line(), step("2", "Photos", "step-unavailable"),
+                line(), step("3", "Modèle 3D", "step-unavailable"), line(), step("4", "Validation", ""));
+        steps.setAlignment(Pos.CENTER_LEFT);
+        Label stepsNote = Ui.label("Photos et modèle 3D : lot 4 (écrans 05 à 09). L'enregistrement se fait dès l'étape 1.", "muted", "t-12");
+        stepsNote.setWrapText(true);
+
+        energy.setValue("DIESEL");
+        energy.setMaxWidth(Double.MAX_VALUE);
+        energy.setAccessibleText("Énergie");
+
+        box.getChildren().addAll(title, steps, stepsNote,
+                group("registration", "Immatriculation *", registration),
+                row(group("make", "Marque *", make), group("model", "Modèle *", model)),
+                row(group("year", "Année", year), group("energy", "Énergie", energy)),
+                row(group("tank", "Capacité du réservoir", tank), group("category", "Catégorie", category)),
+                group("vin", "Numéro de châssis (VIN)", vin),
+                globalError);
+
+        Button cancel = new Button("Annuler");
+        cancel.getStyleClass().add("btn-secondary");
+        cancel.setOnAction(e -> onCancel.run());
+        save.getStyleClass().add("btn-primary");
+        save.setDefaultButton(true);
+        HBox actions = new HBox(10, Ui.spacer(), cancel, save);
+        box.getChildren().add(actions);
+        globalError.setWrapText(true);
+
+        save.setOnAction(e -> submit(gateway, onCreated));
+    }
+
+    private void submit(FleetGateway gateway, Consumer<Vehicle> onCreated) {
+        clearErrors();
+        VehicleFormValidator.Result r = new VehicleFormValidator().validate(registration.getText(), vin.getText(),
+                make.getText(), model.getText(), year.getText(), energy.getValue(), tank.getText(), category.getText(),
+                Year.now(ZoneId.of("Africa/Douala")));
+        if (!r.ok()) {
+            r.errors().forEach(this::showFieldError);
+            controls.get(r.errors().keySet().iterator().next()).requestFocus();
+            return;
+        }
+        save.setDisable(true);
+        save.setText("Enregistrement…");
+        Ui.async(() -> gateway.createVehicle(r.draft()), v -> {
+            save.setDisable(false);
+            save.setText("Enregistrer");
+            onCreated.accept(v);
+        }, err -> {
+            save.setDisable(false);
+            save.setText("Enregistrer");
+            if (err.kind() == GatewayException.Kind.CONFLICT) {
+                showFieldError("registration", err.getMessage());
+                registration.requestFocus();
+            } else {
+                globalError.setText(err.getMessage());
+            }
+        });
+    }
+
+    /** Pour la recette visuelle : remplit le formulaire avec une saisie erronée puis valide. */
+    void fillInvalidForTest() {
+        registration.setText("CE-4401 lt");
+        make.setText("Toyota");
+        model.setText("");
+        year.setText("1890");
+        tank.setText("abc");
+        save.fire();
+    }
+
+    private void showFieldError(String key, String message) {
+        Label l = errorLabels.get(key);
+        if (l != null) {
+            l.setText(message);
+            l.setManaged(true);
+            l.setVisible(true);
+        }
+        Control c = controls.get(key);
+        if (c != null) {
+            c.getStyleClass().add("field-error");
+            c.setAccessibleHelp(message);
+        }
+    }
+
+    private void clearErrors() {
+        globalError.setText("");
+        errorLabels.values().forEach(l -> {
+            l.setText("");
+            l.setManaged(false);
+            l.setVisible(false);
+        });
+        controls.values().forEach(c -> c.getStyleClass().remove("field-error"));
+    }
+
+    private Node group(String key, String label, Control control) {
+        Label l = Ui.label(label, "field-label");
+        l.setLabelFor(control);
+        Label err = Ui.label("", "error-text");
+        err.setWrapText(true);
+        err.setManaged(false);
+        err.setVisible(false);
+        errorLabels.put(key, err);
+        controls.put(key, control);
+        control.setMaxWidth(Double.MAX_VALUE);
+        if (control.getAccessibleText() == null) control.setAccessibleText(label.replace(" *", ""));
+        VBox v = new VBox(4, l, control, err);
+        HBox.setHgrow(v, Priority.ALWAYS);
+        v.setMaxWidth(Double.MAX_VALUE);
+        return v;
+    }
+
+    private static HBox row(Node a, Node b) {
+        HBox h = new HBox(12, a, b);
+        return h;
+    }
+
+    private static TextField field(String prompt) {
+        TextField t = new TextField();
+        t.setPromptText(prompt);
+        return t;
+    }
+
+    private static HBox step(String n, String label, String state) {
+        Label num = Ui.label(n, "step-number");
+        Label l = Ui.label(label, "step-label");
+        l.setMinWidth(Region.USE_PREF_SIZE);
+        num.setMinWidth(Region.USE_PREF_SIZE);
+        HBox h = new HBox(6, num, l);
+        h.getStyleClass().add("step");
+        if (!state.isEmpty()) h.getStyleClass().add(state);
+        h.setAlignment(Pos.CENTER_LEFT);
+        return h;
+    }
+
+    private static Region line() {
+        Region r = new Region();
+        r.getStyleClass().add("step-line");
+        HBox.setHgrow(r, Priority.ALWAYS);
+        r.setMinWidth(8);
+        return r;
+    }
+}

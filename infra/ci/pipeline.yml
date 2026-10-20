@@ -1,0 +1,36 @@
+# Chaîne d'intégration proposée (syntaxe GitHub Actions ; à transposer vers le Git institutionnel retenu par la DSIR).
+# STATUT : non exécutée.
+name: nextfleet-ci
+on: [push, pull_request]
+jobs:
+  base-de-donnees:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-16 postgresql-16-postgis-3
+      - run: sudo pg_ctlcluster 16 main start && sudo -u postgres psql -c "create role nextfleet login password 'ci_only' createdb;"
+      - run: PGPASSWORD=ci_only infra/db/tests/run_db_tests.sh
+  java:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21', cache: maven }
+      - run: mvn -B verify                      # domaine, API (Testcontainers), bureau
+      - run: python3 tools/check_contrast.py
+  desktop-paquets:
+    needs: java
+    strategy:
+      matrix: { os: [ubuntu-24.04, windows-2022] }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21', cache: maven }
+      - run: mvn -B -pl apps/desktop-javafx -am package -DskipTests
+      - run: echo "jpackage selon docs/BUILD.md (DEB sous Linux, MSI/EXE sous Windows)"
+  secrets-et-licences:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Analyse des secrets (ex. gitleaks) et SBOM CycloneDX à brancher après choix DSIR"
