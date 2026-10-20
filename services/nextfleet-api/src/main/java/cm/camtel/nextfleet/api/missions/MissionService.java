@@ -203,7 +203,7 @@ public class MissionService {
             List<UUID> scope = new ArrayList<>(access.scopeFor("gps:read"));
             scope.addAll(access.scopeFor("mission:manage"));
             if (!scope.contains(r.orgUnitId())) {
-                audit.record(u.userId(), "ACCESS_DENIED", "mission", id.toString(), "gps:read", null, null);
+                audit.recordDenied(u.userId(), "mission", id.toString(), "gps:read");
                 throw new AccessDeniedException("Trajet hors périmètre");
             }
         }

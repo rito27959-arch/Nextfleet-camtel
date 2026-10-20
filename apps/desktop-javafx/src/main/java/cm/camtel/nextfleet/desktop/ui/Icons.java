@@ -15,6 +15,7 @@ public final class Icons {
     private Icons() { }
 
     public static final String HOME = "M4 11 L12 4 L20 11 M6 9.5 V20 H10 V14 H14 V20 H18 V9.5";
+    public static final String CUBE = "M12 3 L20 7.5 V16.5 L12 21 L4 16.5 V7.5 Z M4 7.5 L12 12 L20 7.5 M12 12 V21";
     public static final String CAR = "M3 16 V12.5 L5.2 7.5 C5.5 6.9 6 6.5 6.7 6.5 H17.3 C18 6.5 18.5 6.9 18.8 7.5 L21 12.5 V16 H3 Z M3 12.5 H21 M6.5 16 V18.5 M17.5 16 V18.5 M6.5 14.2 H7.5 M16.5 14.2 H17.5";
     public static final String WRENCH = "M14.5 6.5 A4 4 0 0 0 19.6 11.6 L19.9 11.3 A4.5 4.5 0 0 1 13.7 5.1 L13.4 5.4 Z M14.2 9.8 L5 19 A1.4 1.4 0 0 1 3 17 L12.2 7.8";
     public static final String FUEL = "M5 20 V5.5 C5 4.7 5.7 4 6.5 4 H12.5 C13.3 4 14 4.7 14 5.5 V20 M3.5 20 H15.5 M5 10 H14 M14 8.5 H16 C16.8 8.5 17.5 9.2 17.5 10 V16.5 C17.5 17.3 18.2 18 19 18 C19.8 18 20.5 17.3 20.5 16.5 V8 L18 5.5";

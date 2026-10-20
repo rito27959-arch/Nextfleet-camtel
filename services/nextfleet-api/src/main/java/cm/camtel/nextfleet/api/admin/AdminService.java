@@ -43,7 +43,7 @@ public class AdminService {
         List<UUID> s = access.scopeFor(permission);
         if (s.isEmpty()) {
             AuthenticatedUser u = access.currentUser();
-            audit.record(u.userId(), "ACCESS_DENIED", "admin", permission, permission, null, null);
+            audit.recordDenied(u.userId(), "admin", permission, permission);
             throw new AccessDeniedException("Hors profil");
         }
         return s;

@@ -52,6 +52,9 @@ public final class ScreenshotTour {
         add(app::toggleTheme);
         add(() -> shot("21c-missions-sombre"));
         add(app::toggleTheme);
+        add(() -> shell().show(AppShell.Section.CATALOGUE));
+        add(() -> { });
+        add(() -> shot("23-catalogue-3d"));
         add(() -> shell().show(AppShell.Section.MESSAGES));
         add(() -> shot("22-messages"));
         add(() -> find(MessagesView.class).typeAndSendForTest("Bien noté, merci Alain. Bonne fin de route."));

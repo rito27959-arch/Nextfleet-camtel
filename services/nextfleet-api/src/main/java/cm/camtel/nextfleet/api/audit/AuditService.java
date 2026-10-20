@@ -36,6 +36,15 @@ public class AuditService {
                         .addValue("rid", MDC.get("requestId")));
     }
 
+    /**
+     * Refus d'accès journalisé dans une transaction AUTONOME : la trace survit à l'annulation de la transaction
+     * appelante et fonctionne aussi depuis une transaction en lecture seule (REC-SEC-01).
+     */
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void recordDenied(UUID actorId, String objectType, String objectId, String permission) {
+        record(actorId, "ACCESS_DENIED", objectType, objectId, permission, null, null);
+    }
+
     private String json(Object v) {
         if (v == null) return null;
         try {

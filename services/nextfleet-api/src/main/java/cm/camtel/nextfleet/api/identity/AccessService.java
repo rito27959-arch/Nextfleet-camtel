@@ -46,7 +46,7 @@ public class AccessService {
     public void require(String permission, UUID objectOrgId, String objectType, String objectId) {
         AuthenticatedUser u = currentUser();
         if (!policy().isAllowed(u.grants(), permission, objectOrgId == null ? null : objectOrgId.toString(), clock.instant())) {
-            audit.record(u.userId(), "ACCESS_DENIED", objectType, objectId, permission, null, null);
+            audit.recordDenied(u.userId(), objectType, objectId, permission);
             throw new AccessDeniedException("Accès refusé");
         }
     }

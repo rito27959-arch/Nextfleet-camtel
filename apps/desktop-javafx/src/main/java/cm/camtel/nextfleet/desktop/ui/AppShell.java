@@ -43,7 +43,7 @@ public final class AppShell extends StackPane {
         MY_MISSIONS("Mes missions", Icons.ROUTE), WORKSHOP("Atelier", Icons.WRENCH), USERS("Comptes et rôles", Icons.USERS),
         OVERVIEW("Vue d'ensemble", Icons.HOME), MISSIONS("Missions", Icons.ROUTE), MESSAGES("Messages", Icons.BUBBLE),
         ASSISTANT("Assistant", Icons.SPARK), VEHICLES("Véhicules", Icons.CAR), DUE("Échéances", Icons.CALENDAR),
-        DRIVERS("Conducteurs", Icons.USER), AUDIT("Journal d'audit", Icons.LIST), MAINTENANCE("Entretiens", Icons.WRENCH),
+        DRIVERS("Conducteurs", Icons.USER), CATALOGUE("Catalogue 3D", Icons.CUBE), AUDIT("Journal d'audit", Icons.LIST), MAINTENANCE("Entretiens", Icons.WRENCH),
         FUEL("Carburant", Icons.FUEL), COSTS("Coûts", Icons.CHART), REPORTS("Rapports", Icons.REPORT),
         SETTINGS("Réglages", Icons.GEAR);
 
@@ -128,6 +128,7 @@ public final class AppShell extends StackPane {
             case ASSISTANT -> session.can(ASSISTANT_USE);
             case VEHICLES, DUE -> session.can(VEHICLE_READ);
             case DRIVERS -> session.can(DRIVER_READ);
+            case CATALOGUE -> session.can(VEHICLE_READ) || session.can(MAINTENANCE_WRITE);
             case AUDIT -> session.can(AUDIT_READ);
             case MAINTENANCE -> session.can(VEHICLE_WRITE);
             case FUEL -> session.can(FUEL_ORDER_CREATE) || session.can(FUEL_ORDER_APPROVE) || session.can(FUEL_FILL_CREATE);
@@ -425,6 +426,7 @@ public final class AppShell extends StackPane {
             case VEHICLES -> new VehiclesView(gateway, session, null, this);
             case DUE -> new DueDatesView(gateway, this);
             case DRIVERS -> new DriversView(gateway);
+            case CATALOGUE -> new CatalogueView(this);
             case SETTINGS -> new SettingsView(gateway, session, this);
             default -> unavailable(s);
         };

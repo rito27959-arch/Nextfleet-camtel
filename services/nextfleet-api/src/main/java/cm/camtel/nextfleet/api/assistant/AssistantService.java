@@ -95,7 +95,7 @@ public class AssistantService {
             s = AssistantActivation.decide(enable, securityReviewRef, approvedBy, reason, u.displayName(), permissionsOf(u.userId()), clock.instant());
         } catch (AssistantActivation.Refused e) {
             if (!permissionsOf(u.userId()).contains(Permission.ADMIN_SETTINGS)) {
-                audit.record(u.userId(), "ACCESS_DENIED", "assistant_activation", "-", "admin:settings", null, null);
+                audit.recordDenied(u.userId(), "assistant_activation", "-", "admin:settings");
                 throw new org.springframework.security.access.AccessDeniedException(e.getMessage());
             }
             throw new IllegalArgumentException(e.getMessage());

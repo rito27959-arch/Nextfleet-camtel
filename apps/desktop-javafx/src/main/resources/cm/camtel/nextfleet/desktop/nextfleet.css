@@ -589,3 +589,11 @@
 .demo-account:hover { -fx-background-color: -nf-fill; }
 .demo-account .role-label { -fx-font-size: 13px; -fx-font-weight: 600; }
 .demo-account .role-summary { -fx-font-size: 11px; -fx-text-fill: -nf-muted; }
+
+/* ---------------------------------------------------------------- catalogue 3D */
+.catalogue-item { -fx-background-color: transparent; -fx-background-radius: 12; -fx-padding: 10 12; -fx-cursor: hand; }
+.catalogue-item:hover { -fx-background-color: -nf-fill; }
+.catalogue-item:selected { -fx-background-color: -nf-surface; -fx-effect: dropshadow(gaussian, rgba(16, 36, 52, 0.10), 14, 0, 0, 4); }
+.root.dark .catalogue-item:selected { -fx-effect: null; -fx-background-color: -nf-fill-strong; }
+.viewer-stage { -fx-background-color: linear-gradient(to bottom, #F6F8FA, #E9EDF1); -fx-background-radius: 18; }
+.root.dark .viewer-stage { -fx-background-color: linear-gradient(to bottom, #1F2A31, #141B20); }
