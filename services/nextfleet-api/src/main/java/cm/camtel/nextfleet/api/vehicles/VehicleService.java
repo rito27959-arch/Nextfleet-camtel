@@ -68,8 +68,8 @@ public class VehicleService {
                    AND (:archived OR archived_at IS NULL)
                    AND (CAST(:q AS text) IS NULL OR registration_normalized LIKE :qn
                         OR lower(make) LIKE :q OR lower(model) LIKE :q)""";
-        long total = jdbc.queryForObject("SELECT count(*) FROM vehicle" + where, p, Long.class);
-        List<VehicleView> items = jdbc.query("SELECT " + COLUMNS + " FROM vehicle" + where
+        long total = jdbc.queryForObject("SELECT count(*) FROM vehicle " + where, p, Long.class);
+        List<VehicleView> items = jdbc.query("SELECT " + COLUMNS + " FROM vehicle " + where
                 + " ORDER BY registration_normalized LIMIT :limit OFFSET :offset", p, MAPPER);
         return new Page<>(items, page, size, total);
     }
