@@ -78,22 +78,33 @@ public final class FleetTrackingView extends HBox {
         listScroll.setFitToWidth(true);
         listScroll.getStyleClass().add("split-list");
         VBox.setVgrow(listScroll, Priority.ALWAYS);
-        VBox left = new VBox(14, titles, search, listScroll);
-        left.setPrefWidth(300);
-        left.setMinWidth(260);
-
-        StackPane center = new StackPane(map, legend());
-        HBox.setHgrow(center, Priority.ALWAYS);
-        center.setMinWidth(360);
+        // Comme Plans sur Mac : carte plein cadre, liste et fiche en panneaux de verre posés dessus
+        VBox left = new VBox(12, titles, search, listScroll);
+        left.getStyleClass().add("map-glass-panel");
+        left.setPrefWidth(312);
+        left.setMaxWidth(312);
+        StackPane.setAlignment(left, Pos.TOP_LEFT);
+        StackPane.setMargin(left, new Insets(14));
 
         panel.getStyleClass().add("tracking-panel");
-        panel.setPrefWidth(320);
-        panel.setMinWidth(280);
         ScrollPane panelScroll = new ScrollPane(panel);
         panelScroll.setFitToWidth(true);
         panelScroll.getStyleClass().add("split-list");
+        VBox right = new VBox(panelScroll);
+        right.getStyleClass().add("map-glass-panel");
+        right.setPrefWidth(372);
+        right.setMaxWidth(372);
+        right.setMaxHeight(Region.USE_PREF_SIZE);
+        panelScroll.setPrefViewportHeight(560);
+        StackPane.setAlignment(right, Pos.TOP_RIGHT);
+        StackPane.setMargin(right, new Insets(14));
 
-        getChildren().addAll(left, center, panelScroll);
+        StackPane center = new StackPane(map, legend(), left, right);
+        HBox.setHgrow(center, Priority.ALWAYS);
+        center.setMinWidth(600);
+        setPadding(new Insets(4, 22, 22, 4));
+
+        getChildren().addAll(center);
         showEmptyPanel();
         if (shell.gateway().isDemo()) {
             connection.setText("Démonstration · positions simulées");
@@ -144,7 +155,7 @@ public final class FleetTrackingView extends HBox {
         renderMarkers(false);
         if (!fitted && !vehicles.isEmpty()) {
             fitted = true;
-            map.fit(vehicles.values().stream().map(v -> new double[]{v.lat(), v.lon()}).toList(), 80);
+            map.fit(vehicles.values().stream().map(v -> new double[]{v.lat(), v.lon()}).toList(), 40, 400, 80, 340);
         }
         if (selected == null && !vehicles.isEmpty()) select(vehicles.keySet().iterator().next(), false);
         else if (selected != null && vehicles.containsKey(selected)) renderPanel(vehicles.get(selected));
@@ -282,7 +293,7 @@ public final class FleetTrackingView extends HBox {
         renderList();
         renderMarkers(false);
         renderPanel(v);
-        if (center) map.setCenter(v.lat(), v.lon());
+        if (center) map.fit(List.of(new double[]{v.lat(), v.lon()}), 40, 400, 80, 340);
         try {
             java.util.UUID mission = java.util.UUID.fromString(v.missionId());
             Ui.async(() -> shell.gateway().missionTrack(mission), fixes -> {
@@ -331,7 +342,7 @@ public final class FleetTrackingView extends HBox {
         mission.setOnAction(e -> shell.show(AppShell.Section.MISSIONS));
         Button recenter = new Button("Centrer");
         recenter.getStyleClass().addAll("btn-secondary", "btn-small");
-        recenter.setOnAction(e -> map.setCenter(v.lat(), v.lon()));
+        recenter.setOnAction(e -> map.fit(List.of(new double[]{v.lat(), v.lon()}), 40, 400, 80, 340));
         HBox actions = new HBox(8, recenter, mission);
         panel.getChildren().setAll(head, group, actions);
     }

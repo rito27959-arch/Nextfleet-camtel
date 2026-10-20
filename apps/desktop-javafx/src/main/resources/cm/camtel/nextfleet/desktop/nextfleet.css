@@ -645,3 +645,194 @@
 .root.dark .map-graticule { -fx-stroke: rgba(255,255,255,0.06); }
 .map-place-dot { -fx-fill: #8A969E; }
 .map-place { -fx-font-size: 11px; -fx-text-fill: #5E6B73; -fx-font-weight: 600; }
+
+/* =====================================================================================================================
+ * DESIGN v2 — « Liquid Glass teinté » (iOS 26 / macOS 26), voir docs/RECHERCHE_DESIGN_IOS26.md
+ * Règles : verre réservé à la couche de navigation (barre latérale, barre d'outils, panneaux posés sur la carte) ;
+ * contenu sur surfaces opaques ; capsules pour les contrôles ; rayons concentriques (26 → 16, 22 → 14, 28 → capsule) ;
+ * titres plus gras alignés à gauche ; couleur réservée au sens. Classe .opaque = « Réduire la transparence ».
+ * Ces règles viennent après le lot 1.2 et le remplacent là où elles se recouvrent.
+ * ===================================================================================================================== */
+.root {
+    -nf-backdrop: linear-gradient(from 0% 0% to 100% 100%, #E9F0F3 0%, #F3F5F8 42%, #EEF5F2 72%, #E8F1F6 100%);
+    -nf-glass: linear-gradient(to bottom, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.82));
+    -nf-glass-stroke: rgba(16, 36, 52, 0.09);
+    -nf-glass-edge: rgba(255, 255, 255, 0.95);
+    -nf-glass-shadow: rgba(16, 36, 52, 0.14);
+    -nf-select: rgba(0, 133, 117, 0.13);
+    -fx-font-size: 14px;
+}
+.root.dark {
+    -nf-backdrop: linear-gradient(from 0% 0% to 100% 100%, #0B1013 0%, #10171C 50%, #0C1416 100%);
+    -nf-glass: linear-gradient(to bottom, rgba(44, 52, 60, 0.86), rgba(30, 36, 42, 0.80));
+    -nf-glass-stroke: rgba(255, 255, 255, 0.10);
+    -nf-glass-edge: rgba(255, 255, 255, 0.14);
+    -nf-glass-shadow: rgba(0, 0, 0, 0.45);
+    -nf-select: rgba(61, 219, 196, 0.16);
+}
+
+/* ---------- fond et verre */
+.app-backdrop, .login-root { -fx-background-color: -nf-backdrop; }
+.content { -fx-background-color: transparent; -fx-padding: 22 32 36 22; }
+.scroll-pane, .scroll-pane > .viewport { -fx-background-color: transparent; -fx-background: transparent; }
+
+.glass {
+    -fx-background-color: -nf-glass-stroke, -nf-glass-edge, -nf-glass;
+    -fx-background-insets: 0, 1, 1.6;
+    -fx-background-radius: 999;
+    -fx-effect: dropshadow(gaussian, -nf-glass-shadow, 22, 0, 0, 6);
+}
+.root.opaque .glass, .root.opaque .sidebar {
+    -fx-background-color: -nf-glass-stroke, -nf-surface;
+    -fx-background-insets: 0, 1;
+}
+
+/* ---------- barre latérale flottante (rayon 26, éléments concentriques 16) */
+.sidebar-host { -fx-padding: 12 0 12 12; }
+.sidebar {
+    -fx-background-color: -nf-glass-stroke, -nf-glass-edge, -nf-glass;
+    -fx-background-insets: 0, 1, 1.6;
+    -fx-background-radius: 26;
+    -fx-effect: dropshadow(gaussian, -nf-glass-shadow, 30, 0, 0, 10);
+    -fx-padding: 18 10 12 10;
+    -fx-pref-width: 236; -fx-min-width: 236;
+}
+.sidebar .brand-name { -fx-text-fill: -nf-text; -fx-font-size: 21px; }
+.sidebar .section-title { -fx-text-fill: -nf-muted; -fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 14 12 6 12; }
+.nav-item {
+    -fx-background-radius: 16; -fx-text-fill: -nf-text; -fx-font-size: 14px; -fx-font-weight: 500;
+    -fx-min-height: 40; -fx-pref-height: 40; -fx-padding: 0 12;
+}
+.nav-item .icon { -fx-stroke: -nf-muted; }
+.nav-item .label { -fx-text-fill: -nf-text; }
+.nav-item:hover { -fx-background-color: -nf-fill; }
+.nav-item:selected, .nav-item:selected .label { -fx-text-fill: -nf-accent-text; -fx-font-weight: 700; }
+.nav-item:selected .icon { -fx-stroke: -nf-accent-text; }
+.nav-indicator {
+    -fx-background-color: -nf-select;
+    -fx-background-radius: 16;
+    -fx-effect: null;
+}
+.nav-count { -fx-background-color: -nf-fill-strong; -fx-text-fill: -nf-text; }
+.nav-count-alert { -fx-background-color: -nf-red; -fx-text-fill: white; }
+.sidebar-footer { -fx-border-color: -nf-separator transparent transparent transparent; -fx-padding: 12 8 2 8; }
+.sidebar-footer .label { -fx-text-fill: -nf-text; }
+.sidebar-footer .muted { -fx-text-fill: -nf-muted; }
+
+/* ---------- barre d'outils : capsules de verre flottantes */
+.topbar { -fx-background-color: transparent; -fx-border-color: transparent; -fx-padding: 14 32 4 22; -fx-spacing: 10; -fx-min-height: 64; }
+.search-capsule { -fx-pref-width: 360; -fx-max-width: 360; }
+.search-capsule .search-field, .search-field {
+    -fx-background-color: transparent; -fx-background-radius: 999; -fx-border-radius: 999;
+    -fx-min-height: 40; -fx-pref-height: 40; -fx-padding: 0 16 0 36; -fx-font-size: 14px;
+}
+.search-capsule .search-field:focused { -fx-background-color: transparent; -fx-border-color: -nf-focus; -fx-border-width: 2; }
+.toolbar-group { -fx-padding: 3 4; -fx-min-height: 40; }
+.toolbar-group .icon-button { -fx-background-radius: 999; -fx-min-width: 34; -fx-min-height: 34; }
+.toolbar-account { -fx-background-radius: 999; -fx-padding: 0 12 0 4; -fx-min-height: 34; -fx-pref-height: 34; }
+.toolbar-account:hover { -fx-background-color: -nf-fill; }
+.badge-demo { -fx-background-radius: 999; -fx-padding: 4 10; }
+
+/* ---------- typographie (bureau : entre iPadOS et macOS ; titres plus gras, alignés à gauche) */
+.large-title, .h1 { -fx-font-size: 30px; -fx-font-weight: 800; }
+.title1 { -fx-font-size: 24px; -fx-font-weight: 800; }
+.title2 { -fx-font-size: 20px; -fx-font-weight: bold; }
+.title3 { -fx-font-size: 17px; -fx-font-weight: 700; }
+.headline, .h2 { -fx-font-size: 14px; -fx-font-weight: 700; }
+.body { -fx-font-size: 14px; }
+.kpi-value { -fx-font-size: 32px; -fx-font-weight: 800; }
+.overline { -fx-font-size: 11px; -fx-font-weight: 700; }
+
+/* ---------- contrôles : capsules */
+.button, .toggle-button { -fx-background-radius: 999; -fx-border-radius: 999; -fx-min-height: 36; -fx-pref-height: 36; -fx-padding: 0 18; }
+.button:focus-visible, .toggle-button:focus-visible { -fx-border-radius: 999; }
+.btn-large { -fx-min-height: 46; -fx-pref-height: 46; -fx-background-radius: 999; -fx-padding: 0 24; -fx-font-size: 15px; }
+.btn-small { -fx-min-height: 30; -fx-pref-height: 30; -fx-background-radius: 999; -fx-padding: 0 12; }
+.btn-primary, .btn-filled { -fx-effect: dropshadow(gaussian, rgba(0, 133, 117, 0.28), 12, 0, 0, 3); }
+.root.dark .btn-primary, .root.dark .btn-filled { -fx-effect: null; }
+.icon-button { -fx-background-radius: 999; }
+.text-field, .password-field, .combo-box { -fx-background-radius: 12; -fx-border-radius: 12; -fx-min-height: 40; }
+.segmented { -fx-background-radius: 999; -fx-padding: 3; }
+.segmented-thumb { -fx-background-radius: 999; -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.16), 8, 0, 0, 2); }
+.segment { -fx-background-radius: 999; -fx-min-height: 30; -fx-pref-height: 30; -fx-padding: 0 16; }
+.pill { -fx-background-radius: 999; -fx-padding: 3 10 3 9; }
+.chip { -fx-min-height: 32; -fx-pref-height: 32; -fx-padding: 0 16; }
+.symbol-tile { -fx-background-radius: 10; }
+.kpi-icon-bubble { -fx-background-radius: 999; }
+
+/* ---------- contenu opaque : cartes et listes groupées (rayon 22 → lignes 14) */
+.card {
+    -fx-background-radius: 22; -fx-border-radius: 22; -fx-padding: 20 22;
+    -fx-border-color: -nf-border;
+    -fx-effect: dropshadow(gaussian, rgba(16, 36, 52, 0.05), 20, 0, 0, 4);
+}
+.card:hover { -fx-effect: dropshadow(gaussian, rgba(16, 36, 52, 0.09), 26, 0, 0, 8); }
+.card-dark { -fx-background-radius: 22; -fx-padding: 20 22; }
+.root.dark .card-dark { -fx-border-radius: 22; }
+.inset-group { -fx-background-radius: 22; -fx-border-radius: 22; }
+.alert-row, .list-row { -fx-background-radius: 14; }
+.map-card { -fx-background-radius: 26; -fx-border-radius: 26; }
+.tile-map { -fx-background-radius: 26; -fx-border-radius: 26; }
+.banner-error, .banner-info, .demo-hint { -fx-background-radius: 16; }
+.table-row-cell { -fx-cell-size: 54; }
+.table-row-cell:selected { -fx-background-color: -nf-select; }
+
+/* ---------- panneaux, feuilles, alertes, bannières */
+.sheet { -fx-background-radius: 28 0 0 28; -fx-padding: 24 26; }
+.alert-card { -fx-background-radius: 28; -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.28), 50, 0, 0, 18); }
+.alert-body { -fx-padding: 24 22 12 22; -fx-spacing: 8; }
+.alert-title { -fx-font-size: 17px; -fx-font-weight: 700; }
+.alert-actions { -fx-padding: 6 16 16 16; }
+.alert-button {
+    -fx-background-color: -nf-fill; -fx-background-radius: 999; -fx-min-height: 44; -fx-pref-height: 44;
+    -fx-text-fill: -nf-text; -fx-font-size: 15px; -fx-font-weight: 600;
+}
+.alert-button:hover { -fx-background-color: -nf-fill-strong; }
+.alert-button.alert-prominent { -fx-background-color: -nf-accent; -fx-text-fill: white; }
+.alert-button.alert-prominent:hover { -fx-background-color: -nf-accent-hover; }
+.alert-button.destructive { -fx-background-color: -nf-red-tint; -fx-text-fill: -nf-red-text; }
+.alert-button:focus-visible { -fx-border-color: -nf-focus; -fx-border-width: 3; -fx-border-insets: -3; -fx-border-radius: 999; }
+.banner { -fx-background-radius: 22; -fx-border-radius: 22; }
+.toast { -fx-background-radius: 999; }
+
+/* ---------- carte de suivi GPS : panneaux de verre posés sur la carte */
+.map-glass-panel {
+    -fx-background-color: -nf-glass-stroke, -nf-glass-edge, -nf-glass;
+    -fx-background-insets: 0, 1, 1.6;
+    -fx-background-radius: 26;
+    -fx-effect: dropshadow(gaussian, -nf-glass-shadow, 26, 0, 0, 8);
+    -fx-padding: 16 12 12 12;
+}
+.root.opaque .map-glass-panel, .root.opaque .map-zoom, .root.opaque .map-chip { -fx-background-color: -nf-glass-stroke, -nf-surface; -fx-background-insets: 0, 1; }
+.map-zoom { -fx-background-radius: 999; -fx-background-color: -nf-glass-stroke, -nf-glass-edge, -nf-glass; -fx-background-insets: 0, 1, 1.6; }
+.map-zoom-button:hover { -fx-background-radius: 999; }
+.map-chip { -fx-background-color: -nf-glass-stroke, -nf-glass-edge, -nf-glass; -fx-background-insets: 0, 1, 1.6; -fx-padding: 6 12; }
+.tracking-row { -fx-background-radius: 16; }
+.tracking-row-selected, .tracking-row-selected:hover { -fx-background-color: -nf-select; -fx-effect: null; }
+.live-chip { -fx-padding: 4 12; }
+.card { -fx-padding: 18 20; }
+.alert-button { -fx-padding: 0 12; -fx-font-size: 14px; }
+.login-brand {
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 100%, #10303C 0%, #102631 55%, #0C4A45 100%);
+    -fx-background-radius: 28;
+    -fx-effect: dropshadow(gaussian, rgba(16, 38, 49, 0.28), 30, 0, 0, 10);
+}
+.field-group { -fx-background-radius: 16; -fx-border-radius: 16; }
+.demo-account { -fx-background-radius: 14; }
+
+/* ---------- colonnes (messages, missions) : panneaux arrondis opaques */
+.split-list { -fx-background-color: -nf-surface; -fx-background-radius: 22; -fx-border-color: -nf-border; -fx-border-radius: 22; }
+.thread { -fx-background-color: -nf-surface; -fx-background-radius: 22; }
+.thread-header { -fx-background-color: -nf-surface; }
+.composer { -fx-background-color: -nf-surface; }
+.composer-field { -fx-background-radius: 999; -fx-border-radius: 999; }
+.split-list .search-field, .map-glass-panel .search-field {
+    -fx-background-color: -nf-fill; -fx-background-radius: 999; -fx-padding: 0 14; -fx-min-height: 36; -fx-pref-height: 36;
+}
+.map-glass-panel .split-list, .map-glass-panel .scroll-pane, .map-glass-panel .scroll-pane > .viewport {
+    -fx-background-color: transparent; -fx-background: transparent; -fx-border-color: transparent; -fx-pref-width: -1; -fx-min-width: 0;
+}
+.mission-card { -fx-background-radius: 18; -fx-border-radius: 18; }
+.conv-row { -fx-background-radius: 16; }
+.split-list .search-field { -fx-padding: 0 14 0 34; }
+.sheet, .notification-center { -fx-background-radius: 28; }

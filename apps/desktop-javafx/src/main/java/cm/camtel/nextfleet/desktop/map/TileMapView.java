@@ -116,12 +116,12 @@ public final class TileMapView extends StackPane {
         VBox zoomBox = new VBox(plus, minus);
         zoomBox.getStyleClass().add("map-zoom");
         zoomBox.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
-        StackPane.setAlignment(zoomBox, Pos.TOP_RIGHT);
-        StackPane.setMargin(zoomBox, new Insets(14));
+        StackPane.setAlignment(zoomBox, Pos.BOTTOM_RIGHT);
+        StackPane.setMargin(zoomBox, new Insets(0, 14, 34, 0));
 
         offlineBadge.getStyleClass().add("map-chip");
         offlineBadge.setVisible(false);
-        StackPane.setAlignment(offlineBadge, Pos.TOP_LEFT);
+        StackPane.setAlignment(offlineBadge, Pos.TOP_CENTER);
         StackPane.setMargin(offlineBadge, new Insets(14));
 
         getChildren().addAll(fallback, tiles, overlay, scale, attribution, zoomBox, offlineBadge);
@@ -196,6 +196,33 @@ public final class TileMapView extends StackPane {
         centerX = wx * k - px + w / 2;
         centerY = wy * k - py + h / 2;
         zoom = nz;
+        relayout();
+    }
+
+    /**
+     * Cadre la vue sur des points en réservant des zones masquées par des panneaux flottants (haut, droite, bas,
+     * gauche) : les marqueurs restent visibles entre les panneaux.
+     */
+    public void fit(List<double[]> points, double top, double right, double bottom, double left) {
+        if (points.isEmpty()) return;
+        double w = getWidth() > 0 ? getWidth() : 1100;
+        double h = getHeight() > 0 ? getHeight() : 700;
+        double availW = Math.max(160, w - left - right);
+        double availH = Math.max(160, h - top - bottom);
+        double minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+        for (double[] p : points) {
+            minLat = Math.min(minLat, p[0]);
+            maxLat = Math.max(maxLat, p[0]);
+            minLon = Math.min(minLon, p[1]);
+            maxLon = Math.max(maxLon, p[1]);
+        }
+        boolean single = points.size() == 1 || (maxLat - minLat < 1e-4 && maxLon - minLon < 1e-4);
+        zoom = single ? 14 : Math.min(15, WebMercator.fitZoom(minLat, minLon, maxLat, maxLon, availW, availH, 40, source.maxZoom()));
+        // centre de l'emprise placé au centre de la zone libre, puis décalé vers le centre de la vue
+        double cx = (WebMercator.lonToX(minLon, zoom) + WebMercator.lonToX(maxLon, zoom)) / 2;
+        double cy = (WebMercator.latToY(maxLat, zoom) + WebMercator.latToY(minLat, zoom)) / 2;
+        centerX = cx - (left - right) / 2;
+        centerY = cy - (top - bottom) / 2;
         relayout();
     }
 

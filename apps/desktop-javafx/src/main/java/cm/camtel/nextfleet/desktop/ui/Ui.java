@@ -340,6 +340,17 @@ public final class Ui {
         return z.format(java.time.format.DateTimeFormatter.ofPattern("EEE d MMM", Locale.FRANCE));
     }
 
+    /** Découpe un panneau à coins arrondis (le fond suit ; les enfants ne débordent pas des coins). */
+    public static <T extends Region> T rounded(T r, double radius) {
+        javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle();
+        clip.setArcWidth(radius * 2);
+        clip.setArcHeight(radius * 2);
+        clip.widthProperty().bind(r.widthProperty());
+        clip.heightProperty().bind(r.heightProperty());
+        r.setClip(clip);
+        return r;
+    }
+
     public static Region spacer() {
         Region r = new Region();
         HBox.setHgrow(r, Priority.ALWAYS);

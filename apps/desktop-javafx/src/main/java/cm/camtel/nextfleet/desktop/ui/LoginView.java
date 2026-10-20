@@ -114,7 +114,10 @@ public final class LoginView extends StackPane {
         StackPane right = new StackPane(form);
         right.setPadding(new Insets(40));
         HBox.setHgrow(right, Priority.ALWAYS);
-        HBox split = new HBox(brandPane, right);
+        // iOS 26 : panneau de marque décollé des bords, coins concentriques avec la fenêtre
+        StackPane brandHost = new StackPane(brandPane);
+        brandHost.setPadding(new Insets(14, 0, 14, 14));
+        HBox split = new HBox(brandHost, right);
         getChildren().add(split);
 
         submit.setOnAction(e -> attempt(gateway, onLogin));

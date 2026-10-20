@@ -53,10 +53,16 @@ public final class SettingsView extends ScrollPane {
         Controls.Segmented theme = new Controls.Segmented(List.of("Clair", "Sombre"), shell.isDark() ? 1 : 0,
                 i -> shell.setDark(i == 1));
         Controls.Switch motion = new Controls.Switch(Motion.isReduced(), "Réduire les animations", Motion::setReduced);
+        Controls.Switch opaque = new Controls.Switch(Appearance.isOpaque(), "Réduire la transparence", on -> {
+            Appearance.setOpaque(on);
+            if (getScene() != null) Appearance.apply(getScene().getRoot());
+        });
         col.getChildren().add(Ui.insetGroup("Apparence", List.of(
                 Ui.listRow(Ui.symbolTile(Icons.MOON, "tile-indigo"), "Thème", null, theme, null),
+                Ui.listRow(Ui.symbolTile(Icons.LAYERS, "tile-mint"), "Réduire la transparence", null, opaque, null),
                 Ui.listRow(Ui.symbolTile(Icons.MOTION, "tile-blue"), "Réduire les animations", null, motion, null)),
-                "Avec la réduction de mouvement, chaque écran s'affiche directement dans son état final."));
+                "Réduire la transparence rend opaques la barre latérale, la barre d'outils et les panneaux (lisibilité en plein soleil). "
+                        + "Avec la réduction de mouvement, chaque écran s'affiche directement dans son état final."));
 
         // Notifications
         col.getChildren().add(Ui.insetGroup("Notifications", List.of(

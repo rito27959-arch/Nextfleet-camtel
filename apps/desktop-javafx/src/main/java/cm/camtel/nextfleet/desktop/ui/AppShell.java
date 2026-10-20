@@ -5,6 +5,7 @@ import cm.camtel.nextfleet.desktop.data.Models.DueLevel;
 import cm.camtel.nextfleet.desktop.data.Models.Session;
 import javafx.application.Platform;
 import javafx.geometry.Bounds;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -84,7 +85,11 @@ public final class AppShell extends StackPane {
         this.onToggleTheme = onToggleTheme;
         this.isDark = isDark;
         BorderPane frame = new BorderPane();
-        frame.setLeft(sidebar());
+        frame.getStyleClass().add("app-backdrop");
+        // iOS 26 : barre latérale flottante et décollée des bords (verre teinté), le contenu passe derrière visuellement
+        StackPane sideHost = new StackPane(sidebar());
+        sideHost.getStyleClass().add("sidebar-host");
+        frame.setLeft(sideHost);
         BorderPane main = new BorderPane();
         main.setTop(topbar());
         main.setCenter(content);
@@ -213,6 +218,8 @@ public final class AppShell extends StackPane {
         panel.setPrefWidth(width);
         StackPane layer = new StackPane(scrim, panel);
         StackPane.setAlignment(panel, Pos.CENTER_RIGHT);
+        StackPane.setMargin(panel, new Insets(12));   // feuille décollée des bords (iOS 26)
+        Ui.rounded(panel, 28);
         layer.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ESCAPE) closeSidePanel();
         });
@@ -330,7 +337,7 @@ public final class AppShell extends StackPane {
         boolean inStack = sel.getParent().getParent() == indicatorLayer.getParent();
         if (!inStack) {   // Paramètres : hors de la pile principale → fond plein sur le bouton
             indicator.setOpacity(0);
-            sel.setStyle("-fx-background-color: -nf-green;");
+            sel.setStyle("-fx-background-color: -nf-select;");
             return;
         }
         nav.values().forEach(b -> b.setStyle(null));
@@ -360,6 +367,7 @@ public final class AppShell extends StackPane {
         search.getStyleClass().add("search-field");
         search.setAccessibleText("Recherche globale");
         StackPane searchBox = new StackPane(search, Icons.stroke(Icons.SEARCH, 16, "-nf-muted"));
+        searchBox.getStyleClass().addAll("glass", "search-capsule");
         StackPane.setAlignment(searchBox.getChildren().get(1), Pos.CENTER_LEFT);
         searchBox.getChildren().get(1).setTranslateX(12);
         searchBox.getChildren().get(1).setMouseTransparent(true);
@@ -401,9 +409,16 @@ public final class AppShell extends StackPane {
         user.setOnAction(e -> show(Section.SETTINGS));
         user.setStyle("-fx-text-fill: -nf-text; -fx-font-size: 13px; -fx-font-weight: 500;");
         for (Node n : new Node[]{theme, bell, user}) Motion.pressable(n);
-        bar.getChildren().add(theme);
-        if (session.can(VEHICLE_READ)) bar.getChildren().add(bellBox);
-        bar.getChildren().add(user);
+        // Barre d'outils iOS 26 : icônes regroupées dans une seule capsule de verre, compte dans la sienne
+        HBox tools = new HBox(2, theme);
+        if (session.can(VEHICLE_READ)) tools.getChildren().add(bellBox);
+        tools.getStyleClass().addAll("glass", "toolbar-group");
+        tools.setAlignment(Pos.CENTER);
+        user.getStyleClass().add("toolbar-account");
+        HBox account = new HBox(user);
+        account.getStyleClass().addAll("glass", "toolbar-group");
+        account.setAlignment(Pos.CENTER);
+        bar.getChildren().addAll(tools, account);
         return bar;
     }
 

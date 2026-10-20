@@ -77,8 +77,8 @@ public final class AlertDialog {
 
         VBox card = new VBox(body);
         card.setStyle("-fx-background-color: -nf-overlay-surface;");
-        card.setMaxSize(300, Region.USE_PREF_SIZE);
-        card.setPrefWidth(300);
+        card.setMaxSize(360, Region.USE_PREF_SIZE);
+        card.setPrefWidth(360);
         card.setAccessibleRole(javafx.scene.AccessibleRole.PARENT);
         card.setAccessibleText("Alerte : " + title);
 
@@ -109,34 +109,37 @@ public final class AlertDialog {
             if (a.role() == Role.CANCEL) cancel = b;
             buttons.add(b);
         }
-        Region top = hairline(true);
-        card.getChildren().add(top);
-        if (stacked || buttons.size() == 1) {
-            for (int i = 0; i < buttons.size(); i++) {
-                if (i > 0) card.getChildren().add(hairline(true));
-                card.getChildren().add(buttons.get(i));
-            }
-        } else {
-            HBox row = new HBox();
-            for (int i = 0; i < buttons.size(); i++) {
-                if (i > 0) row.getChildren().add(hairline(false));
-                HBox.setHgrow(buttons.get(i), Priority.ALWAYS);
-                buttons.get(i).setPrefWidth(150);
-                row.getChildren().add(buttons.get(i));
-            }
-            card.getChildren().add(row);
+        // iOS 26 : boutons en capsules, concentriques à la carte (rayon 28, marge 16) ; action préférée teintée
+        for (Button b : buttons) {
+            if (b.getStyleClass().contains("preferred") && !b.getStyleClass().contains("destructive")) b.getStyleClass().add("alert-prominent");
         }
+        javafx.scene.layout.Pane actionsBox;
+        if (stacked) {
+            VBox col = new VBox(8);
+            col.getChildren().addAll(buttons);
+            actionsBox = col;
+        } else {
+            HBox row = new HBox(10);
+            for (Button btn : buttons) {
+                HBox.setHgrow(btn, Priority.ALWAYS);
+                btn.setPrefWidth(120);
+                row.getChildren().add(btn);
+            }
+            actionsBox = row;
+        }
+        actionsBox.getStyleClass().add("alert-actions");
+        card.getChildren().add(actionsBox);
         // Coins arrondis : découpe du contenu au rayon de la carte
         javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle();
-        clip.setArcWidth(32);
-        clip.setArcHeight(32);
+        clip.setArcWidth(56);
+        clip.setArcHeight(56);
         clip.widthProperty().bind(card.widthProperty());
         clip.heightProperty().bind(card.heightProperty());
         card.setClip(clip);
         // L'ombre est portée par un support non découpé
         StackPane shadow = new StackPane(card);
         shadow.getStyleClass().add("alert-card");
-        shadow.setMaxSize(300, Region.USE_PREF_SIZE);
+        shadow.setMaxSize(360, Region.USE_PREF_SIZE);
         StackPane layer = new StackPane(dim, shadow);
         StackPane.setAlignment(shadow, Pos.CENTER);
 
@@ -176,19 +179,4 @@ public final class AlertDialog {
         }
     }
 
-    private static Region hairline(boolean horizontal) {
-        Region r = new Region();
-        r.getStyleClass().add("hairline");
-        if (horizontal) {
-            r.setMinHeight(1);
-            r.setMaxHeight(1);
-            r.setMaxWidth(Double.MAX_VALUE);
-        } else {
-            r.setMinWidth(1);
-            r.setMaxWidth(1);
-            r.setPrefWidth(1);
-            r.setStyle("-fx-min-height: 46;");
-        }
-        return r;
-    }
 }

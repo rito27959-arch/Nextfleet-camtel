@@ -41,6 +41,7 @@ public class NextfleetDesktopApp extends Application {
         boolean demo = getParameters().getUnnamed().contains("--demo") || !args.containsKey("api");
         dark = getParameters().getUnnamed().contains("--dark");
         cm.camtel.nextfleet.desktop.ui.Motion.setReduced(getParameters().getUnnamed().contains("--reduce-motion"));
+        cm.camtel.nextfleet.desktop.ui.Appearance.setOpaque(getParameters().getUnnamed().contains("--opaque"));
         cm.camtel.nextfleet.desktop.ui.FleetTrackingView.configureTiles(args.get("tiles"));
         String shots = args.get("screenshot");
         gateway = demo
@@ -104,6 +105,7 @@ public class NextfleetDesktopApp extends Application {
         Parent root = scene.getRoot();
         root.getStyleClass().remove("dark");
         if (dark) root.getStyleClass().add("dark");
+        cm.camtel.nextfleet.desktop.ui.Appearance.apply(root);
     }
 
     public Scene scene() {

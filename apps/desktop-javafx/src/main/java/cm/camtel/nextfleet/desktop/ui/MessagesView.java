@@ -81,14 +81,17 @@ final class MessagesView extends BorderPane {
         VBox left = new VBox(header, sp);
         VBox.setVgrow(sp, Priority.ALWAYS);
         left.getStyleClass().add("split-list");
-        setLeft(left);
+        setLeft(Ui.rounded(left, 22));
+        // iOS 26 : colonnes en panneaux arrondis décollés des bords, alignés sur la barre latérale flottante
+        setPadding(new Insets(4, 22, 22, 4));
+        BorderPane.setMargin(left, new Insets(0, 14, 0, 0));
 
         thread.getStyleClass().add("thread");
         bodyScroll.setFitToWidth(true);
         bodyScroll.getStyleClass().add("thread");
         body.getStyleClass().add("thread-body");
         body.heightProperty().addListener((o, a, b) -> bodyScroll.setVvalue(1.0));
-        setCenter(thread);
+        setCenter(Ui.rounded(thread, 22));
         thread.setCenter(Ui.statePanel(Icons.BUBBLE, "Aucune conversation sélectionnée",
                 "Les échanges sont réservés aux participants de chaque conversation."));
 

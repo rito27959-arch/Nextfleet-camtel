@@ -56,7 +56,10 @@ final class MissionsView extends BorderPane {
         VBox left = new VBox(header, sp);
         VBox.setVgrow(sp, Priority.ALWAYS);
         left.getStyleClass().add("split-list");
-        setLeft(left);
+        setLeft(Ui.rounded(left, 22));
+        // iOS 26 : colonnes en panneaux arrondis décollés des bords, alignés sur la barre latérale flottante
+        setPadding(new Insets(4, 22, 22, 4));
+        BorderPane.setMargin(left, new Insets(0, 14, 0, 0));
 
         ScrollPane right = new ScrollPane(detail);
         right.setFitToWidth(true);
