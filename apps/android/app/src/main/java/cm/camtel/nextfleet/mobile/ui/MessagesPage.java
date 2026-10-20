@@ -28,7 +28,7 @@ final class MessagesPage implements Page {
     MessagesPage(MainActivity a) {
         this.a = a;
         col = Ui.column(a, 0);
-        col.setPadding(Ui.dp(a, 16), Ui.dp(a, 16), Ui.dp(a, 16), Ui.dp(a, 24));
+        col.setPadding(Ui.dp(a, 16), Ui.dp(a, 16), Ui.dp(a, 16), Ui.dp(a, Ui.TAB_CLEARANCE));
         scroll = new ScrollView(a);
         scroll.addView(col);
         Ui.applyInsets(scroll, true, false);
@@ -63,8 +63,7 @@ final class MessagesPage implements Page {
         TextView t = Ui.largeTitle(a, "Messages");
         t.setPadding(Ui.dp(a, 4), 0, 0, Ui.dp(a, 12));
         col.addView(t);
-        LinearLayout group = Ui.column(a, 0);
-        group.setBackground(Ui.rounded(a, Ui.SURFACE, 14));
+        LinearLayout group = Ui.group(a);
         for (int i = 0; i < list.size(); i++) {
             Conversation c = list.get(i);
             if (i > 0) {
@@ -87,8 +86,8 @@ final class MessagesPage implements Page {
                 0xFFFFFFFF, NexFleetApp.get().semibold());
         avatar.setGravity(Gravity.CENTER);
         avatar.setBackground(Ui.rounded(a, c.kind == Chat.Kind.MISSION ? Ui.BRAND : c.kind == Chat.Kind.SERVICE ? 0xFFFF8D28 : 0xFF8E9AA6,
-                c.kind == Chat.Kind.DIRECT ? 22 : 12));
-        r.addView(avatar, new LinearLayout.LayoutParams(Ui.dp(a, 44), Ui.dp(a, 44)));
+                999));
+        r.addView(avatar, new LinearLayout.LayoutParams(Ui.dp(a, 48), Ui.dp(a, 48)));
         LinearLayout text = Ui.column(a, 3);
         LinearLayout top = Ui.row(a, 6);
         top.addView(Ui.headline(a, c.title), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
@@ -108,6 +107,8 @@ final class MessagesPage implements Page {
         }
         text.addView(bottom);
         r.addView(text, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        r.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x14000000), null,
+                new android.graphics.drawable.ColorDrawable(0xFF000000)));
         r.setOnClickListener(v -> a.startActivity(new Intent(a, ThreadActivity.class).putExtra("id", c.id).putExtra("title", c.title)));
         r.setContentDescription(c.title + (c.unread > 0 ? ", " + c.unread + " non lus" : ""));
         return r;

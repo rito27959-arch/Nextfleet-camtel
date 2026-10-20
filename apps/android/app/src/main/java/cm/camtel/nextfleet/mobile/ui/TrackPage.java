@@ -34,12 +34,12 @@ final class TrackPage implements Page, TrackingBus.Listener {
     TrackPage(MainActivity a) {
         this.a = a;
         col = Ui.column(a, 14);
-        col.setPadding(Ui.dp(a, 20), Ui.dp(a, 16), Ui.dp(a, 20), Ui.dp(a, 24));
+        col.setPadding(Ui.dp(a, 20), Ui.dp(a, 16), Ui.dp(a, 20), Ui.dp(a, Ui.TAB_CLEARANCE));
         col.addView(Ui.largeTitle(a, "Trajet"));
         status = Ui.muted(a, "", 14);
         col.addView(status);
         map = new TrackView(a);
-        map.setBackground(Ui.rounded(a, 0xFFEEF2F0, 16));
+        map.setBackground(Ui.rounded(a, 0xFFEEF2F0, 26));
         map.setClipToOutline(true);
         col.addView(map, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(a, 360)));
         stats = Ui.body(a, "");

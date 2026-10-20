@@ -48,7 +48,7 @@ final class MissionsPage implements Page, TrackingBus.Listener {
     MissionsPage(MainActivity a) {
         this.a = a;
         col = Ui.column(a, 16);
-        col.setPadding(Ui.dp(a, 20), Ui.dp(a, 16), Ui.dp(a, 20), Ui.dp(a, 24));
+        col.setPadding(Ui.dp(a, 20), Ui.dp(a, 16), Ui.dp(a, 20), Ui.dp(a, Ui.TAB_CLEARANCE));
         scroll = new ScrollView(a);
         scroll.addView(col);
         Ui.applyInsets(scroll, true, false);
@@ -108,7 +108,9 @@ final class MissionsPage implements Page, TrackingBus.Listener {
         Session s = NexFleetApp.get().session();
         col.removeAllViews();
         liveLine = null;
-        col.addView(Ui.largeTitle(a, s.can(Permission.MISSION_DRIVE) && !s.can(Permission.MISSION_MANAGE) ? "Mes missions" : "Missions"));
+        TextView title = Ui.largeTitle(a, s.can(Permission.MISSION_DRIVE) && !s.can(Permission.MISSION_MANAGE) ? "Mes missions" : "Missions");
+        title.setPadding(Ui.dp(a, 4), 0, 0, 0);
+        col.addView(title);
         Mission active = null, next = null;
         List<Mission> others = new ArrayList<>();
         for (Mission m : missions) {
@@ -124,11 +126,13 @@ final class MissionsPage implements Page, TrackingBus.Listener {
                 + "NexFleet (puis Traccar) uniquement pendant la mission."
                 : "La localisation fonctionne uniquement entre le démarrage et la clôture d'une mission autorisée.", 12);
         note.setPadding(Ui.dp(a, 14), Ui.dp(a, 10), Ui.dp(a, 14), Ui.dp(a, 10));
-        note.setBackground(Ui.rounded(a, 0x1F0088FF, 12));
+        note.setBackground(Ui.rounded(a, 0x1F0088FF, 16));
         note.setTextColor(Ui.TEXT);
         col.addView(note);
         if (!others.isEmpty()) {
-            col.addView(Ui.overline(a, "Toutes les missions", Ui.MUTED));
+            TextView h = Ui.text(a, "TOUTES LES MISSIONS", 13, Ui.MUTED, NexFleetApp.get().regular());
+            h.setPadding(Ui.dp(a, 6), Ui.dp(a, 8), 0, 0);
+            col.addView(h);
             for (Mission m : others) col.addView(card(m));
         }
         if (active != null) {
@@ -142,8 +146,13 @@ final class MissionsPage implements Page, TrackingBus.Listener {
     private View hero(Mission m, boolean active) {
         LinearLayout h = Ui.column(a, 10);
         h.setPadding(Ui.dp(a, 22), Ui.dp(a, 22), Ui.dp(a, 22), Ui.dp(a, 22));
-        h.setBackground(Ui.rounded(a, active ? 0xFF00806F : Ui.NAVY, 22));
-        h.setElevation(Ui.dp(a, 6));
+        // carte héroïque à la Wallet : dégradé, rayon 28, bouton capsule concentrique
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                active ? new int[]{0xFF007A6A, 0xFF00A08A} : new int[]{0xFF12323F, 0xFF0C4A45});
+        bg.setCornerRadius(Ui.dp(a, 28));
+        h.setBackground(bg);
+        h.setElevation(Ui.dp(a, 8));
         h.addView(Ui.overline(a, active ? "Mission en cours" : "Prochaine mission", 0xC8FFFFFF));
         TextView t = Ui.title(a, m.purpose);
         t.setTextColor(0xFFFFFFFF);

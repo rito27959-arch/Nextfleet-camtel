@@ -54,16 +54,14 @@ public final class MainActivity extends Activity {
         pages.add(new CataloguePage(this));
         pages.add(new ProfilePage(this));
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Ui.BG);
-        root.addView(content, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
-        View hair = new View(this);
-        hair.setBackgroundColor(Ui.SEPARATOR);
-        root.addView(hair, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1));
+        // iOS 26 : contenu plein écran sur fond doux, barre d'onglets en verre teinté qui flotte au-dessus
+        FrameLayout root = new FrameLayout(this);
+        root.setBackground(Ui.backdrop());
+        root.addView(content, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         LinearLayout bar = new LinearLayout(this);
-        bar.setBackgroundColor(0xF7FFFFFF);
-        bar.setPadding(0, Ui.dp(this, 6), 0, Ui.dp(this, 4));
+        bar.setBackground(Ui.glass(this, 32));
+        bar.setElevation(Ui.dp(this, 10));
+        bar.setPadding(Ui.dp(this, 6), Ui.dp(this, 6), Ui.dp(this, 6), Ui.dp(this, 6));
         for (int i = 0; i < pages.size(); i++) {
             final int idx = i;
             LinearLayout t = new LinearLayout(this);
@@ -71,18 +69,25 @@ public final class MainActivity extends Activity {
             t.setGravity(Gravity.CENTER);
             ImageView ic = new ImageView(this);
             ic.setImageResource(pages.get(i).icon());
-            t.addView(ic, new LinearLayout.LayoutParams(Ui.dp(this, 26), Ui.dp(this, 26)));
-            TextView label = Ui.text(this, pages.get(i).title(), 10.5f, Ui.MUTED, NexFleetApp.get().semibold());
+            t.addView(ic, new LinearLayout.LayoutParams(Ui.dp(this, 24), Ui.dp(this, 24)));
+            TextView label = Ui.text(this, pages.get(i).title(), 10.5f, Ui.TEXT, NexFleetApp.get().semibold());
             label.setGravity(Gravity.CENTER);
+            label.setPadding(0, Ui.dp(this, 2), 0, 0);
             t.addView(label);
             t.setOnClickListener(v -> show(idx));
             t.setContentDescription(pages.get(i).title());
-            t.setMinimumHeight(Ui.dp(this, 50));
+            t.setMinimumHeight(Ui.dp(this, 52));
             tabs.add(t);
-            bar.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            bar.addView(t, new LinearLayout.LayoutParams(0, Ui.dp(this, 52), 1f));
         }
-        root.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        Ui.applyInsets(bar, false, true);
+        FrameLayout barHost = new FrameLayout(this);
+        FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM);
+        bp.setMargins(Ui.dp(this, 14), 0, Ui.dp(this, 14), Ui.dp(this, 10));
+        barHost.addView(bar, bp);
+        root.addView(barHost, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM));
+        Ui.applyInsets(barHost, false, true);
         setContentView(root);
         show(0);
     }
@@ -124,10 +129,12 @@ public final class MainActivity extends Activity {
         v.setTranslationY(Ui.dp(this, 8));
         v.animate().alpha(1f).translationY(0).setDuration(220).start();
         for (int k = 0; k < tabs.size(); k++) {
-            int color = k == i ? Ui.ACCENT : Ui.MUTED;
+            int color = k == i ? Ui.GLASS_ACCENT : Ui.TEXT;
             LinearLayout t = tabs.get(k);
             ((ImageView) t.getChildAt(0)).setImageTintList(ColorStateList.valueOf(color));
             ((TextView) t.getChildAt(1)).setTextColor(color);
+            // onglet actif : capsule teintée concentrique à la barre (32 − 6 = 26)
+            t.setBackground(k == i ? Ui.rounded(this, Ui.SELECT, 26) : null);
             t.setSelected(k == i);
         }
         pages.get(i).onShow();

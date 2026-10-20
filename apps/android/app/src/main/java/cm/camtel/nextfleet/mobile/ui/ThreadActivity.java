@@ -58,19 +58,23 @@ public final class ThreadActivity extends Activity {
         conversationId = getIntent().getStringExtra("id");
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Ui.SURFACE);
+        root.setBackground(Ui.backdrop());
 
         LinearLayout header = Ui.row(this, 8);
         header.setPadding(Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 16), Ui.dp(this, 10));
-        header.setBackgroundColor(0xF7FFFFFF);
-        TextView back = Ui.text(this, "‹ Messages", 17, Ui.ACCENT_TEXT, NexFleetApp.get().regular());
-        back.setPadding(Ui.dp(this, 8), Ui.dp(this, 8), Ui.dp(this, 8), Ui.dp(this, 8));
+        // iOS 26 : bouton retour en capsule de verre, titre centré ; pas de fond de barre
+        TextView back = Ui.text(this, "‹", 26, Ui.TEXT, NexFleetApp.get().regular());
+        back.setGravity(Gravity.CENTER);
+        back.setBackground(Ui.glass(this, 999));
+        back.setElevation(Ui.dp(this, 4));
+        back.setContentDescription("Retour aux messages");
+        back.setLayoutParams(new LinearLayout.LayoutParams(Ui.dp(this, 44), Ui.dp(this, 44)));
         back.setOnClickListener(v -> finish());
         header.addView(back);
         TextView title = Ui.headline(this, getIntent().getStringExtra("title"));
         title.setGravity(Gravity.CENTER);
         header.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        header.addView(new View(this), new LinearLayout.LayoutParams(Ui.dp(this, 80), 1));
+        header.addView(new View(this), new LinearLayout.LayoutParams(Ui.dp(this, 44), 1));
         root.addView(header);
         Ui.applyInsets(header, true, false);
 
@@ -82,7 +86,7 @@ public final class ThreadActivity extends Activity {
 
         LinearLayout composer = Ui.row(this, 10);
         composer.setPadding(Ui.dp(this, 12), Ui.dp(this, 8), Ui.dp(this, 12), Ui.dp(this, 8));
-        composer.setBackgroundColor(0xF7FFFFFF);
+        composer.setPadding(Ui.dp(this, 12), Ui.dp(this, 8), Ui.dp(this, 12), Ui.dp(this, 12));
         input = new EditText(this);
         input.setHint("Message");
         input.setTypeface(NexFleetApp.get().regular());
@@ -91,10 +95,10 @@ public final class ThreadActivity extends Activity {
         input.setHintTextColor(Ui.TERTIARY);
         input.setMaxLines(5);
         input.setImeOptions(EditorInfo.IME_ACTION_SEND);
-        android.graphics.drawable.GradientDrawable field = Ui.rounded(this, Ui.SURFACE, 20);
-        field.setStroke(Ui.dp(this, 1), 0xFFD1D1D6);
-        input.setBackground(field);
-        input.setPadding(Ui.dp(this, 14), Ui.dp(this, 8), Ui.dp(this, 14), Ui.dp(this, 8));
+        input.setBackground(Ui.glass(this, 22));
+        input.setElevation(Ui.dp(this, 3));
+        input.setMinHeight(Ui.dp(this, 44));
+        input.setPadding(Ui.dp(this, 16), Ui.dp(this, 10), Ui.dp(this, 16), Ui.dp(this, 10));
         input.setOnEditorActionListener((v, id, e) -> {
             submit();
             return true;
@@ -103,21 +107,21 @@ public final class ThreadActivity extends Activity {
         send = new ImageButton(this);
         send.setImageResource(R.drawable.ic_send);
         send.setImageTintList(ColorStateList.valueOf(0xFFFFFFFF));
-        send.setBackground(Ui.rounded(this, Ui.ACCENT, 18));
+        send.setBackground(Ui.rounded(this, Ui.ACCENT, 999));
         send.setContentDescription("Envoyer");
         send.setOnClickListener(v -> submit());
-        composer.addView(send, new LinearLayout.LayoutParams(Ui.dp(this, 36), Ui.dp(this, 36)));
+        composer.addView(send, new LinearLayout.LayoutParams(Ui.dp(this, 44), Ui.dp(this, 44)));
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) { }
             @Override public void onTextChanged(CharSequence s, int st, int b, int c) { }
             @Override public void afterTextChanged(Editable s) {
                 boolean on = s.toString().trim().length() > 0;
                 send.setEnabled(on);
-                send.setBackground(Ui.rounded(ThreadActivity.this, on ? Ui.ACCENT : 0xFFC7C7CC, 18));
+                send.setBackground(Ui.rounded(ThreadActivity.this, on ? Ui.ACCENT : 0xFFC7C7CC, 999));
             }
         });
         send.setEnabled(false);
-        send.setBackground(Ui.rounded(this, 0xFFC7C7CC, 18));
+        send.setBackground(Ui.rounded(this, 0xFFC7C7CC, 999));
         root.addView(composer);
         Ui.applyInsets(composer, false, true);
         setContentView(root);
@@ -192,7 +196,7 @@ public final class ThreadActivity extends Activity {
     private View bubble(String text, boolean mine, boolean pendingState, boolean failed) {
         TextView b = Ui.text(this, text, 15.5f, mine && !failed ? 0xFFFFFFFF : failed ? Ui.RED : Ui.TEXT, NexFleetApp.get().regular());
         b.setPadding(Ui.dp(this, 13), Ui.dp(this, 8), Ui.dp(this, 13), Ui.dp(this, 9));
-        b.setBackground(Ui.rounded(this, failed ? 0x1FFF383C : mine ? Ui.ACCENT : 0xFFE9E9EB, 18));
+        b.setBackground(Ui.rounded(this, failed ? 0x1FFF383C : mine ? Ui.ACCENT : 0xFFFFFFFF, 20));
         b.setMaxWidth((int) (getResources().getDisplayMetrics().widthPixels * 0.72));
         if (pendingState) b.setAlpha(0.6f);
         LinearLayout row = new LinearLayout(this);

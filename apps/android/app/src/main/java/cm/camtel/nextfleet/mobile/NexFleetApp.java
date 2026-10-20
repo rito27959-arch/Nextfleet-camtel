@@ -27,6 +27,7 @@ public final class NexFleetApp extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        cm.camtel.nextfleet.mobile.ui.Ui.loadPreferences(this);
         instance = this;
         regular = getResources().getFont(R.font.inter_regular);
         semibold = getResources().getFont(R.font.inter_semibold);

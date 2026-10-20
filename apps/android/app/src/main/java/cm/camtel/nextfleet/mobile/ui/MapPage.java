@@ -78,8 +78,8 @@ final class MapPage implements Page {
         LinearLayout top = Ui.row(a, 10);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setPadding(Ui.dp(a, 16), Ui.dp(a, 10), Ui.dp(a, 16), Ui.dp(a, 10));
-        top.setBackground(Ui.rounded(a, 0xF2FFFFFF, 16));
-        top.setElevation(Ui.dp(a, 3));
+        top.setBackground(Ui.glass(a, 999));
+        top.setElevation(Ui.dp(a, 6));
         top.addView(Ui.title(a, "Carte"));
         chip = Ui.pill(a, "Connexion…", Ui.MUTED);
         top.addView(chip);
@@ -88,11 +88,14 @@ final class MapPage implements Page {
         tp.setMargins(Ui.dp(a, 12), Ui.dp(a, 12), 0, 0);
         root.addView(top, tp);
 
+        // panneau à crans façon Plans : poignée, aperçu du véhicule choisi ou liste complète ; posé au-dessus des onglets
         LinearLayout bottom = Ui.column(a, 8);
-        bottom.setPadding(Ui.dp(a, 12), 0, Ui.dp(a, 12), Ui.dp(a, 12));
-        sheet = Ui.card(a);
+        bottom.setPadding(Ui.dp(a, 12), 0, Ui.dp(a, 12), Ui.dp(a, Ui.TAB_CLEARANCE - 8));
+        sheet = Ui.column(a, 8);
+        sheet.setPadding(Ui.dp(a, 18), Ui.dp(a, 8), Ui.dp(a, 18), Ui.dp(a, 16));
+        sheet.setBackground(Ui.glass(a, 28));
         sheet.setVisibility(View.GONE);
-        sheet.setElevation(Ui.dp(a, 4));
+        sheet.setElevation(Ui.dp(a, 8));
         bottom.addView(sheet);
         strip = Ui.row(a, 8);
         HorizontalScrollView hs = new HorizontalScrollView(a);
@@ -223,13 +226,14 @@ final class MapPage implements Page {
 
     private void renderStrip() {
         strip.removeAllViews();
+        strip.setVisibility(expanded ? View.GONE : View.VISIBLE);
         for (Models.VehicleLive v : vehicles.values()) {
             LinearLayout c = Ui.row(a, 6);
             c.setGravity(Gravity.CENTER_VERTICAL);
             c.setPadding(Ui.dp(a, 12), Ui.dp(a, 8), Ui.dp(a, 14), Ui.dp(a, 8));
             boolean sel = v.vehicleId.equals(selected);
-            c.setBackground(Ui.rounded(a, sel ? Ui.NAVY : 0xF2FFFFFF, 999));
-            c.setElevation(Ui.dp(a, 2));
+            c.setBackground(sel ? Ui.rounded(a, Ui.NAVY, 999) : Ui.glass(a, 999));
+            c.setElevation(Ui.dp(a, 4));
             View dot = new View(a);
             dot.setBackground(Ui.rounded(a, android.graphics.Color.parseColor(color(v.state)), 999));
             c.addView(dot, new LinearLayout.LayoutParams(Ui.dp(a, 10), Ui.dp(a, 10)));
@@ -241,14 +245,62 @@ final class MapPage implements Page {
         }
     }
 
+    private boolean expanded;
+
+    private View handle() {
+        View h = new View(a);
+        h.setBackground(Ui.rounded(a, 0x4D767680, 999));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Ui.dp(a, 38), Ui.dp(a, 5));
+        lp.gravity = Gravity.CENTER_HORIZONTAL;
+        lp.bottomMargin = Ui.dp(a, 4);
+        h.setLayoutParams(lp);
+        return h;
+    }
+
+    private void toggleSheet() {
+        expanded = !expanded;
+        renderSheet();
+        renderStrip();
+    }
+
     private void renderSheet() {
         Models.VehicleLive v = selected == null ? null : vehicles.get(selected);
         sheet.removeAllViews();
+        sheet.addView(handle());
+        sheet.setOnClickListener(x -> toggleSheet());
+        sheet.setContentDescription(expanded ? "Réduire le panneau" : "Afficher tous les véhicules");
+        if (expanded && !vehicles.isEmpty()) {
+            sheet.setVisibility(View.VISIBLE);
+            sheet.addView(Ui.title3(a, vehicles.size() + (vehicles.size() > 1 ? " véhicules en mission" : " véhicule en mission")));
+            int i = 0;
+            for (Models.VehicleLive x : vehicles.values()) {
+                if (i++ > 0) sheet.addView(Ui.separator(a, 22));
+                LinearLayout r = Ui.row(a, 12);
+                r.setMinimumHeight(Ui.dp(a, 52));
+                View dot = new View(a);
+                dot.setBackground(Ui.rounded(a, android.graphics.Color.parseColor(color(x.state)), 999));
+                r.addView(dot, new LinearLayout.LayoutParams(Ui.dp(a, 10), Ui.dp(a, 10)));
+                LinearLayout t = Ui.column(a, 2);
+                t.addView(Ui.headline(a, x.registration));
+                TextView st = Ui.muted(a, x.stateLabel + " · " + x.driverName, 13);
+                st.setTextColor(Ui.GLASS_MUTED);
+                t.addView(st);
+                r.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                r.setOnClickListener(c -> {
+                    expanded = false;
+                    select(x.vehicleId, true);
+                });
+                sheet.addView(r);
+            }
+            return;
+        }
         if (v == null) {
             sheet.setVisibility(vehicles.isEmpty() ? View.VISIBLE : View.GONE);
             if (vehicles.isEmpty()) {
                 sheet.addView(Ui.headline(a, "Aucun véhicule en mission"));
-                sheet.addView(Ui.muted(a, "Les positions n'existent que pendant une mission démarrée par son conducteur.", 13));
+                TextView none = Ui.muted(a, "Les positions n'existent que pendant une mission démarrée par son conducteur.", 13);
+                none.setTextColor(Ui.GLASS_MUTED);
+                sheet.addView(none);
             }
             return;
         }
@@ -258,11 +310,15 @@ final class MapPage implements Page {
         head.addView(Ui.title(a, v.registration));
         head.addView(Ui.pill(a, v.stateLabel, android.graphics.Color.parseColor(color(v.state))));
         sheet.addView(head);
-        sheet.addView(Ui.muted(a, v.vehicleLabel + " · " + v.missionRef + " · " + v.driverName, 13));
+        TextView meta = Ui.muted(a, v.vehicleLabel + " · " + v.missionRef + " · " + v.driverName, 13);
+        meta.setTextColor(Ui.GLASS_MUTED);
+        sheet.addView(meta);
         String speed = v.speedKmh == null ? "vitesse non mesurée" : Math.round(v.speedKmh) + " km/h";
         String dist = v.distanceKm == null ? "" : String.format(Locale.FRANCE, " · %.1f km parcourus", v.distanceKm);
         sheet.addView(Ui.body(a, "→ " + v.destination + "\n" + speed + dist));
-        sheet.addView(Ui.muted(a, "Dernier signal " + ago(v.recordedAt), 12));
+        TextView last = Ui.muted(a, "Dernier signal " + ago(v.recordedAt), 13);
+        last.setTextColor(Ui.GLASS_MUTED);
+        sheet.addView(last);
     }
 
     static String ago(Instant at) {

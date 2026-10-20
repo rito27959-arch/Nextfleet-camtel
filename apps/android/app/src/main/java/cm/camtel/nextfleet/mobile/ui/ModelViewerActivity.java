@@ -87,13 +87,17 @@ public final class ModelViewerActivity extends Activity implements Choreographer
 
         LinearLayout panel = Ui.column(this, 4);
         panel.setPadding(Ui.dp(this, 18), Ui.dp(this, 14), Ui.dp(this, 18), Ui.dp(this, 14));
-        panel.setBackground(Ui.rounded(this, 0xF2FFFFFF, 18));
+        panel.setBackground(Ui.glass(this, 28));
+        panel.setElevation(Ui.dp(this, 8));
         panel.addView(Ui.headline(this, entry.label));
         panel.addView(Ui.muted(this, entry.category + " · " + entry.licence, 13));
         panel.addView(Ui.muted(this, "Auteur : " + entry.author, 12));
         panel.addView(Ui.muted(this, "Glisser pour tourner · pincer pour zoomer", 12));
-        TextView close = Ui.text(this, "Fermer", 16, Ui.ACCENT_TEXT, NexFleetApp.get().semibold());
-        close.setPadding(Ui.dp(this, 16), Ui.dp(this, 12), Ui.dp(this, 16), Ui.dp(this, 12));
+        // bouton fermer en capsule de verre (iOS 26), action principale séparée du contenu
+        TextView close = Ui.text(this, "Terminé", 16, Ui.ACCENT_TEXT, NexFleetApp.get().semibold());
+        close.setPadding(Ui.dp(this, 18), Ui.dp(this, 11), Ui.dp(this, 18), Ui.dp(this, 11));
+        close.setBackground(Ui.glass(this, 999));
+        close.setElevation(Ui.dp(this, 6));
         close.setOnClickListener(v -> finish());
 
         FrameLayout root = new FrameLayout(this);
@@ -102,8 +106,10 @@ public final class ModelViewerActivity extends Activity implements Choreographer
                 android.view.Gravity.BOTTOM);
         pp.setMargins(Ui.dp(this, 14), 0, Ui.dp(this, 14), Ui.dp(this, 14));
         root.addView(panel, pp);
-        root.addView(close, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
-                android.view.Gravity.TOP | android.view.Gravity.END));
+        FrameLayout.LayoutParams cp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.view.Gravity.TOP | android.view.Gravity.END);
+        cp.setMargins(0, Ui.dp(this, 10), Ui.dp(this, 14), 0);
+        root.addView(close, cp);
         Ui.applyInsets(root, true, true);
         setContentView(root);
         choreographer = Choreographer.getInstance();

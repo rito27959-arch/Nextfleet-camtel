@@ -836,3 +836,18 @@
 .conv-row { -fx-background-radius: 16; }
 .split-list .search-field { -fx-padding: 0 14 0 34; }
 .sheet, .notification-center { -fx-background-radius: 28; }
+
+/* ---------- lisibilité du verre (vérifiée par tools/check_contrast.py, pire cas : verre à 90 % sur fond noir) */
+.root {
+    -nf-glass: linear-gradient(to bottom, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.90));
+    -nf-glass-muted: #525D66;
+    -nf-glass-accent: #00695B;
+}
+.root.dark {
+    -nf-glass: linear-gradient(to bottom, rgba(40, 47, 54, 0.95), rgba(28, 34, 40, 0.90));
+    -nf-glass-muted: #AEB8C0;
+    -nf-glass-accent: #3DDBC4;
+}
+.glass .muted, .sidebar .muted, .sidebar .section-title, .map-glass-panel .muted, .map-chip .label { -fx-text-fill: -nf-glass-muted; }
+.nav-item:selected, .nav-item:selected .label { -fx-text-fill: -nf-glass-accent; }
+.nav-item:selected .icon { -fx-stroke: -nf-glass-accent; }

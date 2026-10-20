@@ -43,18 +43,21 @@ public final class LoginActivity extends Activity {
 
         ImageView icon = new ImageView(this);
         icon.setImageResource(R.mipmap.ic_launcher);
-        icon.setLayoutParams(new LinearLayout.LayoutParams(Ui.dp(this, 64), Ui.dp(this, 64)));
+        icon.setLayoutParams(new LinearLayout.LayoutParams(Ui.dp(this, 72), Ui.dp(this, 72)));
+        icon.setBackground(Ui.rounded(this, Ui.NAVY, 20));
+        icon.setClipToOutline(true);
+        icon.setElevation(Ui.dp(this, 6));
         col.addView(icon);
-        col.addView(Ui.largeTitle(this, "Connexion"));
+        col.addView(Ui.largeTitle(this, "Bienvenue"));
         col.addView(Ui.muted(this, "NexFleet CAMTEL — missions, localisation, messages et catalogue 3D.", 15));
 
         LinearLayout seg = Ui.row(this, 0);
-        seg.setBackground(Ui.rounded(this, Ui.FILL, 10));
-        seg.setPadding(Ui.dp(this, 2), Ui.dp(this, 2), Ui.dp(this, 2), Ui.dp(this, 2));
+        seg.setBackground(Ui.rounded(this, Ui.FILL, 999));
+        seg.setPadding(Ui.dp(this, 3), Ui.dp(this, 3), Ui.dp(this, 3), Ui.dp(this, 3));
         modeDemo = segment("Démonstration", v -> setMode(true));
         modeServer = segment("Serveur NexFleet", v -> setMode(false));
-        seg.addView(modeDemo, new LinearLayout.LayoutParams(0, Ui.dp(this, 36), 1f));
-        seg.addView(modeServer, new LinearLayout.LayoutParams(0, Ui.dp(this, 36), 1f));
+        seg.addView(modeDemo, new LinearLayout.LayoutParams(0, Ui.dp(this, 38), 1f));
+        seg.addView(modeServer, new LinearLayout.LayoutParams(0, Ui.dp(this, 38), 1f));
         col.addView(seg);
 
         server = field("Adresse du serveur (https://…)", InputType.TYPE_TEXT_VARIATION_URI);
@@ -66,8 +69,7 @@ public final class LoginActivity extends Activity {
             return true;
         });
         col.addView(server);
-        LinearLayout group = Ui.column(this, 0);
-        group.setBackground(Ui.rounded(this, Ui.SURFACE, 12));
+        LinearLayout group = Ui.group(this);
         group.addView(login);
         View hair = new View(this);
         hair.setBackgroundColor(Ui.SEPARATOR);
@@ -83,15 +85,18 @@ public final class LoginActivity extends Activity {
         submit = Ui.button(this, "Se connecter", Ui.Style.FILLED, v -> attempt());
         col.addView(submit);
 
-        col.addView(Ui.overline(this, "Comptes de démonstration · mot de passe « demo »", Ui.MUTED));
-        LinearLayout accounts = Ui.column(this, 0);
-        accounts.setBackground(Ui.rounded(this, Ui.SURFACE, 12));
+        TextView demoHeader = Ui.text(this, "COMPTES DE DÉMONSTRATION · MOT DE PASSE « demo »", 13, Ui.MUTED, NexFleetApp.get().regular());
+        demoHeader.setPadding(Ui.dp(this, 16), Ui.dp(this, 12), 0, 0);
+        col.addView(demoHeader);
+        LinearLayout accounts = Ui.group(this);
         String[][] demoRoles = {{"conducteur", "DRIVER"}, {"gestionnaire", "FLEET_MANAGER"}, {"maintenance", "MAINTENANCE"}, {"controleur", "CONTROLLER"}};
         for (String[] a : demoRoles) {
             if (!Models.demoLogins().contains(a[0])) continue;
             Role r = Role.valueOf(a[1]);
+            if (accounts.getChildCount() > 0) accounts.addView(Ui.separator(this, 16));
             LinearLayout row = Ui.row(this, 12);
-            row.setPadding(Ui.dp(this, 14), Ui.dp(this, 12), Ui.dp(this, 14), Ui.dp(this, 12));
+            row.setPadding(Ui.dp(this, 16), Ui.dp(this, 12), Ui.dp(this, 14), Ui.dp(this, 12));
+            row.setMinimumHeight(Ui.dp(this, 56));
             LinearLayout txt = Ui.column(this, 2);
             txt.addView(Ui.headline(this, r.label));
             txt.addView(Ui.muted(this, a[0], 12));
@@ -112,7 +117,7 @@ public final class LoginActivity extends Activity {
         ScrollView sv = new ScrollView(this);
         sv.setFillViewport(true);
         sv.addView(col);
-        sv.setBackgroundColor(Ui.BG);
+        sv.setBackground(Ui.backdrop());
         Ui.applyInsets(sv, true, true);
         setContentView(sv);
         setMode(true);
@@ -129,8 +134,10 @@ public final class LoginActivity extends Activity {
     private void setMode(boolean d) {
         demo = d;
         server.setVisibility(d ? View.GONE : View.VISIBLE);
-        modeDemo.setBackground(d ? Ui.rounded(this, Ui.SURFACE, 8) : null);
-        modeServer.setBackground(!d ? Ui.rounded(this, Ui.SURFACE, 8) : null);
+        modeDemo.setBackground(d ? Ui.rounded(this, Ui.SURFACE, 999) : null);
+        modeServer.setBackground(!d ? Ui.rounded(this, Ui.SURFACE, 999) : null);
+        modeDemo.setElevation(d ? Ui.dp(this, 2) : 0);
+        modeServer.setElevation(!d ? Ui.dp(this, 2) : 0);
         modeDemo.setTextColor(Ui.TEXT);
         modeServer.setTextColor(Ui.TEXT);
     }
@@ -148,7 +155,7 @@ public final class LoginActivity extends Activity {
         e.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
         e.setMinHeight(Ui.dp(this, 52));
         e.setGravity(Gravity.CENTER_VERTICAL);
-        if (variation == InputType.TYPE_TEXT_VARIATION_URI) e.setBackground(Ui.rounded(this, Ui.SURFACE, 12));
+        if (variation == InputType.TYPE_TEXT_VARIATION_URI) e.setBackground(Ui.rounded(this, Ui.SURFACE, 16));
         return e;
     }
 
