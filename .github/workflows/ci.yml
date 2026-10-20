@@ -20,7 +20,7 @@ jobs:
     name: Base PostgreSQL + PostGIS (62 tests)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: PostgreSQL 16 + PostGIS
         run: |
           sudo apt-get update -q
@@ -41,8 +41,8 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U nextfleet" --health-interval 5s --health-timeout 5s --health-retries 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: '21', cache: maven }
       - name: Base d'intégration (migrations + jeu fictif)
         env: { PGPASSWORD: ci_only }
@@ -51,9 +51,13 @@ jobs:
           for f in $(ls infra/db/migrations/V*__*.sql | sort -V); do psql -h localhost -U nextfleet -d nextfleet_it -v ON_ERROR_STOP=1 -q -f "$f" > /dev/null; done
           psql -h localhost -U nextfleet -d nextfleet_it -v ON_ERROR_STOP=1 -q -f infra/db/tests/it_fixture.sql
       - name: mvn verify
-        run: >
-          mvn -B -ntp verify
-          -Dnf.db.url=jdbc:postgresql://localhost:5432/nextfleet_it -Dnf.db.user=nextfleet -Dnf.db.password=ci_only
+        run: |
+          set -o pipefail
+          mvn -B -ntp verify -Dnf.db.url=jdbc:postgresql://localhost:5432/nextfleet_it -Dnf.db.user=nextfleet \
+            -Dnf.db.password=ci_only 2>&1 | tee build.log
+      - name: Annotations d'échec
+        if: failure()
+        run: tools/ci-annotate.sh build.log Maven
       - name: Contrastes et contrats
         run: |
           python3 tools/check_contrast.py
@@ -76,8 +80,8 @@ jobs:
     name: Android — APK
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: '21' }
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: '9.5.0' }
@@ -85,12 +89,17 @@ jobs:
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
       - name: Tests unitaires, lint et APK
         working-directory: apps/android
-        run: gradle --no-daemon testDebugUnitTest lintDebug assembleDebug assembleRelease
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace testDebugUnitTest lintDebug assembleDebug assembleRelease 2>&1 | tee build.log
         env:
           NF_KEYSTORE_BASE64: ${{ secrets.NF_KEYSTORE_BASE64 }}
           NF_KEYSTORE_PASSWORD: ${{ secrets.NF_KEYSTORE_PASSWORD }}
           NF_KEY_ALIAS: ${{ secrets.NF_KEY_ALIAS }}
           NF_KEY_PASSWORD: ${{ secrets.NF_KEY_PASSWORD }}
+      - name: Annotations d'échec
+        if: failure()
+        run: tools/ci-annotate.sh apps/android/build.log Android
       - name: Renommer les APK
         run: |
           mkdir -p dist
@@ -121,11 +130,13 @@ jobs:
     defaults:
       run: { shell: bash }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: '21', cache: maven }
       - name: Construire le client bureau
-        run: mvn -B -ntp -pl apps/desktop-javafx -am package -DskipTests
+        run: |
+          set -o pipefail
+          mvn -B -ntp -pl apps/desktop-javafx -am package -DskipTests 2>&1 | tee build.log
       - name: Préparer l'image d'application
         run: |
           T=apps/desktop-javafx/target
@@ -138,6 +149,7 @@ jobs:
           ls jp/app jp/fx
       - name: jpackage (${{ matrix.type }})
         run: |
+          exec > >(tee -a build.log) 2>&1
           EXTRA=()
           if [ "${{ matrix.type }}" = deb ]; then
             EXTRA=(--linux-shortcut --linux-menu-group Office --linux-app-category misc --linux-package-name nexfleet
@@ -155,6 +167,9 @@ jobs:
             --icon apps/desktop-javafx/packaging/${{ matrix.icon }} \
             --dest dist "${EXTRA[@]}"
           ls -la dist
+      - name: Annotations d'échec
+        if: failure()
+        run: tools/ci-annotate.sh build.log "Bureau ${{ matrix.type }}"
       - uses: actions/upload-artifact@v4
         with:
           name: nexfleet-bureau-${{ matrix.type }}
