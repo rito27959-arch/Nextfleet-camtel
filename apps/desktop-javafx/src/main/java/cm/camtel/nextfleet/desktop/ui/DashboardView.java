@@ -18,8 +18,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableView;
-import javafx.scene.control.ToggleButton;
-import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -66,9 +64,11 @@ public final class DashboardView extends ScrollPane {
 
     private Node header(DashboardData d) {
         String who = session.displayName().replaceAll("\\s*\\(.*\\)", "").toUpperCase(FR);
-        Label overline = Ui.label(AppShell.greeting() + ", " + who, "overline");
-        Label title = Ui.label("Votre flotte, en un regard.", "h1");
-        Label sub = Ui.label("Disponibilité, coûts et alertes. L'essentiel, au même endroit.", "muted");
+        String today = java.time.LocalDate.now(java.time.ZoneId.of("Africa/Douala"))
+                .format(java.time.format.DateTimeFormatter.ofPattern("EEEE d MMMM", FR)).toUpperCase(FR);
+        Label overline = Ui.label(today + "  ·  " + AppShell.greeting() + ", " + who, "overline");
+        Label title = Ui.label("Votre flotte, en un regard.", "large-title");
+        Label sub = Ui.label("Disponibilité, coûts et alertes. L'essentiel, au même endroit.", "body", "muted");
         VBox left = new VBox(4, overline, title, sub);
 
         String period = d == null ? "…" : capitalize(d.period().getMonth().getDisplayName(TextStyle.FULL, FR)) + " " + d.period().getYear();
@@ -128,7 +128,7 @@ public final class DashboardView extends ScrollPane {
 
         Node c2 = kpi(Icons.WRENCH, "Entretiens à venir", d.upcomingMaintenance(), x -> String.valueOf(Math.round(x)), "",
                 Ui.trend(BigDecimal.valueOf(d.maintenanceDelta()), true, "sur le mois dernier", ""),
-                Ui.bubble(Icons.CALENDAR, "green", "-nf-green-strong"), "Échéances à 30 jours");
+                Ui.symbolTile(Icons.CALENDAR, "tile-orange"), "Échéances à 30 jours");
         Node c3 = kpi(Icons.FUEL, "Consommation moyenne", d.avgConsumption() == null ? Double.NaN : d.avgConsumption().doubleValue(),
                 x -> Double.isNaN(x) ? "—" : Ui.decimal(BigDecimal.valueOf(x), 1), " L / 100 km",
                 Ui.trend(d.consumptionTrendPercent(), true, "sur le mois dernier"),
@@ -137,7 +137,7 @@ public final class DashboardView extends ScrollPane {
         Node c4 = kpi(Icons.COINS, "Coûts du mois", d.monthCostXaf() == null ? Double.NaN : d.monthCostXaf().doubleValue(),
                 x -> Double.isNaN(x) ? "—" : Ui.compactXaf(BigDecimal.valueOf(x)), " FCFA",
                 Ui.trend(d.costTrendPercent(), true, "sur le mois dernier"),
-                Ui.bubble(Icons.BARS_UP, "danger", "-nf-danger"), "Carburant et entretien validés (données fictives)");
+                Ui.symbolTile(Icons.COINS, "tile-indigo"), "Carburant et entretien validés (données fictives)");
 
         HBox row = new HBox(16, c1, c2, c3, c4);
         for (Node n : row.getChildren()) {
@@ -150,8 +150,8 @@ public final class DashboardView extends ScrollPane {
 
     private Node kpi(String icon, String title, double target, java.util.function.DoubleFunction<String> format,
                      String unit, Node trend, Node bubble, String help) {
-        Label t = new Label(title, Icons.stroke(icon, 16, "-nf-text"));
-        t.getStyleClass().addAll("t-12", "w-500");
+        Label t = new Label(title, Icons.stroke(icon, 15, "-nf-muted"));
+        t.getStyleClass().addAll("subhead", "w-600", "muted");
         Label v = Ui.label("", "kpi-value");
         if (Double.isNaN(target)) v.setText("—"); else Motion.countUp(v, target, format);
         String value = v.getAccessibleText() == null ? "—" : v.getAccessibleText();
@@ -191,37 +191,27 @@ public final class DashboardView extends ScrollPane {
 
     private Node consumptionCard(DashboardData d) {
         Label t = new Label("Consommation moyenne", Icons.stroke(Icons.FUEL, 16, "-nf-text"));
-        t.getStyleClass().addAll("t-12", "w-600");
+        t.getStyleClass().addAll("headline");
         Label v = Ui.label(Ui.decimal(d.avgConsumption(), 1), "kpi-value");
         Label u = Ui.label(" L / 100 km", "kpi-unit");
         HBox val = new HBox(v, u, new Label("  "), Ui.trend(d.consumptionTrendPercent(), true, "sur le mois dernier"));
         val.setAlignment(Pos.BASELINE_LEFT);
 
-        ToggleGroup g = new ToggleGroup();
-        HBox seg = new HBox();
-        seg.getStyleClass().add("segmented");
         StackPane chartHolder = new StackPane();
-        Label note = Ui.label("", "muted", "t-12");
-        for (String[] r : new String[][]{{"3M", "3"}, {"6M", "6"}, {"1A", "12"}}) {
-            ToggleButton b = new ToggleButton(r[0]);
-            b.getStyleClass().add("segment");
-            b.setToggleGroup(g);
-            int months = Integer.parseInt(r[1]);
-            b.setOnAction(e -> {
-                if (!b.isSelected()) b.setSelected(true);
-                List<MonthlyConsumption> s = d.consumptionSeries();
-                List<MonthlyConsumption> view = s.subList(Math.max(0, s.size() - months), s.size());
-                chartHolder.getChildren().setAll(chart(view));
-                note.setText(months > s.size() ? "Historique disponible : " + s.size() + " mois." : qualityNote(view));
-            });
-            b.setAccessibleText("Période " + r[0]);
-            seg.getChildren().add(b);
-        }
+        Label note = Ui.label("", "footnote", "muted");
+        int[] months = {3, 6, 12};
+        java.util.function.IntConsumer apply = idx -> {
+            List<MonthlyConsumption> s = d.consumptionSeries();
+            List<MonthlyConsumption> view = s.subList(Math.max(0, s.size() - months[idx]), s.size());
+            chartHolder.getChildren().setAll(chart(view));
+            note.setText(months[idx] > s.size() ? "Historique disponible : " + s.size() + " mois." : qualityNote(view));
+        };
+        Controls.Segmented seg = new Controls.Segmented(List.of("3 M", "6 M", "1 A"), 1, apply);
+        apply.accept(1);   // 6 mois par défaut (données de démonstration : 6 mois)
         HBox head = new HBox(t, Ui.spacer(), seg);
         head.setAlignment(Pos.CENTER_LEFT);
         VBox card = new VBox(6, head, val, chartHolder, note);
         card.getStyleClass().add("card");
-        ((ToggleButton) seg.getChildren().get(1)).fire();   // 6M par défaut (données de démonstration : 6 mois)
         return card;
     }
 
@@ -272,7 +262,7 @@ public final class DashboardView extends ScrollPane {
 
     private Node alertsCard(List<Alert> alerts) {
         Label t = new Label("Votre attention", Icons.stroke(Icons.BELL, 16, "-nf-text"));
-        t.getStyleClass().addAll("t-12", "w-600");
+        t.getStyleClass().addAll("headline");
         Label count = Ui.label(String.valueOf(alerts.size()), "count-chip");
         Button all = new Button("Tout voir", Icons.stroke(Icons.CHEVRON_RIGHT, 12, "-nf-green-strong"));
         all.getStyleClass().add("btn-ghost");
@@ -295,8 +285,12 @@ public final class DashboardView extends ScrollPane {
                 case "warning" -> "-nf-warning";
                 default -> "-nf-info";
             };
-            Node bubble = Ui.bubble(icon, tone, stroke);
-            VBox text = new VBox(2, Ui.label(a.title(), "t-12", "w-600"), Ui.label(a.detail(), "muted", "t-12"));
+            Node bubble = Ui.symbolTile(icon, switch (tone) {
+                case "danger" -> "tile-red";
+                case "warning" -> "tile-orange";
+                default -> "tile-blue";
+            });
+            VBox text = new VBox(2, Ui.label(a.title(), "subhead", "w-600"), Ui.label(a.detail(), "footnote", "muted"));
             Label due = Ui.label(a.due(), "due-" + tone);
             due.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
             HBox row = new HBox(12, bubble, text, Ui.spacer(), due, Icons.stroke(Icons.CHEVRON_RIGHT, 14, "-nf-muted"));
@@ -314,7 +308,7 @@ public final class DashboardView extends ScrollPane {
 
     private Node recentTable(List<Vehicle> vehicles) {
         Label t = new Label("Derniers véhicules", Icons.stroke(Icons.CAR, 16, "-nf-text"));
-        t.getStyleClass().addAll("t-12", "w-600");
+        t.getStyleClass().addAll("headline");
         Button all = new Button("Voir tout", Icons.stroke(Icons.CHEVRON_RIGHT, 12, "-nf-green-strong"));
         all.getStyleClass().add("btn-ghost");
         all.setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);

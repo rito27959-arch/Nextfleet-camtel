@@ -15,6 +15,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 import java.time.Year;
@@ -47,21 +48,31 @@ final class VehicleFormView extends ScrollPane {
         VBox box = new VBox(10);
         box.getStyleClass().add("sheet");
         box.setPrefWidth(440);
+        box.setMinWidth(0);
         setContent(box);
         setFitToWidth(true);
         setPrefWidth(460);
         setHbarPolicy(ScrollBarPolicy.NEVER);
 
-        Button close = new Button(null, Icons.stroke(Icons.CLOSE, 16, "-nf-muted"));
-        close.getStyleClass().add("icon-button");
-        close.setAccessibleText("Fermer le formulaire");
-        close.setOnAction(e -> onCancel.run());
-        HBox title = new HBox(Ui.label("Ajouter un véhicule", "t-20", "w-700"), Ui.spacer(), close);
-        title.setAlignment(Pos.CENTER_LEFT);
+        // Barre de feuille iOS : Annuler (gauche) · titre (centre) · Ajouter (droite, gras)
+        Button cancelTop = new Button("Annuler");
+        cancelTop.getStyleClass().add("btn-plain");
+        cancelTop.setCancelButton(true);
+        cancelTop.setOnAction(e -> onCancel.run());
+        Button addTop = new Button("Ajouter");
+        addTop.getStyleClass().add("btn-plain");
+        addTop.setStyle("-fx-font-weight: bold;");
+        addTop.setOnAction(e -> save.fire());
+        Label sheetTitle = Ui.label("Nouveau véhicule", "headline");
+        StackPane title = new StackPane(sheetTitle, cancelTop, addTop);
+        StackPane.setAlignment(cancelTop, Pos.CENTER_LEFT);
+        StackPane.setAlignment(addTop, Pos.CENTER_RIGHT);
+        title.setMinHeight(40);
 
-        HBox steps = new HBox(8, step("1", "Informations", "step-active"), line(), step("2", "Photos", "step-unavailable"),
-                line(), step("3", "Modèle 3D", "step-unavailable"), line(), step("4", "Validation", ""));
+        HBox steps = new HBox(8, step("1", "Infos", "step-active"), line(), step("2", "Photos", "step-unavailable"),
+                line(), step("3", "3D", "step-unavailable"), line(), step("4", "Valider", ""));
         steps.setAlignment(Pos.CENTER_LEFT);
+        steps.setMinWidth(0);
         Label stepsNote = Ui.label("Photos et modèle 3D : lot 4 (écrans 05 à 09). L'enregistrement se fait dès l'étape 1.", "muted", "t-12");
         stepsNote.setWrapText(true);
 
@@ -77,13 +88,12 @@ final class VehicleFormView extends ScrollPane {
                 group("vin", "Numéro de châssis (VIN)", vin),
                 globalError);
 
-        Button cancel = new Button("Annuler");
-        cancel.getStyleClass().add("btn-secondary");
-        cancel.setOnAction(e -> onCancel.run());
-        save.getStyleClass().add("btn-primary");
+        save.getStyleClass().addAll("btn-primary", "btn-large");
+        save.setText("Ajouter le véhicule");
         save.setDefaultButton(true);
-        HBox actions = new HBox(10, Ui.spacer(), cancel, save);
-        box.getChildren().add(actions);
+        save.setMaxWidth(Double.MAX_VALUE);
+        Motion.pressable(save);
+        box.getChildren().add(save);
         globalError.setWrapText(true);
 
         save.setOnAction(e -> submit(gateway, onCreated));
@@ -100,14 +110,14 @@ final class VehicleFormView extends ScrollPane {
             return;
         }
         save.setDisable(true);
-        save.setText("Enregistrement…");
+        save.setText("Ajout…");
         Ui.async(() -> gateway.createVehicle(r.draft()), v -> {
             save.setDisable(false);
-            save.setText("Enregistrer");
+            save.setText("Ajouter le véhicule");
             onCreated.accept(v);
         }, err -> {
             save.setDisable(false);
-            save.setText("Enregistrer");
+            save.setText("Ajouter le véhicule");
             if (err.kind() == GatewayException.Kind.CONFLICT) {
                 showFieldError("registration", err.getMessage());
                 registration.requestFocus();
@@ -187,13 +197,14 @@ final class VehicleFormView extends ScrollPane {
     private static TextField field(String prompt) {
         TextField t = new TextField();
         t.setPromptText(prompt);
+        t.setPrefColumnCount(8);
         return t;
     }
 
     private static HBox step(String n, String label, String state) {
         Label num = Ui.label(n, "step-number");
         Label l = Ui.label(label, "step-label");
-        l.setMinWidth(Region.USE_PREF_SIZE);
+        l.setMinWidth(0);
         num.setMinWidth(Region.USE_PREF_SIZE);
         HBox h = new HBox(6, num, l);
         h.getStyleClass().add("step");

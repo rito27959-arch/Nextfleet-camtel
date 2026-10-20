@@ -202,7 +202,7 @@ public final class Ui {
         d.setWrapText(true);
         d.setMaxWidth(460);
         d.setStyle("-fx-text-alignment: center;");
-        VBox v = new VBox(Icons.stroke(iconPath, 34, "-nf-muted"), t, d);
+        VBox v = new VBox(Icons.stroke(iconPath, 44, "-nf-tertiary"), t, d);
         v.getStyleClass().add("state-panel");
         v.setPadding(new Insets(40));
         return v;
@@ -268,6 +268,76 @@ public final class Ui {
         Region r = new Region();
         r.getStyleClass().add("divider");
         return r;
+    }
+
+    /** Carré arrondi coloré avec pictogramme blanc (icônes de Réglages / notifications iOS). */
+    public static StackPane symbolTile(String iconPath, String tileClass) {
+        StackPane t = new StackPane(Icons.stroke(iconPath, 17, "white"));
+        t.getStyleClass().addAll("symbol-tile", tileClass);
+        return t;
+    }
+
+    /** Groupe inset (liste groupée iOS) : en-tête facultatif, lignes séparées par des filets inset, pied facultatif. */
+    public static VBox insetGroup(String header, java.util.List<Node> rows, String footer) {
+        VBox list = new VBox();
+        list.getStyleClass().add("inset-group");
+        for (int i = 0; i < rows.size(); i++) {
+            if (i > 0) {
+                Region sep = new Region();
+                sep.getStyleClass().add("row-separator");
+                VBox.setMargin(sep, new Insets(0, 0, 0, rows.get(i).getProperties().containsKey("hasIcon") ? 58 : 14));
+                list.getChildren().add(sep);
+            }
+            list.getChildren().add(rows.get(i));
+        }
+        // découpe aux coins pour le survol des lignes
+        javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle();
+        clip.setArcWidth(24);
+        clip.setArcHeight(24);
+        clip.widthProperty().bind(list.widthProperty());
+        clip.heightProperty().bind(list.heightProperty());
+        list.setClip(clip);
+        VBox box = new VBox();
+        if (header != null) box.getChildren().add(label(header.toUpperCase(Locale.FRANCE), "section-header"));
+        box.getChildren().add(list);
+        if (footer != null) {
+            Label f = label(footer, "section-footer");
+            f.setWrapText(true);
+            box.getChildren().add(f);
+        }
+        return box;
+    }
+
+    /** Ligne de liste : tuile facultative, titre, valeur secondaire, accessoire (chevron, interrupteur…). */
+    public static HBox listRow(Node tile, String title, String value, Node accessory, Runnable onClick) {
+        HBox row = new HBox(12);
+        row.getStyleClass().add("list-row");
+        if (tile != null) {
+            row.getChildren().add(tile);
+            row.getProperties().put("hasIcon", true);
+        }
+        Label t = label(title, "row-title");
+        row.getChildren().addAll(t, spacer());
+        if (value != null) row.getChildren().add(label(value, "row-value"));
+        if (accessory != null) row.getChildren().add(accessory);
+        if (onClick != null) {
+            row.getStyleClass().add("clickable");
+            row.setOnMouseClicked(e -> onClick.run());
+            if (accessory == null) row.getChildren().add(Icons.stroke(Icons.CHEVRON_RIGHT, 13, "-nf-tertiary"));
+        }
+        row.setAccessibleText(title + (value == null ? "" : ", " + value));
+        return row;
+    }
+
+    /** « maintenant », « il y a 12 min », « il y a 3 h », « hier », « lun. 14:05 » (fuseau Africa/Douala). */
+    public static String relativeTime(java.time.Instant at, java.time.Instant now) {
+        long min = java.time.Duration.between(at, now).toMinutes();
+        if (min < 1) return "maintenant";
+        if (min < 60) return "il y a " + min + " min";
+        if (min < 24 * 60) return "il y a " + (min / 60) + " h";
+        java.time.ZonedDateTime z = at.atZone(java.time.ZoneId.of("Africa/Douala"));
+        if (min < 48 * 60) return "hier";
+        return z.format(java.time.format.DateTimeFormatter.ofPattern("EEE d MMM", Locale.FRANCE));
     }
 
     public static Region spacer() {

@@ -68,10 +68,10 @@ public final class VehiclesView extends BorderPane {
     }
 
     private Node header() {
-        VBox titles = new VBox(4, Ui.label("Votre flotte", "h1"), Ui.label("Retrouvez votre véhicule.", "muted"));
+        VBox titles = new VBox(4, Ui.label("Votre flotte", "large-title"), Ui.label("Retrouvez votre véhicule.", "body", "muted"));
         HBox h = new HBox(titles, Ui.spacer());
         h.setAlignment(Pos.BOTTOM_LEFT);
-        Button add = new Button("Ajouter", Icons.stroke(Icons.PLUS, 16, "white"));
+        Button add = new Button("Nouveau véhicule", Icons.stroke(Icons.PLUS, 15, "white"));
         add.getStyleClass().add("btn-primary");
         if (session.has("FLEET_MANAGER")) {
             add.setOnAction(e -> openForm());
@@ -171,7 +171,7 @@ public final class VehiclesView extends BorderPane {
         VehicleSheet sheet = new VehicleSheet(v, gateway, () -> {
             closeOverlay();
             table.getSelectionModel().clearSelection();
-        });
+        }, session.has("FLEET_MANAGER") ? () -> confirmArchive(v) : null);
         showOverlay(sheet, 420);
     }
 
@@ -182,6 +182,24 @@ public final class VehiclesView extends BorderPane {
             if (shell != null) shell.toasts().success("Véhicule enregistré", created.registration() + " · " + created.label());
         }, this::closeOverlay);
         showOverlay(form, 460);
+    }
+
+    /**
+     * Archivage confirmé par une alerte (HIG : action délibérée → bouton « Archiver » en style normal, préféré ;
+     * Annuler à gauche). En cas de conflit de version, l'erreur est expliquée par une seconde alerte.
+     */
+    private void confirmArchive(Vehicle v) {
+        StackPane host = shell;
+        AlertDialog.show(host, Ui.symbolTile(Icons.DOC, "tile-orange"), "Archiver " + v.registration() + " ?",
+                "Le véhicule disparaîtra du parc actif. Son historique et ses pièces restent consultables.",
+                java.util.List.of(AlertDialog.Action.cancel("Annuler"), AlertDialog.Action.preferred("Archiver", () ->
+                        Ui.async(() -> gateway.archiveVehicle(v.id(), v.version(), "Archivage depuis la fiche véhicule"), a -> {
+                            closeOverlay();
+                            shell.toasts().show(Ui.symbolTile(Icons.CHECK, "tile-green"), "Véhicule archivé",
+                                    a.registration() + " a été retiré du parc actif.", null);
+                            load();
+                        }, err -> AlertDialog.show(host, null, "Archivage impossible", err.getMessage(),
+                                java.util.List.of(AlertDialog.Action.preferred("OK", () -> { })))))));
     }
 
     /** Feuille latérale sur voile : glisse depuis la droite avec un ressort ; clic sur le voile ou Échap pour fermer. */
@@ -221,6 +239,10 @@ public final class VehiclesView extends BorderPane {
     /** Pour la recette automatisée : sélectionne le premier véhicule affiché. */
     public void selectFirstForTest() {
         if (!table.getItems().isEmpty()) table.getSelectionModel().select(0);
+    }
+
+    public void archiveFirstForTest() {
+        if (!table.getItems().isEmpty()) confirmArchive(table.getItems().get(0));
     }
 
     public void openFormForTest() {

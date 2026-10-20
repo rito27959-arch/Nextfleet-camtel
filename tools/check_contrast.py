@@ -22,17 +22,18 @@ def ratio(a, b):
 PAIRS = [  # (thème, texte, fond, seuil, usage)
     ("light", "text", "background", 4.5, "texte courant"),
     ("light", "text", "surface", 4.5, "texte sur carte"),
-    ("light", "muted", "surface", 4.5, "texte secondaire"),
-    ("light", "muted", "background", 4.5, "texte secondaire sur fond"),
-    ("light", "greenStrong", "surface", 4.5, "lien / tendance positive"),
-    ("light", "greenStrong", "greenSoft", 4.5, "badge « En service »"),
-    ("light", "danger", "dangerSoft", 4.5, "badge « Entretien requis »"),
-    ("light", "info", "infoSoft", 4.5, "badge « En déplacement »"),
-    ("light", "warning", "warningSoft", 3.0, "échéance (gras 12 px : seuil grand texte non atteint → à surveiller)"),
+    ("light", "muted", "surface", 4.5, "libellé secondaire"),
+    ("light", "muted", "background", 4.5, "libellé secondaire sur fond"),
+    ("light", "accentText", "surface", 4.5, "lien, bouton sans fond"),
+    ("light", "redText", "surface", 4.5, "texte d'alerte, bouton destructif"),
+    ("light", "orangeText", "surface", 4.5, "échéance proche"),
+    ("light", "greenText", "surface", 4.5, "statut conforme"),
+    ("light", "blueText", "surface", 4.5, "statut en déplacement"),
     ("dark", "text", "background", 4.5, "texte courant sombre"),
-    ("dark", "muted", "surface", 4.5, "texte secondaire sombre"),
-    ("dark", "greenStrong", "surface", 4.5, "tendance positive sombre"),
-    ("dark", "danger", "surface", 4.5, "alerte sombre"),
+    ("dark", "muted", "surface", 4.5, "libellé secondaire sombre"),
+    ("dark", "accentText", "surface", 4.5, "lien sombre"),
+    ("dark", "redText", "surface", 4.5, "alerte sombre"),
+    ("dark", "orangeText", "surface", 4.5, "échéance sombre"),
 ]
 
 failures = 0
@@ -43,7 +44,9 @@ for theme, fg, bg, threshold, usage in PAIRS:
     failures += not ok
     print(f"{'OK ' if ok else 'ÉCHEC'} {theme:5} {fg:>12} sur {bg:<11} {r:5.2f}:1 (seuil {threshold}) — {usage}")
 
-white_on_green = ratio("#FFFFFF", tokens["color"]["light"]["green"])
-print(f"{'OK ' if white_on_green >= 3 else 'ÉCHEC'} blanc sur vert #009B87 (bouton, texte 14 px semi-gras) : {white_on_green:.2f}:1"
-      " — conforme grand texte seulement ; voir docs/ETAT_AVANCEMENT.md")
+for theme in ("light", "dark"):
+    r = ratio("#FFFFFF", tokens["color"][theme]["accent"])
+    ok = r >= 4.5
+    failures += not ok
+    print(f"{'OK ' if ok else 'ÉCHEC'} {theme:5} blanc sur accent {tokens['color'][theme]['accent']} (bouton plein) : {r:.2f}:1 (seuil 4.5)")
 sys.exit(1 if failures else 0)

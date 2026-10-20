@@ -1,4 +1,4 @@
-# État réel d'avancement — Lot 1.1
+# État réel d'avancement — Lot 1.2
 
 **20 octobre 2026 (mis à jour après l'audit de l'ancien dépôt et la refonte du design).** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
 Aucune autorisation CAMTEL, aucun avis DSIR ou DS et aucune mise en production ne sont revendiqués.
@@ -25,6 +25,15 @@ Aucune autorisation CAMTEL, aucun avis DSIR ou DS et aucune mise en production n
 | `HttpFleetGateway` contre la vraie API | Testé contre un faux serveur local seulement | Test de bout en bout bureau ↔ API |
 | `infra/compose.local.yaml`, `infra/ci/pipeline.yml` | Non exécutés (Docker et CI indisponibles) | Exécution sur le poste DSIR |
 | Paquets DEB / MSI / EXE | Procédure documentée, aucun paquet produit | `docs/BUILD.md` §3 sur chaque OS |
+
+## Nouveautés du lot 1.2 — refonte selon les Human Interface Guidelines d'Apple
+
+- Recherche documentée et correspondance règle par règle : `docs/DESIGN_HIG.md` (typographie, couleurs, boutons, alertes, notifications).
+- Nouveau design system : échelle Dynamic Type, Inter / Inter Display (SF Pro non redistribuable), couleurs système Apple harmonisées avec la marque.
+- **Arbitrage de contraste résolu** : boutons pleins sur la menthe accessible d'Apple #008575 (blanc 4,55:1) ; 16 couples vérifiés conformes.
+- Nouveaux composants : alertes modales, bannières, **centre de notifications**, contrôle segmenté, interrupteurs, listes groupées inset.
+- Nouveaux écrans et parcours : **Réglages**, centre de notifications, **archivage de véhicule** confirmé par alerte (gestion du conflit de version), « Mot de passe oublié », confirmation de déconnexion.
+- 11 tests du client bureau (dont notifications et archivage) ; 23 captures et 6 GIF.
 
 ## Nouveautés du lot 1.1
 

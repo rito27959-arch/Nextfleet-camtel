@@ -21,11 +21,11 @@ import java.util.Locale;
  */
 final class VehicleSheet extends VBox {
 
-    VehicleSheet(Vehicle v, cm.camtel.nextfleet.desktop.data.FleetGateway gateway, Runnable onClose) {
+    VehicleSheet(Vehicle v, cm.camtel.nextfleet.desktop.data.FleetGateway gateway, Runnable onClose, Runnable onArchive) {
         boolean demo = gateway.isDemo();
         getStyleClass().add("sheet");
-        Button close = new Button(null, Icons.stroke(Icons.CLOSE, 16, "-nf-muted"));
-        close.getStyleClass().add("icon-button");
+        Button close = new Button(null, Icons.stroke(Icons.CLOSE, 12, "-nf-muted"));
+        close.getStyleClass().setAll("button", "sheet-close");
         close.setAccessibleText("Fermer la fiche");
         close.setOnAction(e -> onClose.run());
         close.setCancelButton(true);
@@ -82,11 +82,19 @@ final class VehicleSheet extends VBox {
         Label tabs = Ui.label("Vue 3D, photos, documents et historique : prévus aux lots 2 et 4 (écrans 08 à 13).", "muted", "t-12");
         tabs.setWrapText(true);
         Button maint = new Button("Voir les entretiens", Icons.stroke(Icons.CALENDAR, 16, "white"));
-        maint.getStyleClass().add("btn-primary");
+        maint.getStyleClass().addAll("btn-primary", "btn-large");
         maint.setMaxWidth(Double.MAX_VALUE);
         maint.setDisable(true);
         Node maintWrapped = DashboardView.wrapTooltip(maint, "Module Entretiens : lot 2 (NF-14).");
         getChildren().addAll(Ui.spacer(), tabs, maintWrapped);
+        if (onArchive != null) {
+            Button archive = new Button("Archiver le véhicule…");
+            archive.getStyleClass().add("btn-gray");
+            archive.setMaxWidth(Double.MAX_VALUE);
+            archive.setOnAction(e -> onArchive.run());
+            Motion.pressable(archive);
+            getChildren().add(archive);
+        }
         setAccessibleText("Fiche du véhicule " + v.registration());
     }
 

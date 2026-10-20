@@ -127,6 +127,42 @@ class DesktopLogicTest {
     }
 
     @Test
+    @DisplayName("NF-24 : notifications — titres courts, corps en phrase complète, lecture mémorisée, tri récent d'abord")
+    void notifications() {
+        DemoFleetGateway g = demo();
+        g.login("gestionnaire", "demo".toCharArray());
+        var n = g.notifications();
+        assertFalse(n.isEmpty());
+        for (int i = 1; i < n.size(); i++) assertFalse(n.get(i).at().isAfter(n.get(i - 1).at()), "plus récent d'abord");
+        for (var x : n) {
+            assertFalse(x.title().endsWith("."), "HIG : pas de ponctuation finale au titre — " + x.title());
+            assertTrue(x.body().endsWith("."), "HIG : corps en phrase complète — " + x.body());
+        }
+        assertTrue(n.stream().noneMatch(x -> x.read()));
+        g.markNotificationsRead(java.util.List.of(n.get(0).id()));
+        assertTrue(g.notifications().get(0).read());
+    }
+
+    @Test
+    @DisplayName("RG-04 : archivage — droits, version attendue, retrait de la liste active")
+    void archive() {
+        DemoFleetGateway g = demo();
+        g.login("gestionnaire", "demo".toCharArray());
+        var v = g.vehicles("BK 7280", null, 0, 1).items().get(0);
+        assertEquals(GatewayException.Kind.CONFLICT,
+                assertThrows(GatewayException.class, () -> g.archiveVehicle(v.id(), v.version() + 5, "test")).kind());
+        var a = g.archiveVehicle(v.id(), v.version(), "Archivage de test");
+        assertEquals(VehicleStatus.ARCHIVED, a.status());
+        assertEquals(11, g.vehicles("", null, 0, 50).total(), "un véhicule archivé ne figure plus au parc actif");
+        assertEquals(1, g.vehicles("", VehicleStatus.ARCHIVED, 0, 50).total(), "mais il reste consultable");
+        DemoFleetGateway g2 = demo();
+        g2.login("auditeur", "demo".toCharArray());
+        var v2 = g2.vehicles("", null, 0, 1).items().get(0);
+        assertEquals(GatewayException.Kind.FORBIDDEN,
+                assertThrows(GatewayException.class, () -> g2.archiveVehicle(v2.id(), v2.version(), "x")).kind());
+    }
+
+    @Test
     @DisplayName("Formulaire 04 : champs obligatoires, année, capacité et VIN validés")
     void formValidation() {
         VehicleFormValidator v = new VehicleFormValidator();

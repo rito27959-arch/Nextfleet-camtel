@@ -12,6 +12,7 @@ import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 import java.time.format.DateTimeFormatter;
@@ -43,8 +44,8 @@ public final class DueDatesView extends ScrollPane {
     }
 
     private Node header() {
-        VBox titles = new VBox(4, Ui.label("Échéances", "h1"),
-                Ui.label("Documents des véhicules et des conducteurs. Seuil d'alerte : " + THRESHOLD_DAYS + " jours.", "muted"));
+        VBox titles = new VBox(4, Ui.label("Échéances", "large-title"),
+                Ui.label("Documents des véhicules et des conducteurs. Seuil d'alerte : " + THRESHOLD_DAYS + " jours.", "body", "muted"));
         return new HBox(titles);
     }
 
@@ -70,9 +71,9 @@ public final class DueDatesView extends ScrollPane {
         long expired = items.stream().filter(d -> d.level() == DueLevel.EXPIRE).count();
         long soon = items.stream().filter(d -> d.level() == DueLevel.A_ECHEANCE).count();
         long ok = items.stream().filter(d -> d.level() == DueLevel.A_JOUR).count();
-        HBox tiles = new HBox(16, tile("Expirées", expired, "summary-expire", "À régulariser sans délai"),
-                tile("Sous " + THRESHOLD_DAYS + " jours", soon, "summary-soon", "À planifier"),
-                tile("À jour", ok, "summary-ok", "Aucune action"));
+        HBox tiles = new HBox(16, tile("Expirées", expired, "summary-expire", Icons.CLOSE, "tile-red"),
+                tile("Sous " + THRESHOLD_DAYS + " jours", soon, "summary-soon", Icons.CALENDAR, "tile-orange"),
+                tile("À jour", ok, "summary-ok", Icons.CHECK, "tile-green"));
 
         ToggleGroup g = new ToggleGroup();
         HBox chips = new HBox(8);
@@ -129,7 +130,7 @@ public final class DueDatesView extends ScrollPane {
                 Ui.label(d.dueOn().format(mon).toUpperCase(Locale.FRANCE), "month"));
         date.getStyleClass().add("date-block");
         String icon = d.vehicle() ? Icons.CAR : Icons.USER;
-        VBox text = new VBox(2, Ui.label(d.kind().label, "t-14", "w-600"),
+        VBox text = new VBox(2, Ui.label(d.kind().label, "callout", "w-600"),
                 new Label(d.subject() + " · " + d.subjectDetail(), Icons.stroke(icon, 14, "-nf-muted")));
         ((Label) text.getChildren().get(1)).getStyleClass().addAll("muted", "t-12");
         HBox row = new HBox(14, date, text, Ui.spacer(), Ui.dueChip(d));
@@ -142,10 +143,16 @@ public final class DueDatesView extends ScrollPane {
         return row;
     }
 
-    private Node tile(String title, long value, String cls, String hint) {
+    /** Tuile de synthèse façon « listes intelligentes » de Rappels : pastille colorée, compteur, libellé. */
+    private Node tile(String title, long value, String cls, String icon, String tileClass) {
         Label v = Ui.label("", "summary-value");
         Motion.countUp(v, value, x -> String.valueOf(Math.round(x)));
-        VBox t = new VBox(4, Ui.label(title, "t-12", "w-600"), v, Ui.label(hint, "t-12"));
+        StackPane dot = Ui.symbolTile(icon, tileClass);
+        dot.setStyle("-fx-background-radius: 999;");
+        HBox top = new HBox(dot, Ui.spacer(), v);
+        top.setAlignment(Pos.CENTER_LEFT);
+        Label name = Ui.label(title, "headline", "muted");
+        VBox t = new VBox(8, top, name);
         t.getStyleClass().addAll("summary-tile", cls);
         HBox.setHgrow(t, Priority.ALWAYS);
         t.setMaxWidth(Double.MAX_VALUE);

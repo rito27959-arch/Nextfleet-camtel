@@ -86,6 +86,19 @@ public final class Models {
     public record DueItem(DueKind kind, String subject, String subjectDetail, boolean vehicle, LocalDate dueOn,
                           long daysLeft, DueLevel level) { }
 
+    public enum NotificationKind { ECHEANCE, ENTRETIEN, CARBURANT, SYSTEME }
+
+    /**
+     * Notification (HIG « Notifications ») : titre court en casse de titre sans ponctuation finale, corps en phrase complète,
+     * aucune donnée sensible ; {@code targetQuery} ouvre le contenu lié.
+     */
+    public record NotificationItem(String id, NotificationKind kind, String title, String body, Instant at,
+                                   boolean read, String targetSection, String targetQuery) {
+        public NotificationItem withRead(boolean r) {
+            return new NotificationItem(id, kind, title, body, at, r, targetSection, targetQuery);
+        }
+    }
+
     public record Page<T>(List<T> items, int page, int size, long total) { }
 
     public record VehicleDraft(String registration, String vin, String make, String model, Integer modelYear,

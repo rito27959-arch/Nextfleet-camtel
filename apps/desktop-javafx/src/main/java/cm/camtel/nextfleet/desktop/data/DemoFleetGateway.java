@@ -104,6 +104,7 @@ public final class DemoFleetGateway implements FleetGateway {
         pause();
         requireSession();
         YearMonth current = YearMonth.now(clock.withZone(DOUALA));
+        List<Vehicle> vehicles = this.vehicles.stream().filter(v -> v.status() != VehicleStatus.ARCHIVED).toList();
         int active = (int) vehicles.stream().filter(v -> v.status() == VehicleStatus.IN_SERVICE
                 || v.status() == VehicleStatus.ON_MISSION || v.status() == VehicleStatus.AVAILABLE).count();
         LocalDate today = LocalDate.now(clock.withZone(DOUALA));
@@ -129,7 +130,8 @@ public final class DemoFleetGateway implements FleetGateway {
         String q = query == null ? "" : query.strip().toLowerCase(Locale.ROOT);
         String qn = q.replaceAll("[^a-z0-9]", "").toUpperCase(Locale.ROOT);
         List<Vehicle> filtered = vehicles.stream()
-                .filter(v -> status == null || v.status() == status)
+                .filter(v -> status == VehicleStatus.ARCHIVED ? v.status() == VehicleStatus.ARCHIVED
+                        : v.status() != VehicleStatus.ARCHIVED && (status == null || v.status() == status))
                 .filter(v -> q.isEmpty()
                         || (!qn.isEmpty() && RegistrationNumber.of(v.registration()).normalized().contains(qn))
                         || v.label().toLowerCase(Locale.ROOT).contains(q)
@@ -313,6 +315,70 @@ public final class DemoFleetGateway implements FleetGateway {
         return out;
     }
 
+    // ------------------------------------------------------------------ notifications (NF-24, démo)
+
+    private final java.util.Set<String> readIds = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    @Override
+    public List<Models.NotificationItem> notifications() {
+        requireSession();
+        Instant now = clock.instant();
+        List<Models.NotificationItem> out = new ArrayList<>();
+        int i = 0;
+        for (Models.DueItem d : dueDates(30)) {
+            if (d.level() == Models.DueLevel.A_JOUR) continue;
+            String id = "due-" + d.kind() + "-" + d.subject();
+            String title = d.kind().label + (d.level() == Models.DueLevel.EXPIRE ? " expiré" : " à renouveler");
+            if (d.kind() == Models.DueKind.ASSURANCE || d.kind() == Models.DueKind.VIGNETTE || d.kind() == Models.DueKind.CNI) {
+                title = d.kind().label + (d.level() == Models.DueLevel.EXPIRE ? " expirée" : " à renouveler");
+            }
+            String body = d.level() == Models.DueLevel.EXPIRE
+                    ? d.subject() + " : échéance dépassée depuis " + (-d.daysLeft()) + " jour" + (d.daysLeft() < -1 ? "s." : ".")
+                    : d.subject() + " : échéance le " + d.dueOn().format(java.time.format.DateTimeFormatter.ofPattern("d MMMM", Locale.FRANCE)) + ".";
+            out.add(new Models.NotificationItem(id, Models.NotificationKind.ECHEANCE, title, body,
+                    now.minus(Duration.ofMinutes(7L + i * 97L)), readIds.contains(id),
+                    d.vehicle() ? "VEHICLES" : "DRIVERS", d.subject()));
+            i++;
+        }
+        vehicles.stream().filter(v -> v.status() == VehicleStatus.MAINTENANCE).forEach(v -> out.add(new Models.NotificationItem(
+                "maint-" + v.registration(), Models.NotificationKind.ENTRETIEN, "Entretien requis",
+                v.registration() + " (" + v.label() + ") est signalé en entretien.", now.minus(Duration.ofHours(3)),
+                readIds.contains("maint-" + v.registration()), "VEHICLES", v.registration())));
+        vehicles.stream().filter(v -> v.fuelLevelPercent() != null && v.fuelLevelPercent() > 0 && v.fuelLevelPercent() < 20)
+                .forEach(v -> out.add(new Models.NotificationItem("fuel-" + v.registration(), Models.NotificationKind.CARBURANT,
+                        "Niveau de carburant bas", v.registration() + " : niveau déclaré à " + v.fuelLevelPercent() + " %.",
+                        now.minus(Duration.ofHours(26)), readIds.contains("fuel-" + v.registration()), "VEHICLES", v.registration())));
+        out.add(new Models.NotificationItem("sys-demo", Models.NotificationKind.SYSTEME, "Mode démonstration",
+                "Les données affichées sont fictives et ne sont jamais envoyées en production.", now.minus(Duration.ofDays(3)),
+                readIds.contains("sys-demo"), null, null));
+        out.sort(Comparator.comparing(Models.NotificationItem::at).reversed());
+        return out;
+    }
+
+    @Override
+    public void markNotificationsRead(java.util.Collection<String> ids) {
+        readIds.addAll(ids);
+    }
+
+    @Override
+    public Vehicle archiveVehicle(UUID id, long expectedVersion, String reason) {
+        pause();
+        Session s = requireSession();
+        if (!s.has("FLEET_MANAGER")) {
+            throw new GatewayException(GatewayException.Kind.FORBIDDEN, "Vous n'avez pas les droits nécessaires pour cette action.");
+        }
+        Vehicle v = vehicle(id);
+        if (v.version() != expectedVersion) {
+            throw new GatewayException(GatewayException.Kind.CONFLICT,
+                    "Le véhicule a été modifié par un autre utilisateur. Rechargez-le avant de recommencer.");
+        }
+        Vehicle archived = new Vehicle(v.id(), v.registration(), v.make(), v.model(), v.modelYear(), v.energy(),
+                VehicleStatus.ARCHIVED, v.driverName(), v.fuelLevelPercent(), v.lastKnownPlace(), v.odometerKm(),
+                v.tankCapacityLiters(), v.nextMaintenance(), v.category(), v.version() + 1);
+        vehicles.replaceAll(x -> x.id().equals(id) ? archived : x);
+        return archived;
+    }
+
     // ------------------------------------------------------------------ conducteurs et échéances (parité ancien NexFleet)
 
     @Override
@@ -331,6 +397,7 @@ public final class DemoFleetGateway implements FleetGateway {
         LocalDate today = LocalDate.now(clock.withZone(DOUALA));
         List<Models.DueItem> out = new ArrayList<>();
         for (Vehicle v : vehicles) {
+            if (v.status() == VehicleStatus.ARCHIVED) continue;
             out.addAll(vehicleDue(v, today, thresholdDays));
         }
         for (Models.Driver d : drivers) {

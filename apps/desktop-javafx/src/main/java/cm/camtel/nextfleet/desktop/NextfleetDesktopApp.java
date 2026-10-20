@@ -62,7 +62,7 @@ public class NextfleetDesktopApp extends Application {
     }
 
     public void showLogin(String notice) {
-        setRoot(new LoginView(gateway, notice, session -> setRoot(new AppShell(gateway, session, this::logout, this::toggleTheme))));
+        setRoot(new LoginView(gateway, notice, session -> setRoot(new AppShell(gateway, session, this::logout, this::toggleTheme, () -> dark))));
     }
 
     private void logout() {
@@ -117,8 +117,9 @@ public class NextfleetDesktopApp extends Application {
 
     /** Police Inter embarquée (OFL 1.1, licence jointe dans fonts/) ; police système en repli. */
     private void loadFonts() {
-        for (String w : new String[]{"Regular", "Medium", "SemiBold", "Bold"}) {
-            try (InputStream in = getClass().getResourceAsStream("fonts/Inter-" + w + ".otf")) {
+        for (String w : new String[]{"Inter-Regular", "Inter-Medium", "Inter-SemiBold", "Inter-Bold",
+                "InterDisplay-SemiBold", "InterDisplay-Bold"}) {
+            try (InputStream in = getClass().getResourceAsStream("fonts/" + w + ".otf")) {
                 if (in != null) Font.loadFont(in, 14);
             } catch (java.io.IOException ignored) {
                 // repli sur la police système

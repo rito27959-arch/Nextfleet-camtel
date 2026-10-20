@@ -65,11 +65,17 @@ public final class AppShell extends StackPane {
     private Node current;
     private Section currentSection;
 
-    public AppShell(FleetGateway gateway, Session session, Runnable onLogout, Runnable onToggleTheme) {
+    private final java.util.function.BooleanSupplier isDark;
+    private final Label bellBadge = Ui.label("", "notif-badge");
+    private Node sidePanel;
+
+    public AppShell(FleetGateway gateway, Session session, Runnable onLogout, Runnable onToggleTheme,
+                    java.util.function.BooleanSupplier isDark) {
         this.gateway = gateway;
         this.session = session;
         this.onLogout = onLogout;
         this.onToggleTheme = onToggleTheme;
+        this.isDark = isDark;
         BorderPane frame = new BorderPane();
         frame.setLeft(sidebar());
         BorderPane main = new BorderPane();
@@ -89,7 +95,77 @@ public final class AppShell extends StackPane {
             }
         });
         refreshDueBadge();
+        refreshBellBadge();
         show(Section.OVERVIEW);
+    }
+
+    // ------------------------------------------------------------------ actions partagées (Réglages, alertes, notifications)
+
+    public boolean isDark() {
+        return isDark.getAsBoolean();
+    }
+
+    public void setDark(boolean dark) {
+        if (dark != isDark()) onToggleTheme.run();
+    }
+
+    /** Déconnexion confirmée par une alerte (HIG : titre précis, Annuler à gauche, action à droite). */
+    public void confirmLogout() {
+        AlertDialog.show(this, Ui.symbolTile(Icons.LOCK, "tile-navy"), "Se déconnecter de NexFleet ?",
+                "Votre session sera révoquée sur ce poste.",
+                java.util.List.of(AlertDialog.Action.cancel("Annuler"),
+                        AlertDialog.Action.preferred("Se déconnecter", onLogout)));
+    }
+
+    public void openNotificationCenter() {
+        NotificationCenter nc = new NotificationCenter(gateway, this::closeSidePanel, n -> {
+            closeSidePanel();
+            if (n.targetSection() == null) return;
+            if ("VEHICLES".equals(n.targetSection())) openVehicles(n.targetQuery());
+            else show(Section.valueOf(n.targetSection()));
+        }, this::refreshBellBadge);
+        showSidePanel(nc, 400);
+    }
+
+    private void showSidePanel(javafx.scene.layout.Region panel, double width) {
+        closeSidePanelNow();
+        javafx.scene.layout.Region scrim = new javafx.scene.layout.Region();
+        scrim.getStyleClass().add("scrim");
+        scrim.setOnMouseClicked(e -> closeSidePanel());
+        panel.setMaxWidth(width);
+        panel.setPrefWidth(width);
+        StackPane layer = new StackPane(scrim, panel);
+        StackPane.setAlignment(panel, Pos.CENTER_RIGHT);
+        layer.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ESCAPE) closeSidePanel();
+        });
+        sidePanel = layer;
+        getChildren().add(getChildren().size() - 1, layer);   // sous les bannières
+        Motion.enter(scrim, javafx.util.Duration.ZERO, 0);
+        Motion.slideInFromRight(panel, width);
+        layer.requestFocus();
+    }
+
+    private void closeSidePanel() {
+        Node layer = sidePanel;
+        if (layer == null) return;
+        sidePanel = null;
+        Node panel = ((StackPane) layer).getChildren().get(1);
+        Motion.slideOutToRight(panel, 420, () -> getChildren().remove(layer));
+    }
+
+    private void closeSidePanelNow() {
+        if (sidePanel != null) getChildren().remove(sidePanel);
+        sidePanel = null;
+    }
+
+    private void refreshBellBadge() {
+        Ui.async(gateway::notifications, list -> {
+            long n = NotificationCenter.unread(list);
+            bellBadge.setText(n > 99 ? "99+" : String.valueOf(n));
+            bellBadge.setVisible(n > 0);
+            bellBadge.setAccessibleText(n + " notifications non lues");
+        }, err -> bellBadge.setVisible(false));
     }
 
     public Toasts toasts() {
@@ -117,8 +193,7 @@ public final class AppShell extends StackPane {
 
         VBox box = new VBox(brand, Ui.label("VOTRE ESPACE", "section-title"), navStack, Ui.spacer(), navButton(Section.SETTINGS));
         box.getStyleClass().add("sidebar");
-        StackPane mark = new StackPane(Icons.stroke(Icons.GAUGE, 18, "white"));
-        mark.setStyle("-fx-background-color: rgba(255,255,255,0.08); -fx-background-radius: 999; -fx-min-width: 34; -fx-min-height: 34;");
+        StackPane mark = Ui.symbolTile(Icons.GAUGE, "tile-mint");
         VBox who = new VBox(Ui.label("CAMTEL", "w-700", "t-12"), Ui.label("Gestion de flotte", "muted", "t-12"));
         HBox footer = new HBox(10, mark, who);
         footer.setAlignment(Pos.CENTER_LEFT);
@@ -201,30 +276,23 @@ public final class AppShell extends StackPane {
             demo.setTooltip(new Tooltip("Données fictives — environnement de démonstration, séparé de la production (NF-04)."));
             bar.getChildren().add(demo);
         }
-        ToggleButton motion = new ToggleButton(null, Icons.stroke(Icons.MOTION, 18, "-nf-muted"));
-        motion.getStyleClass().addAll("icon-button", "icon-toggle");
-        motion.setSelected(Motion.isReduced());
-        motion.setTooltip(new Tooltip("Réduire les animations"));
-        motion.setAccessibleText("Réduire les animations");
-        motion.setOnAction(e -> {
-            Motion.setReduced(motion.isSelected());
-            toasts.info(motion.isSelected() ? "Animations réduites" : "Animations activées", null);
-        });
         Button theme = new Button(null, Icons.stroke(Icons.MOON, 18, "-nf-muted"));
         theme.getStyleClass().add("icon-button");
         theme.setAccessibleText("Basculer le thème clair ou sombre");
         theme.setTooltip(new Tooltip("Thème clair / sombre"));
         theme.setOnAction(e -> onToggleTheme.run());
 
-        Circle dot = new Circle(4);
-        dot.getStyleClass().add("notif-dot");
-        StackPane bellIcon = new StackPane(Icons.stroke(Icons.BELL, 18, "-nf-muted"), dot);
-        StackPane.setAlignment(dot, Pos.TOP_RIGHT);
-        Button bell = new Button(null, bellIcon);
+        Button bell = new Button(null, Icons.stroke(Icons.BELL, 18, "-nf-muted"));
         bell.getStyleClass().add("icon-button");
-        bell.setAccessibleText("Échéances et alertes");
-        bell.setTooltip(new Tooltip("Échéances et alertes"));
-        bell.setOnAction(e -> show(Section.DUE));
+        bell.setAccessibleText("Notifications");
+        bell.setTooltip(new Tooltip("Centre de notifications"));
+        bell.setOnAction(e -> openNotificationCenter());
+        bellBadge.setVisible(false);
+        bellBadge.setMouseTransparent(true);
+        StackPane bellBox = new StackPane(bell, bellBadge);
+        StackPane.setAlignment(bellBadge, Pos.TOP_RIGHT);
+        bellBadge.setTranslateX(6);
+        bellBadge.setTranslateY(-3);
 
         StackPane avatar = new StackPane(Ui.label(initials(session.displayName())));
         avatar.getStyleClass().add("avatar");
@@ -232,17 +300,19 @@ public final class AppShell extends StackPane {
         user.getStyleClass().add("btn-ghost");
         user.setStyle("-fx-text-fill: -nf-text; -fx-font-size: 12px;");
         user.setGraphicTextGap(8);
-        user.setTooltip(new Tooltip("Se déconnecter"));
-        user.setAccessibleText("Profil de " + session.displayName() + ". Activer pour se déconnecter.");
-        user.setOnAction(e -> onLogout.run());
-        for (Node n : new Node[]{motion, theme, bell, user}) Motion.pressable(n);
-        bar.getChildren().addAll(motion, theme, bell, user);
+        user.setTooltip(new Tooltip("Compte et réglages"));
+        user.setAccessibleText("Compte de " + session.displayName() + ". Ouvrir les réglages.");
+        user.setOnAction(e -> show(Section.SETTINGS));
+        user.setStyle("-fx-text-fill: -nf-text; -fx-font-size: 13px; -fx-font-weight: 500;");
+        for (Node n : new Node[]{theme, bell, user}) Motion.pressable(n);
+        bar.getChildren().addAll(theme, bellBox, user);
         return bar;
     }
 
     // ------------------------------------------------------------------ navigation
 
     public void show(Section s) {
+        closeSidePanelNow();
         ToggleButton b = nav.get(s);
         if (b != null) b.setSelected(true);
         currentSection = s;
@@ -251,12 +321,14 @@ public final class AppShell extends StackPane {
             case VEHICLES -> new VehiclesView(gateway, session, null, this);
             case DUE -> new DueDatesView(gateway, this);
             case DRIVERS -> new DriversView(gateway);
+            case SETTINGS -> new SettingsView(gateway, session, this);
             default -> unavailable(s);
         };
         setContent(view);
     }
 
     public void openVehicles(String query) {
+        closeSidePanelNow();
         nav.get(Section.VEHICLES).setSelected(true);
         currentSection = Section.VEHICLES;
         setContent(new VehiclesView(gateway, session, query, this));

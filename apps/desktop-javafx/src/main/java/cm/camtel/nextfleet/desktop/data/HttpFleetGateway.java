@@ -117,6 +117,34 @@ public final class HttpFleetGateway implements FleetGateway {
         throw new GatewayException(GatewayException.Kind.SERVER, "Échéances du véhicule : lot 2.");
     }
 
+    @Override
+    public java.util.List<Models.NotificationItem> notifications() {
+        throw new GatewayException(GatewayException.Kind.SERVER, "Centre de notifications : API prévue au lot 3 (NF-24).");
+    }
+
+    @Override
+    public void markNotificationsRead(java.util.Collection<String> ids) {
+        // pas d'état serveur au lot 1
+    }
+
+    /** POST /api/v1/vehicles/{id}/archive avec If-Match (contrat OpenAPI lot 1). */
+    @Override
+    public Vehicle archiveVehicle(UUID id, long expectedVersion, String reason) {
+        String path = "/api/v1/vehicles/" + id + "/archive?reason=" + URLEncoder.encode(reason, StandardCharsets.UTF_8);
+        return toVehicle(sendWithHeader("POST", path, "If-Match", "\"" + expectedVersion + "\""));
+    }
+
+    private JsonNode sendWithHeader(String method, String path, String header, String value) {
+        extraHeader = new String[]{header, value};
+        try {
+            return send(method, path, null, true);
+        } finally {
+            extraHeader = null;
+        }
+    }
+
+    private volatile String[] extraHeader;
+
     static Vehicle toVehicle(JsonNode n) {
         VehicleStatus status;
         try {
@@ -144,6 +172,8 @@ public final class HttpFleetGateway implements FleetGateway {
         b.method(method, body == null ? HttpRequest.BodyPublishers.noBody()
                 : HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8));
         if (body != null) b.header("Content-Type", "application/json");
+        String[] extra = extraHeader;
+        if (extra != null) b.header(extra[0], extra[1]);
         HttpResponse<String> res;
         try {
             res = http.send(b.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));

@@ -39,8 +39,8 @@ public final class DriversView extends ScrollPane {
     public DriversView(FleetGateway gateway) {
         this.gateway = gateway;
         setFitToWidth(true);
-        VBox titles = new VBox(4, Ui.label("Conducteurs", "h1"),
-                Ui.label("Permis, pièces d'identité et affectations, avec leurs échéances.", "muted"));
+        VBox titles = new VBox(4, Ui.label("Conducteurs", "large-title"),
+                Ui.label("Permis, pièces d'identité et affectations, avec leurs échéances.", "body", "muted"));
         search.setPromptText("Nom ou matricule…");
         search.getStyleClass().add("search-field");
         search.setPrefWidth(300);
@@ -90,7 +90,7 @@ public final class DriversView extends ScrollPane {
 
     private Node card(Driver d, int index) {
         LocalDate today = LocalDate.now(ZoneId.of("Africa/Douala"));
-        VBox name = new VBox(2, Ui.label(d.fullName(), "t-16", "w-700"), Ui.label(d.staffNumber() + " · " + d.site(), "muted", "t-12"));
+        VBox name = new VBox(2, Ui.label(d.fullName(), "headline"), Ui.label(d.staffNumber() + " · " + d.site(), "muted", "t-12"));
         HBox top = new HBox(12, Ui.avatar(d.initials(), index), name);
         top.setAlignment(Pos.CENTER_LEFT);
 

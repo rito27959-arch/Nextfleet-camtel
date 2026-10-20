@@ -52,6 +52,13 @@ public interface FleetGateway {
     /** Échéances du périmètre, triées par date ; {@code thresholdDays} = seuil d'alerte approuvé. */
     java.util.List<Models.DueItem> dueDates(int thresholdDays);
 
+    java.util.List<Models.NotificationItem> notifications();
+
+    void markNotificationsRead(java.util.Collection<String> ids);
+
+    /** Archivage métier d'un véhicule (RG-04) avec motif ; l'historique reste consultable. */
+    Vehicle archiveVehicle(UUID id, long expectedVersion, String reason);
+
     /** Échéances d'un véhicule donné. */
     java.util.List<Models.DueItem> vehicleDueDates(UUID vehicleId);
 }

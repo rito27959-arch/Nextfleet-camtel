@@ -39,18 +39,35 @@ public final class ScreenshotTour {
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
+        add(() -> { });   // laisse l'animation d'entrée se terminer
         add(() -> shot("01-connexion"));
+        add(() -> ((LoginView) app.scene().getRoot()).forgotForTest());
+        add(() -> shot("01d-alerte-mot-de-passe-oublie"));
+        add(() -> app.scene().getRoot().lookupAll(".alert-button").stream().findFirst()
+                .ifPresent(b -> ((javafx.scene.control.Button) b).fire()));
         add(() -> login("gestionnaire"));
         record("anim-01-entree-tableau-de-bord", () -> shell().show(AppShell.Section.OVERVIEW), 30, 50);
         add(() -> shot("02-tableau-de-bord"));
         record("anim-02-theme-sombre", app::toggleTheme, 10, 40);
         add(() -> shot("02b-tableau-de-bord-sombre"));
         add(app::toggleTheme);
+        record("anim-05-centre-notifications", () -> shell().openNotificationCenter(), 16, 45);
+        add(() -> shot("07-centre-notifications"));
+        add(() -> app.toggleTheme());
+        add(() -> shell().openNotificationCenter());
+        add(() -> shot("07b-centre-notifications-sombre"));
+        add(() -> app.toggleTheme());
         add(() -> shell().show(AppShell.Section.VEHICLES));
         add(() -> shot("03-liste-vehicules"));
         record("anim-03-fiche-vehicule-ressort", () -> find(VehiclesView.class).selectFirstForTest(), 16, 40);
         add(() -> shot("10-fiche-vehicule-echeances"));
         add(() -> shell().show(AppShell.Section.VEHICLES));
+        record("anim-06-alerte", () -> find(VehiclesView.class).archiveFirstForTest(), 14, 40);
+        add(() -> shot("08-alerte-archivage"));
+        add(() -> app.scene().getRoot().lookupAll(".alert-button").stream()
+                .filter(b -> ((javafx.scene.control.Button) b).getText().equals("Archiver")).findFirst()
+                .ifPresent(b -> ((javafx.scene.control.Button) b).fire()));
+        add(() -> shot("08b-banniere-vehicule-archive"));
         add(() -> find(VehiclesView.class).openFormForTest());
         add(() -> find(VehicleFormView.class).fillInvalidForTest());
         add(() -> shot("04-ajout-vehicule-erreurs"));
@@ -60,9 +77,15 @@ public final class ScreenshotTour {
         add(() -> shot("05-echeances"));
         add(() -> shell().show(AppShell.Section.DRIVERS));
         add(() -> shot("06-conducteurs"));
+        add(() -> shell().show(AppShell.Section.SETTINGS));
+        add(() -> shot("09-reglages"));
         add(() -> app.toggleTheme());
-        add(() -> shot("06b-conducteurs-sombre"));
+        add(() -> shot("09b-reglages-sombre"));
         add(() -> app.toggleTheme());
+        add(() -> shell().confirmLogout());
+        add(() -> shot("09c-alerte-deconnexion"));
+        add(() -> app.scene().getRoot().lookupAll(".alert-button").stream().findFirst()
+                .ifPresent(b -> ((javafx.scene.control.Button) b).fire()));
         add(() -> shell().openVehicles("hilux"));
         add(() -> shot("03b-recherche-hilux"));
         add(() -> ((DemoFleetGateway) app.gateway()).setNetworkDown(true));

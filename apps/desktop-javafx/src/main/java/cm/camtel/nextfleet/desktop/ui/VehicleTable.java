@@ -49,9 +49,9 @@ final class VehicleTable {
     private static Node vehicleCell(Vehicle v) {
         StackPane icon = new StackPane(Icons.stroke(Icons.CAR, 18, "-nf-muted"));
         icon.setStyle("-fx-background-color: -nf-surface-2; -fx-background-radius: 10; -fx-min-width: 40; -fx-min-height: 30;");
-        Label reg = Ui.label(v.registration(), "t-12", "w-700");
+        Label reg = Ui.label(v.registration(), "subhead", "w-600");
         reg.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
-        VBox text = new VBox(0, reg, Ui.label(v.label(), "muted", "t-12"));
+        VBox text = new VBox(1, reg, Ui.label(v.label(), "muted", "footnote"));
         HBox box = new HBox(10, icon, text);
         box.setAlignment(Pos.CENTER_LEFT);
         return box;
