@@ -75,7 +75,6 @@ jobs:
   android:
     name: Android — APK
     runs-on: ubuntu-24.04
-    if: hashFiles('apps/android/settings.gradle') != ''
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -157,7 +156,9 @@ jobs:
             --dest dist "${EXTRA[@]}"
           ls -la dist
       - uses: actions/upload-artifact@v4
-        with: { name: nexfleet-bureau-${{ matrix.type }}, path: dist/* }
+        with:
+          name: nexfleet-bureau-${{ matrix.type }}
+          path: dist/*
 
   publication:
     name: Publication (étiquette vX.Y.Z)
