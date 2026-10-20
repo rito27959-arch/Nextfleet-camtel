@@ -1,6 +1,6 @@
 # NexFleet CAMTEL — intégration continue gratuite (GitHub Actions, dépôt public).
 # Produit : rapports de tests, APK Android, paquet DEB (Ubuntu/Debian), installateur EXE (Windows).
-# Une étiquette vX.Y.Z publie ces fichiers dans une « Release » GitHub.
+# Une étiquette vX.Y.Z, ou un lancement manuel avec « publier », publie ces fichiers dans une « Release » GitHub.
 name: ci
 on:
   push:
@@ -8,6 +8,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      publier:
+        description: "Publier une Release GitHub vAPP_VERSION avec les paquets (crée l'étiquette)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -207,7 +212,7 @@ jobs:
 
   publication:
     name: Publication (étiquette vX.Y.Z)
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publier)
     needs: [base-de-donnees, java, android, bureau-paquets]
     runs-on: ubuntu-24.04
     permissions:
@@ -218,13 +223,16 @@ jobs:
       - run: ls -la out
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', env.APP_VERSION) }}
+          name: NexFleet CAMTEL ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', env.APP_VERSION) }}
+          target_commitish: ${{ github.sha }}
           files: |
             out/*.apk
             out/*.deb
             out/*.exe
             out/nextfleet-api-*.jar
           body: |
-            NexFleet CAMTEL ${{ github.ref_name }} — paquets construits par la CI GitHub.
+            NexFleet CAMTEL ${{ env.APP_VERSION }} — paquets construits par la CI GitHub.
             Version de démonstration et de recette : ni homologation CAMTEL, ni mise en production.
             Voir docs/ETAT_AVANCEMENT.md et docs/INSTALLATION.md.
 
