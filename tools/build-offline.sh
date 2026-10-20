@@ -43,6 +43,7 @@ if [[ "${SKIP_DESKTOP:-0}" != "1" && -d "$ROOT/apps/desktop-javafx/src/main/java
         --module-path "$FX_LIB" --add-modules javafx.controls,javafx.swing \
         -cp "$OUT/domain:$JACKSON" $(find "$DESK/src/main/java" -name '*.java')
   cp -r "$DESK/src/main/resources/." "$OUT/desktop/"
+  mkdir -p "$OUT/desktop/cm/camtel/nextfleet/desktop/assets3d" && cp -r "$ROOT/shared/assets3d/." "$OUT/desktop/cm/camtel/nextfleet/desktop/assets3d/"
   if [[ -d "$DESK/src/test/java" ]]; then
     echo "== desktop-javafx : tests"
     javac --release 21 -d "$OUT/desktop-test" --module-path "$FX_LIB" --add-modules javafx.controls \

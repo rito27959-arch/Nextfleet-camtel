@@ -1,0 +1,183 @@
+# NexFleet CAMTEL — intégration continue gratuite (GitHub Actions, dépôt public).
+# Produit : rapports de tests, APK Android, paquet DEB (Ubuntu/Debian), installateur EXE (Windows).
+# Une étiquette vX.Y.Z publie ces fichiers dans une « Release » GitHub.
+name: ci
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  APP_VERSION: 0.3.0
+
+jobs:
+  base-de-donnees:
+    name: Base PostgreSQL + PostGIS (62 tests)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: PostgreSQL 16 + PostGIS
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-16-postgis-3
+          sudo systemctl start postgresql
+          sudo -u postgres psql -c "CREATE ROLE nextfleet LOGIN PASSWORD 'nextfleet_dev_only' CREATEDB;"
+      - name: Migrations V1–V5 et campagne de tests
+        run: infra/db/tests/run_db_tests.sh
+
+  java:
+    name: Maven — noyau, passerelles, API (Testcontainers), bureau
+    runs-on: ubuntu-24.04
+    services:
+      pg:
+        image: postgis/postgis:16-3.4
+        env: { POSTGRES_USER: nextfleet, POSTGRES_PASSWORD: ci_only, POSTGRES_DB: nextfleet_it }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U nextfleet" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21', cache: maven }
+      - name: Base d'intégration (migrations + jeu fictif)
+        env: { PGPASSWORD: ci_only }
+        run: |
+          psql -h localhost -U nextfleet -d nextfleet_it -v ON_ERROR_STOP=1 -q -c "CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS btree_gist; CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+          for f in $(ls infra/db/migrations/V*__*.sql | sort -V); do psql -h localhost -U nextfleet -d nextfleet_it -v ON_ERROR_STOP=1 -q -f "$f" > /dev/null; done
+          psql -h localhost -U nextfleet -d nextfleet_it -v ON_ERROR_STOP=1 -q -f infra/db/tests/it_fixture.sql
+      - name: mvn verify
+        run: >
+          mvn -B -ntp verify
+          -Dnf.db.url=jdbc:postgresql://localhost:5432/nextfleet_it -Dnf.db.user=nextfleet -Dnf.db.password=ci_only
+      - name: Contrastes et contrats
+        run: |
+          python3 tools/check_contrast.py
+          pip install -q openapi-spec-validator
+          openapi-spec-validator shared/api-contract/openapi.yaml
+          openapi-spec-validator shared/api-contract/openapi-lot2.yaml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rapports-tests-java
+          path: '**/target/surefire-reports/*.xml'
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nexfleet-api-jar
+          path: services/nextfleet-api/target/nextfleet-api-*.jar
+          if-no-files-found: ignore
+
+  android:
+    name: Android — APK
+    runs-on: ubuntu-24.04
+    if: hashFiles('apps/android/settings.gradle') != ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '9.5.0' }
+      - name: Licences du SDK Android
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - name: Tests unitaires, lint et APK
+        working-directory: apps/android
+        run: gradle --no-daemon testDebugUnitTest lintDebug assembleDebug assembleRelease
+        env:
+          NF_KEYSTORE_BASE64: ${{ secrets.NF_KEYSTORE_BASE64 }}
+          NF_KEYSTORE_PASSWORD: ${{ secrets.NF_KEYSTORE_PASSWORD }}
+          NF_KEY_ALIAS: ${{ secrets.NF_KEY_ALIAS }}
+          NF_KEY_PASSWORD: ${{ secrets.NF_KEY_PASSWORD }}
+      - name: Renommer les APK
+        run: |
+          mkdir -p dist
+          cp apps/android/app/build/outputs/apk/debug/app-debug.apk dist/nexfleet-${APP_VERSION}-debug.apk
+          for f in apps/android/app/build/outputs/apk/release/*.apk; do cp "$f" "dist/nexfleet-${APP_VERSION}-$(basename "$f" .apk | sed 's/^app-//').apk"; done
+          ls -la dist
+      - uses: actions/upload-artifact@v4
+        with: { name: nexfleet-android-apk, path: dist/*.apk }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rapports-android
+          path: |
+            apps/android/app/build/reports/
+            apps/android/app/build/test-results/
+          if-no-files-found: ignore
+
+  bureau-paquets:
+    name: Bureau — ${{ matrix.label }}
+    needs: java
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, label: 'DEB (Ubuntu/Debian)', type: deb, classifier: linux, icon: nexfleet.png }
+          - { os: windows-2022, label: 'EXE (Windows)', type: exe, classifier: win, icon: nexfleet.ico }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run: { shell: bash }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21', cache: maven }
+      - name: Construire le client bureau
+        run: mvn -B -ntp -pl apps/desktop-javafx -am package -DskipTests
+      - name: Préparer l'image d'application
+        run: |
+          T=apps/desktop-javafx/target
+          mkdir -p jp/app jp/fx
+          cp $T/nextfleet-desktop-*.jar jp/app/
+          cp $T/libs/*.jar jp/app/
+          # modules JavaFX natifs de la plateforme → runtime ; jars vides retirés du classpath
+          mv jp/app/javafx-*-${{ matrix.classifier }}.jar jp/fx/
+          rm -f jp/app/javafx-*.jar
+          ls jp/app jp/fx
+      - name: jpackage (${{ matrix.type }})
+        run: |
+          EXTRA=()
+          if [ "${{ matrix.type }}" = deb ]; then
+            EXTRA=(--linux-shortcut --linux-menu-group Office --linux-app-category misc --linux-package-name nexfleet
+                   --linux-deb-maintainer "dsir@camtel.invalid")
+          else
+            EXTRA=(--win-menu --win-menu-group NexFleet --win-shortcut --win-dir-chooser --win-per-user-install
+                   --win-upgrade-uuid 6c1f6a7e-3f0b-4f7e-9d0c-2b1a9c4d5e61)
+          fi
+          jpackage --type ${{ matrix.type }} --name NexFleet --app-version "$APP_VERSION" --vendor "CAMTEL" \
+            --description "NexFleet CAMTEL - gestion de flotte" --copyright "CAMTEL" \
+            --input jp/app --main-jar "$(cd jp/app && ls nextfleet-desktop-*.jar)" \
+            --main-class cm.camtel.nextfleet.desktop.NextfleetDesktopApp \
+            --module-path jp/fx \
+            --add-modules javafx.controls,javafx.swing,java.net.http,java.sql,java.naming,java.logging,java.desktop,jdk.crypto.ec,jdk.localedata,jdk.unsupported,jdk.charsets \
+            --icon apps/desktop-javafx/packaging/${{ matrix.icon }} \
+            --dest dist "${EXTRA[@]}"
+          ls -la dist
+      - uses: actions/upload-artifact@v4
+        with: { name: nexfleet-bureau-${{ matrix.type }}, path: dist/* }
+
+  publication:
+    name: Publication (étiquette vX.Y.Z)
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [base-de-donnees, java, android, bureau-paquets]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: out, pattern: 'nexfleet-*', merge-multiple: true }
+      - run: ls -la out
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            out/*.apk
+            out/*.deb
+            out/*.exe
+            out/nexfleet-api-*.jar
+          body: |
+            NexFleet CAMTEL ${{ github.ref_name }} — paquets construits par la CI GitHub.
+            Version de démonstration et de recette : ni homologation CAMTEL, ni mise en production.
+            Voir docs/ETAT_AVANCEMENT.md et docs/INSTALLATION.md.

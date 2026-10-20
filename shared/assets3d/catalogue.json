@@ -1,0 +1,23 @@
+{
+  "$description": "Catalogue 3D embarqué (bureau et Android). Seuls des modèles à licence redistribuable sont inclus (cahier V5 : aucun modèle dont la licence interdit la redistribution). Voir LICENCES.md.",
+  "models": [
+    { "id": "nexfleet-pickup",  "label": "Pick-up double cabine", "category": "Pick-up", "file": "models/nexfleet-pickup.glb",
+      "licence": "Création originale NexFleet", "spdx": "LicenseRef-NexFleet-Original", "author": "Projet NexFleet CAMTEL",
+      "source": "tools/gen_fleet_models.py", "redistributable": true, "matches": ["Toyota Hilux", "Mitsubishi L200", "Nissan Navara", "Isuzu D-Max"] },
+    { "id": "nexfleet-suv",     "label": "SUV", "category": "SUV", "file": "models/nexfleet-suv.glb",
+      "licence": "Création originale NexFleet", "spdx": "LicenseRef-NexFleet-Original", "author": "Projet NexFleet CAMTEL",
+      "source": "tools/gen_fleet_models.py", "redistributable": true, "matches": ["Toyota Prado", "Renault Duster", "Hyundai Tucson"] },
+    { "id": "nexfleet-4x4",     "label": "Tout-terrain 4x4", "category": "4x4", "file": "models/nexfleet-4x4.glb",
+      "licence": "Création originale NexFleet", "spdx": "LicenseRef-NexFleet-Original", "author": "Projet NexFleet CAMTEL",
+      "source": "tools/gen_fleet_models.py", "redistributable": true, "matches": ["Toyota Land Cruiser", "Suzuki Jimny"] },
+    { "id": "nexfleet-berline", "label": "Berline", "category": "Berline", "file": "models/nexfleet-berline.glb",
+      "licence": "Création originale NexFleet", "spdx": "LicenseRef-NexFleet-Original", "author": "Projet NexFleet CAMTEL",
+      "source": "tools/gen_fleet_models.py", "redistributable": true, "matches": ["Peugeot 301", "Toyota Corolla"] },
+    { "id": "nexfleet-minibus", "label": "Minibus", "category": "Minibus", "file": "models/nexfleet-minibus.glb",
+      "licence": "Création originale NexFleet", "spdx": "LicenseRef-NexFleet-Original", "author": "Projet NexFleet CAMTEL",
+      "source": "tools/gen_fleet_models.py", "redistributable": true, "matches": ["Toyota Hiace"] },
+    { "id": "khronos-toycar",   "label": "Toy Car (démonstration de matériaux)", "category": "Démonstration", "file": "models/khronos-toycar.glb",
+      "licence": "CC0 1.0 Universal", "spdx": "CC0-1.0", "author": "Guido Odendahl (modèle), Eric Chadwick (extensions et composition)",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/ToyCar", "redistributable": true, "matches": [] }
+  ]
+}

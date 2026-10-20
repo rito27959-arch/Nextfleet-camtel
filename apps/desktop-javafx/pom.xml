@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Client JavaFX. Compilé et testé hors Maven par tools/build-offline.sh ; build Maven à confirmer dès l'accès à Maven Central. -->
+<!-- Client JavaFX. Compilé par Maven en CI (GitHub Actions) et hors ligne par tools/build-offline.sh. -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
@@ -25,6 +25,14 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource><directory>src/main/resources</directory></resource>
+            <!-- Catalogue 3D partagé avec Android (modèles à licence redistribuable, voir shared/assets3d/LICENCES.md). -->
+            <resource>
+                <directory>../../shared/assets3d</directory>
+                <targetPath>cm/camtel/nextfleet/desktop/assets3d</targetPath>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.openjfx</groupId>
