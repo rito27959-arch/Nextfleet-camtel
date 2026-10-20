@@ -69,7 +69,7 @@ public final class ModelViewerActivity extends Activity implements Choreographer
         });
 
         Renderer.ClearOptions clear = new Renderer.ClearOptions();
-        clear.clearColor = new float[]{0.949f, 0.957f, 0.969f, 1f};
+        clear.clearColor = new double[]{0.949, 0.957, 0.969, 1.0};
         clear.clear = true;
         viewer.getRenderer().setClearOptions(clear);
         IndirectLight ibl = new IndirectLight.Builder()

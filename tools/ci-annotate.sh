@@ -10,3 +10,7 @@ ERR=$(grep -E "\[ERROR\]|error:|FAILED|FAILURE|Exception|What went wrong|e: |Exe
 # 2) fin du journal (150 lignes)
 TAIL=$(tail -150 "$LOG" | cut -c1-300 | enc)
 echo "::error title=${TITLE} — fin du journal::${TAIL}"
+# 3) échecs de tests JUnit (surefire) avec leur cause
+TF=$(grep -E -A25 "<<< (ERROR|FAILURE)!" "$LOG" | grep -v "^\s*at org\.\(junit\|apache\|springframework\.test\)" | head -150 | cut -c1-400 | enc)
+[[ -n "$TF" ]] && echo "::error title=${TITLE} — tests en échec::${TF}"
+exit 0
