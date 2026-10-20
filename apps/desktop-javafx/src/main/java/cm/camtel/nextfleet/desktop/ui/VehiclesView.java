@@ -41,12 +41,18 @@ public final class VehiclesView extends BorderPane {
     private int page;
     private long total;
 
-    public VehiclesView(FleetGateway gateway, Session session, String initialQuery) {
+    private final AppShell shell;
+    private final StackPane layers = new StackPane();
+    private Node overlay;
+
+    public VehiclesView(FleetGateway gateway, Session session, String initialQuery, AppShell shell) {
         this.gateway = gateway;
         this.session = session;
+        this.shell = shell;
         VBox content = new VBox(16, header(), toolbar(), body);
         content.getStyleClass().add("content");
-        setCenter(content);
+        layers.getChildren().add(content);
+        setCenter(layers);
 
         prev.getStyleClass().add("btn-secondary");
         next.getStyleClass().add("btn-secondary");
@@ -162,18 +168,54 @@ public final class VehiclesView extends BorderPane {
     }
 
     private void openSheet(Vehicle v) {
-        setRight(new VehicleSheet(v, gateway.isDemo(), () -> {
-            setRight(null);
+        VehicleSheet sheet = new VehicleSheet(v, gateway, () -> {
+            closeOverlay();
             table.getSelectionModel().clearSelection();
-        }));
+        });
+        showOverlay(sheet, 420);
     }
 
     private void openForm() {
         VehicleFormView form = new VehicleFormView(gateway, created -> {
-            setRight(null);
+            closeOverlay();
             search.setText(created.registration());
-        }, () -> setRight(null));
-        setRight(form);
+            if (shell != null) shell.toasts().success("Véhicule enregistré", created.registration() + " · " + created.label());
+        }, this::closeOverlay);
+        showOverlay(form, 460);
+    }
+
+    /** Feuille latérale sur voile : glisse depuis la droite avec un ressort ; clic sur le voile ou Échap pour fermer. */
+    private void showOverlay(javafx.scene.layout.Region panel, double width) {
+        if (overlay != null) layers.getChildren().remove(overlay);
+        javafx.scene.layout.Region scrim = new javafx.scene.layout.Region();
+        scrim.getStyleClass().add("scrim");
+        scrim.setOnMouseClicked(e -> {
+            closeOverlay();
+            table.getSelectionModel().clearSelection();
+        });
+        panel.setMaxWidth(width);
+        panel.setPrefWidth(width);
+        StackPane o = new StackPane(scrim, panel);
+        StackPane.setAlignment(panel, Pos.CENTER_RIGHT);
+        o.setOnKeyPressed(e -> {
+            if (e.getCode() == javafx.scene.input.KeyCode.ESCAPE) closeOverlay();
+        });
+        overlay = o;
+        layers.getChildren().add(o);
+        Motion.enter(scrim, javafx.util.Duration.ZERO, 0);
+        Motion.slideInFromRight(panel, width);
+        panel.requestFocus();
+    }
+
+    private void closeOverlay() {
+        Node o = overlay;
+        if (o == null) return;
+        overlay = null;
+        Node panel = ((StackPane) o).getChildren().get(1);
+        Motion.slideOutToRight(panel, 460, () -> layers.getChildren().remove(o));
+        javafx.animation.FadeTransition f = new javafx.animation.FadeTransition(Motion.FAST, ((StackPane) o).getChildren().get(0));
+        f.setToValue(0);
+        if (!Motion.isReduced()) f.play();
     }
 
     /** Pour la recette automatisée : sélectionne le premier véhicule affiché. */

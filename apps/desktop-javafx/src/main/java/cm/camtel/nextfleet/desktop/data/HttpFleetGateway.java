@@ -101,6 +101,22 @@ public final class HttpFleetGateway implements FleetGateway {
                 "Création côté API réelle : nécessite l'entité d'affectation (orgUnitId) issue de /me — lot 2.");
     }
 
+    @Override
+    public java.util.List<Models.Driver> drivers(String query) {
+        throw new GatewayException(GatewayException.Kind.SERVER, "Module Conducteurs non encore exposé par l'API (lot 2).");
+    }
+
+    @Override
+    public java.util.List<Models.DueItem> dueDates(int thresholdDays) {
+        throw new GatewayException(GatewayException.Kind.SERVER,
+                "Échéances : la vue base v_due_date existe ; l'API correspondante arrive au lot 2.");
+    }
+
+    @Override
+    public java.util.List<Models.DueItem> vehicleDueDates(UUID vehicleId) {
+        throw new GatewayException(GatewayException.Kind.SERVER, "Échéances du véhicule : lot 2.");
+    }
+
     static Vehicle toVehicle(JsonNode n) {
         VehicleStatus status;
         try {

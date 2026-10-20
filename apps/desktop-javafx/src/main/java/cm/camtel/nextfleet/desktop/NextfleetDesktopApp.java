@@ -40,6 +40,7 @@ public class NextfleetDesktopApp extends Application {
         Map<String, String> args = getParameters().getNamed();
         boolean demo = getParameters().getUnnamed().contains("--demo") || !args.containsKey("api");
         dark = getParameters().getUnnamed().contains("--dark");
+        cm.camtel.nextfleet.desktop.ui.Motion.setReduced(getParameters().getUnnamed().contains("--reduce-motion"));
         String shots = args.get("screenshot");
         gateway = demo
                 ? new DemoFleetGateway(Clock.systemUTC(), shots != null ? Duration.ZERO : Duration.ofMillis(350))
@@ -69,7 +70,23 @@ public class NextfleetDesktopApp extends Application {
         showLogin("Vous êtes déconnecté. Votre session a été révoquée.");
     }
 
+    /** Bascule de thème en fondu enchaîné (240 ms) : l'ancien rendu s'efface au-dessus du nouveau. */
     public void toggleTheme() {
+        Parent root = scene.getRoot();
+        if (!cm.camtel.nextfleet.desktop.ui.Motion.isReduced() && root instanceof javafx.scene.layout.Pane pane) {
+            javafx.scene.image.ImageView before = new javafx.scene.image.ImageView(scene.snapshot(null));
+            before.setManaged(false);
+            before.setMouseTransparent(true);
+            dark = !dark;
+            applyTheme();
+            pane.getChildren().add(before);
+            javafx.animation.FadeTransition f = new javafx.animation.FadeTransition(javafx.util.Duration.millis(240), before);
+            f.setToValue(0);
+            f.setInterpolator(cm.camtel.nextfleet.desktop.ui.Motion.EASE_IN_OUT);
+            f.setOnFinished(e -> pane.getChildren().remove(before));
+            f.play();
+            return;
+        }
         dark = !dark;
         applyTheme();
     }
@@ -77,6 +94,7 @@ public class NextfleetDesktopApp extends Application {
     public void setRoot(Parent root) {
         scene.setRoot(root);
         applyTheme();
+        cm.camtel.nextfleet.desktop.ui.Motion.enter(root, javafx.util.Duration.ZERO, 0);
     }
 
     private void applyTheme() {

@@ -242,6 +242,62 @@ SELECT pg_temp.expect_true('SEC-08 chaînage des empreintes',
 SELECT pg_temp.expect_error('SEC-08 modification du journal interdite',
  $$UPDATE audit_event SET reason = 'falsifié'$$, 'ajout seul');
 
+
+-- ------------------------------------------------------------------ V4 : parité ancien NexFleet
+SELECT pg_temp.expect_true('NF-13 référentiel des 12 points de contrôle', (SELECT count(*) = 12 FROM inspection_point));
+INSERT INTO inspection(id, vehicle_id, kind, inspected_at, result, author_id)
+VALUES ('00000000-0000-0000-0000-000000000501','00000000-0000-0000-0000-0000000000b1','PERIODIQUE', now(), 'RESERVES',
+        '00000000-0000-0000-0000-000000000001');
+SELECT pg_temp.expect_error('NF-13 un défaut doit être décrit',
+ $$INSERT INTO inspection_item(inspection_id, point_code, state) VALUES ('00000000-0000-0000-0000-000000000501','FREINS','DEFAUT')$$,
+ 'inspection_item_check');
+INSERT INTO inspection_item(inspection_id, point_code, state, critical, comment)
+VALUES ('00000000-0000-0000-0000-000000000501','FREINS','DEFAUT', true, 'Plaquettes avant usées');
+SELECT pg_temp.expect_error('NF-14 clôture sans justificatif ni visa refusée',
+ $$INSERT INTO maintenance_order(vehicle_id, category_code, title, status, cost_xaf, odometer_km, work_done, requested_by)
+   VALUES ('00000000-0000-0000-0000-0000000000b1','FREINAGE','Plaquettes','CLOTUREE', 85000, 42000, 'Remplacement', '00000000-0000-0000-0000-000000000001')$$,
+ 'ck_closure_complete');
+INSERT INTO maintenance_order(id, vehicle_id, category_code, title, requested_by)
+VALUES ('00000000-0000-0000-0000-000000000601','00000000-0000-0000-0000-0000000000b1','VIDANGE','Vidange 45 000 km','00000000-0000-0000-0000-000000000001');
+SELECT pg_temp.expect_error('NF-15 vidange liée à un ordre : coût non compté deux fois',
+ $$INSERT INTO oil_change(vehicle_id, maintenance_order_id, done_on, odometer_km, interval_km, cost_xaf, author_id)
+   VALUES ('00000000-0000-0000-0000-0000000000b1','00000000-0000-0000-0000-000000000601','2026-10-01', 45000, 10000, 60000,
+   '00000000-0000-0000-0000-000000000001')$$, 'ck_no_double_cost');
+INSERT INTO oil_change(vehicle_id, done_on, odometer_km, interval_km, oil_filter, cost_xaf, author_id)
+VALUES ('00000000-0000-0000-0000-0000000000b1','2026-10-01', 45000, 10000, true, 60000, '00000000-0000-0000-0000-000000000001');
+SELECT pg_temp.expect_true('NF-15 prochaine vidange calculée à 55 000 km',
+ (SELECT next_due_km = 55000 FROM oil_change WHERE vehicle_id = '00000000-0000-0000-0000-0000000000b1'));
+INSERT INTO tire(id, size, brand) VALUES ('00000000-0000-0000-0000-000000000701','265/65 R17','Marque fictive');
+INSERT INTO tire_event(tire_id, vehicle_id, kind, position, condition, occurred_on, author_id) VALUES
+ ('00000000-0000-0000-0000-000000000701','00000000-0000-0000-0000-0000000000b1','MONTAGE','AVG','NEUF','2026-01-10','00000000-0000-0000-0000-000000000001'),
+ ('00000000-0000-0000-0000-000000000701','00000000-0000-0000-0000-0000000000b1','PERMUTATION','ARD','BON','2026-07-02','00000000-0000-0000-0000-000000000001');
+SELECT pg_temp.expect_true('NF-16 permutation : position courante ARD, origine AVG conservée',
+ (SELECT position = 'ARD' FROM v_tire_current_position) AND (SELECT count(*) = 2 FROM tire_event));
+SELECT pg_temp.expect_error('NF-16 historique de pneus non modifiable', $$UPDATE tire_event SET position = 'AVD'$$, 'ajout seul');
+INSERT INTO vehicle_document(vehicle_id, doc_type, valid_until) VALUES
+ ('00000000-0000-0000-0000-0000000000b1','ASSURANCE','2026-10-30'),
+ ('00000000-0000-0000-0000-0000000000b1','ASSURANCE','2025-10-30'),
+ ('00000000-0000-0000-0000-0000000000b1','VIGNETTE','2026-10-15');
+UPDATE driver SET id_card_expires_on = '2027-06-01' WHERE id = '00000000-0000-0000-0000-0000000000c1';
+INSERT INTO driver_license(driver_id, license_number, categories, expires_on)
+VALUES ('00000000-0000-0000-0000-0000000000c1','PERMIS-FICTIF-1', ARRAY['B','C'], '2026-11-05');
+SELECT pg_temp.expect_true('NF-11 échéances unifiées : seule la dernière assurance compte ; niveaux cohérents',
+ (SELECT count(*) = 1 FROM nf_due_dates('2026-10-20', 30) WHERE due_kind = 'ASSURANCE')
+ AND (SELECT level = 'A_ECHEANCE' AND days_left = 10 FROM nf_due_dates('2026-10-20', 30) WHERE due_kind = 'ASSURANCE')
+ AND (SELECT level = 'EXPIRE' FROM nf_due_dates('2026-10-20', 30) WHERE due_kind = 'VIGNETTE')
+ AND (SELECT level = 'A_ECHEANCE' FROM nf_due_dates('2026-10-20', 30) WHERE due_kind = 'PERMIS')
+ AND (SELECT level = 'A_JOUR' FROM nf_due_dates('2026-10-20', 30) WHERE due_kind = 'CNI'));
+SELECT pg_temp.expect_error('NF-19 position déclarée sans horodatage refusée',
+ $$UPDATE vehicle SET declared_lat = 3.85, declared_lng = 11.50 WHERE id = '00000000-0000-0000-0000-0000000000b1'$$, 'ck_declared_position');
+INSERT INTO budget_plan_line(fiscal_year, org_unit_id, category_code, task, q1_amount, q3_amount, source_file, source_row, import_batch_id)
+VALUES (2026, '00000000-0000-0000-0000-0000000000a1', 'FREINAGE', 'Plaquettes (fictif)', 150000, 150000, 'plan_2026.xlsx', 12, gen_random_uuid());
+SELECT pg_temp.expect_true('NF-21 montant annuel = somme des trimestres (300 000 XAF)',
+ (SELECT annual_amount = 300000 FROM budget_plan_line));
+SELECT pg_temp.expect_error('NF-26 réimport de la même ligne sans doublon',
+ $$INSERT INTO budget_plan_line(fiscal_year, org_unit_id, category_code, task, source_file, source_row, import_batch_id)
+   VALUES (2026, '00000000-0000-0000-0000-0000000000a1', 'FREINAGE', 'x', 'plan_2026.xlsx', 12, gen_random_uuid())$$,
+ 'budget_plan_line_fiscal_year_org_unit_id_source_file_source_key');
+
 -- ------------------------------------------------------------------ bilan
 \o
 SELECT count(*) AS tests_reussis FROM test_result;

@@ -1,7 +1,10 @@
 package cm.camtel.nextfleet.desktop.ui;
 
 import cm.camtel.nextfleet.desktop.data.FleetGateway;
+import cm.camtel.nextfleet.desktop.data.Models.DueLevel;
 import cm.camtel.nextfleet.desktop.data.Models.Session;
+import javafx.application.Platform;
+import javafx.geometry.Bounds;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -15,23 +18,28 @@ import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Circle;
 
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Coquille de l'application bureau (maquette p. 17) : navigation latérale bleu nuit, recherche globale,
- * badge DÉMO permanent en mode démonstration, profil, bascule clair/sombre.
+ * Coquille de l'application bureau (maquette p. 17) : navigation latérale bleu nuit avec indicateur qui glisse,
+ * recherche globale (Ctrl+K), badge DÉMO permanent, notifications, thème clair/sombre en fondu enchaîné,
+ * réduction de mouvement, toasts. Chaque changement d'écran est une transition de 280 ms.
  */
-public final class AppShell extends BorderPane {
+public final class AppShell extends StackPane {
 
     public enum Section {
-        OVERVIEW("Vue d'ensemble", Icons.HOME), VEHICLES("Véhicules", Icons.CAR), MAINTENANCE("Entretiens", Icons.WRENCH),
-        FUEL("Carburant", Icons.FUEL), COSTS("Coûts", Icons.CHART), DRIVERS("Conducteurs", Icons.USER),
-        REPORTS("Rapports", Icons.REPORT), SETTINGS("Paramètres", Icons.GEAR);
+        OVERVIEW("Vue d'ensemble", Icons.HOME), VEHICLES("Véhicules", Icons.CAR), DUE("Échéances", Icons.CALENDAR),
+        DRIVERS("Conducteurs", Icons.USER), MAINTENANCE("Entretiens", Icons.WRENCH), FUEL("Carburant", Icons.FUEL),
+        COSTS("Coûts", Icons.CHART), REPORTS("Rapports", Icons.REPORT), SETTINGS("Paramètres", Icons.GEAR);
 
         final String label;
         final String icon;
@@ -50,40 +58,65 @@ public final class AppShell extends BorderPane {
     private final Map<Section, ToggleButton> nav = new LinkedHashMap<>();
     private final ToggleGroup group = new ToggleGroup();
     private final TextField search = new TextField();
+    private final Region indicator = new Region();
+    private final Pane indicatorLayer = new Pane(indicator);
+    private final Toasts toasts = new Toasts();
+    private final Label dueBadge = Ui.label("", "nav-count", "nav-count-alert");
     private Node current;
+    private Section currentSection;
 
     public AppShell(FleetGateway gateway, Session session, Runnable onLogout, Runnable onToggleTheme) {
         this.gateway = gateway;
         this.session = session;
         this.onLogout = onLogout;
         this.onToggleTheme = onToggleTheme;
-        setLeft(sidebar());
+        BorderPane frame = new BorderPane();
+        frame.setLeft(sidebar());
         BorderPane main = new BorderPane();
         main.setTop(topbar());
         main.setCenter(content);
-        setCenter(main);
+        frame.setCenter(main);
+        getChildren().addAll(frame, toasts.host());
         sceneProperty().addListener((o, a, scene) -> {
             if (scene != null) {
                 scene.getAccelerators().put(new KeyCodeCombination(KeyCode.K, KeyCombination.SHORTCUT_DOWN), search::requestFocus);
-                scene.getAccelerators().put(new KeyCodeCombination(KeyCode.DIGIT1, KeyCombination.SHORTCUT_DOWN), () -> show(Section.OVERVIEW));
-                scene.getAccelerators().put(new KeyCodeCombination(KeyCode.DIGIT2, KeyCombination.SHORTCUT_DOWN), () -> show(Section.VEHICLES));
+                Section[] order = {Section.OVERVIEW, Section.VEHICLES, Section.DUE, Section.DRIVERS};
+                KeyCode[] keys = {KeyCode.DIGIT1, KeyCode.DIGIT2, KeyCode.DIGIT3, KeyCode.DIGIT4};
+                for (int i = 0; i < order.length; i++) {
+                    Section s = order[i];
+                    scene.getAccelerators().put(new KeyCodeCombination(keys[i], KeyCombination.SHORTCUT_DOWN), () -> show(s));
+                }
             }
         });
+        refreshDueBadge();
         show(Section.OVERVIEW);
     }
+
+    public Toasts toasts() {
+        return toasts;
+    }
+
+    // ------------------------------------------------------------------ barre latérale
 
     private VBox sidebar() {
         HBox brand = new HBox(10, Icons.logo(28), Ui.label("NexFleet", "brand-name"));
         brand.setAlignment(Pos.CENTER_LEFT);
         brand.setStyle("-fx-padding: 4 8 8 8;");
-        VBox box = new VBox(brand, Ui.label("VOTRE ESPACE", "section-title"));
-        box.getStyleClass().add("sidebar");
+
+        VBox items = new VBox(4);
         for (Section s : Section.values()) {
             if (s == Section.SETTINGS) continue;
-            box.getChildren().add(navButton(s));
+            items.getChildren().add(navButton(s));
         }
-        box.getChildren().add(Ui.spacer());
-        box.getChildren().add(navButton(Section.SETTINGS));
+        indicator.getStyleClass().add("nav-indicator");
+        indicator.setManaged(false);
+        indicator.setOpacity(0);
+        indicatorLayer.setMouseTransparent(true);
+        StackPane navStack = new StackPane(indicatorLayer, items);
+        navStack.setAlignment(Pos.TOP_LEFT);
+
+        VBox box = new VBox(brand, Ui.label("VOTRE ESPACE", "section-title"), navStack, Ui.spacer(), navButton(Section.SETTINGS));
+        box.getStyleClass().add("sidebar");
         StackPane mark = new StackPane(Icons.stroke(Icons.GAUGE, 18, "white"));
         mark.setStyle("-fx-background-color: rgba(255,255,255,0.08); -fx-background-radius: 999; -fx-min-width: 34; -fx-min-height: 34;");
         VBox who = new VBox(Ui.label("CAMTEL", "w-700", "t-12"), Ui.label("Gestion de flotte", "muted", "t-12"));
@@ -91,6 +124,9 @@ public final class AppShell extends BorderPane {
         footer.setAlignment(Pos.CENTER_LEFT);
         footer.getStyleClass().add("sidebar-footer");
         box.getChildren().add(footer);
+
+        group.selectedToggleProperty().addListener((o, a, b) -> Platform.runLater(this::moveIndicator));
+        items.heightProperty().addListener((o, a, b) -> moveIndicator());
         return box;
     }
 
@@ -100,10 +136,52 @@ public final class AppShell extends BorderPane {
         b.setToggleGroup(group);
         b.setMaxWidth(Double.MAX_VALUE);
         b.setAccessibleText("Ouvrir " + s.label);
-        b.setOnAction(e -> show(s));
+        b.setOnAction(e -> {
+            if (!b.isSelected()) b.setSelected(true);
+            show(s);
+        });
+        if (s == Section.DUE) {
+            b.setContentDisplay(javafx.scene.control.ContentDisplay.LEFT);
+            HBox g = new HBox(12, Icons.icon(s.icon, 18), Ui.label(s.label), Ui.spacer(), dueBadge);
+            g.setAlignment(Pos.CENTER_LEFT);
+            g.setMaxWidth(Double.MAX_VALUE);
+            g.prefWidthProperty().bind(b.widthProperty().subtract(26));
+            ((Label) g.getChildren().get(1)).textFillProperty().bind(b.textFillProperty());
+            b.setText(null);
+            b.setGraphic(g);
+            dueBadge.setVisible(false);
+        }
+        Motion.pressable(b);
         nav.put(s, b);
         return b;
     }
+
+    /** L'indicateur suit l'élément actif avec un ressort ; il est placé sans animation au premier affichage. */
+    private void moveIndicator() {
+        ToggleButton sel = (ToggleButton) group.getSelectedToggle();
+        if (sel == null || sel.getParent() == null || !indicatorLayer.isVisible()) return;
+        boolean inStack = sel.getParent().getParent() == indicatorLayer.getParent();
+        if (!inStack) {   // Paramètres : hors de la pile principale → fond plein sur le bouton
+            indicator.setOpacity(0);
+            sel.setStyle("-fx-background-color: -nf-green;");
+            return;
+        }
+        nav.values().forEach(b -> b.setStyle(null));
+        Bounds bb = sel.getBoundsInParent();
+        indicator.resizeRelocate(0, 0, bb.getWidth(), bb.getHeight());
+        Motion.slideTo(indicator, bb.getMinY());
+    }
+
+    private void refreshDueBadge() {
+        Ui.async(() -> gateway.dueDates(30), list -> {
+            long n = list.stream().filter(d -> d.level() != DueLevel.A_JOUR).count();
+            dueBadge.setText(String.valueOf(n));
+            dueBadge.setVisible(n > 0);
+            dueBadge.setAccessibleText(n + " échéances à traiter");
+        }, err -> dueBadge.setVisible(false));
+    }
+
+    // ------------------------------------------------------------------ barre supérieure
 
     private HBox topbar() {
         search.setPromptText("Rechercher un véhicule, un conducteur…");
@@ -123,6 +201,15 @@ public final class AppShell extends BorderPane {
             demo.setTooltip(new Tooltip("Données fictives — environnement de démonstration, séparé de la production (NF-04)."));
             bar.getChildren().add(demo);
         }
+        ToggleButton motion = new ToggleButton(null, Icons.stroke(Icons.MOTION, 18, "-nf-muted"));
+        motion.getStyleClass().addAll("icon-button", "icon-toggle");
+        motion.setSelected(Motion.isReduced());
+        motion.setTooltip(new Tooltip("Réduire les animations"));
+        motion.setAccessibleText("Réduire les animations");
+        motion.setOnAction(e -> {
+            Motion.setReduced(motion.isSelected());
+            toasts.info(motion.isSelected() ? "Animations réduites" : "Animations activées", null);
+        });
         Button theme = new Button(null, Icons.stroke(Icons.MOON, 18, "-nf-muted"));
         theme.getStyleClass().add("icon-button");
         theme.setAccessibleText("Basculer le thème clair ou sombre");
@@ -135,12 +222,11 @@ public final class AppShell extends BorderPane {
         StackPane.setAlignment(dot, Pos.TOP_RIGHT);
         Button bell = new Button(null, bellIcon);
         bell.getStyleClass().add("icon-button");
-        bell.setAccessibleText("Notifications");
-        bell.setTooltip(new Tooltip("Centre de notifications : prévu au lot 3"));
-        bell.setOnAction(e -> show(Section.OVERVIEW));
+        bell.setAccessibleText("Échéances et alertes");
+        bell.setTooltip(new Tooltip("Échéances et alertes"));
+        bell.setOnAction(e -> show(Section.DUE));
 
-        String initials = initials(session.displayName());
-        StackPane avatar = new StackPane(Ui.label(initials));
+        StackPane avatar = new StackPane(Ui.label(initials(session.displayName())));
         avatar.getStyleClass().add("avatar");
         Button user = new Button(session.displayName(), avatar);
         user.getStyleClass().add("btn-ghost");
@@ -149,16 +235,22 @@ public final class AppShell extends BorderPane {
         user.setTooltip(new Tooltip("Se déconnecter"));
         user.setAccessibleText("Profil de " + session.displayName() + ". Activer pour se déconnecter.");
         user.setOnAction(e -> onLogout.run());
-        bar.getChildren().addAll(theme, bell, user);
+        for (Node n : new Node[]{motion, theme, bell, user}) Motion.pressable(n);
+        bar.getChildren().addAll(motion, theme, bell, user);
         return bar;
     }
+
+    // ------------------------------------------------------------------ navigation
 
     public void show(Section s) {
         ToggleButton b = nav.get(s);
         if (b != null) b.setSelected(true);
+        currentSection = s;
         Node view = switch (s) {
             case OVERVIEW -> new DashboardView(gateway, session, this);
-            case VEHICLES -> new VehiclesView(gateway, session, null);
+            case VEHICLES -> new VehiclesView(gateway, session, null, this);
+            case DUE -> new DueDatesView(gateway, this);
+            case DRIVERS -> new DriversView(gateway);
             default -> unavailable(s);
         };
         setContent(view);
@@ -166,22 +258,28 @@ public final class AppShell extends BorderPane {
 
     public void openVehicles(String query) {
         nav.get(Section.VEHICLES).setSelected(true);
-        setContent(new VehiclesView(gateway, session, query));
+        currentSection = Section.VEHICLES;
+        setContent(new VehiclesView(gateway, session, query, this));
     }
 
     public Node currentView() {
         return current;
     }
 
+    public Section currentSection() {
+        return currentSection;
+    }
+
     private void setContent(Node view) {
         current = view;
         content.getChildren().setAll(view);
+        Motion.enter(view, javafx.util.Duration.ZERO, 8);
     }
 
     /** Module non livré dans ce lot : affiché comme tel, jamais simulé (règle du prompt maître). */
     private Node unavailable(Section s) {
         String lot = switch (s) {
-            case MAINTENANCE, DRIVERS -> "lot 2 (parité métier : NF-12 à NF-17)";
+            case MAINTENANCE -> "lot 2 (NF-13 à NF-16) — tables de contrôle 12 points, maintenance, vidanges et pneus déjà prêtes en base";
             case FUEL -> "lot 3 (chaîne carburant : NF-40 à NF-45) — règles et base déjà réalisées côté serveur";
             case COSTS, REPORTS -> "lot 3 (NF-21, NF-22, NF-25)";
             default -> "lot 2 (NF-03)";
@@ -190,6 +288,11 @@ public final class AppShell extends BorderPane {
                 "Ce module est prévu au " + lot + ". Aucune donnée n'est affichée tant qu'il n'est pas réalisé et recetté.");
         p.getStyleClass().add("content");
         return p;
+    }
+
+    static String greeting() {
+        int h = LocalTime.now(ZoneId.of("Africa/Douala")).getHour();
+        return h < 5 || h >= 18 ? "BONSOIR" : "BONJOUR";
     }
 
     private static String initials(String name) {

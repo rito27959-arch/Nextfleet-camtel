@@ -106,7 +106,8 @@ public final class Ui {
             l.setAccessibleText("Niveau de carburant non renseigné");
             return l;
         }
-        ProgressBar bar = new ProgressBar(percent / 100.0);
+        ProgressBar bar = new ProgressBar(0);
+        Motion.animate(bar.progressProperty(), percent / 100.0, javafx.util.Duration.millis(700), javafx.util.Duration.millis(120));
         bar.getStyleClass().addAll("fuel-bar", percent < 20 ? "fuel-low" : percent < 50 ? "fuel-mid" : "fuel-ok");
         bar.setFocusTraversable(false);
         Label pct = label(percent + " %", "muted", "t-12");
@@ -122,7 +123,9 @@ public final class Ui {
         Circle track = new Circle(radius);
         track.getStyleClass().add("ring-track");
         track.setStrokeWidth(5);
-        Arc arc = new Arc(0, 0, radius, radius, 90, -360 * Math.max(0, Math.min(1, ratio)));
+        Arc arc = new Arc(0, 0, radius, radius, 90, 0);
+        Motion.animate(arc.lengthProperty(), -360 * Math.max(0, Math.min(1, ratio)), javafx.util.Duration.millis(900),
+                javafx.util.Duration.millis(150));
         arc.setType(ArcType.OPEN);
         arc.getStyleClass().add("ring-value");
         arc.setStrokeWidth(5);
@@ -165,6 +168,7 @@ public final class Ui {
         r.setPrefSize(w, h);
         r.setMaxWidth(w < 0 ? Double.MAX_VALUE : w);
         r.setAccessibleText("Chargement en cours");
+        Motion.pulse(r, 0.55, javafx.util.Duration.millis(1100));
         return r;
     }
 
@@ -202,6 +206,68 @@ public final class Ui {
         v.getStyleClass().add("state-panel");
         v.setPadding(new Insets(40));
         return v;
+    }
+
+    /** Compte à rebours d'échéance : « Expiré depuis 6 j », « J-12 », « À jour ». L'expiré respire doucement. */
+    public static Label dueChip(cm.camtel.nextfleet.desktop.data.Models.DueItem d) {
+        String text;
+        String cls;
+        switch (d.level()) {
+            case EXPIRE -> {
+                text = "Expiré depuis " + (-d.daysLeft()) + " j";
+                cls = "due-expire";
+            }
+            case A_ECHEANCE -> {
+                text = d.daysLeft() == 0 ? "Aujourd'hui" : "J-" + d.daysLeft();
+                cls = "due-soon";
+            }
+            default -> {
+                text = "À jour · " + d.daysLeft() + " j";
+                cls = "due-ok";
+            }
+        }
+        Label l = label(text, "due-chip", cls);
+        l.setMinWidth(Region.USE_PREF_SIZE);
+        l.setAccessibleText(d.kind().label + " : " + text);
+        if (d.level() == cm.camtel.nextfleet.desktop.data.Models.DueLevel.EXPIRE) {
+            Motion.pulse(l, 0.62, javafx.util.Duration.millis(1800));
+        }
+        return l;
+    }
+
+    /** Micro-courbe de tendance (sparkline) tracée de gauche à droite. */
+    public static Node sparkline(java.util.List<Double> values, double w, double h, String styleClass) {
+        javafx.scene.shape.Polyline line = new javafx.scene.shape.Polyline();
+        line.getStyleClass().addAll("sparkline", styleClass);
+        if (values.size() >= 2) {
+            double min = values.stream().mapToDouble(Double::doubleValue).min().orElse(0);
+            double max = values.stream().mapToDouble(Double::doubleValue).max().orElse(1);
+            double span = max - min == 0 ? 1 : max - min;
+            for (int i = 0; i < values.size(); i++) {
+                line.getPoints().addAll(i * w / (values.size() - 1), h - 3 - (values.get(i) - min) / span * (h - 6));
+            }
+        }
+        javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle(0, -4, 0, h + 8);
+        Motion.animate(clip.widthProperty(), w + 4, javafx.util.Duration.millis(900), javafx.util.Duration.millis(200));
+        javafx.scene.layout.Pane p = new javafx.scene.layout.Pane(line);
+        p.setClip(clip);
+        p.setMinSize(w, h);
+        p.setPrefSize(w, h);
+        p.setMaxSize(w, h);
+        p.setAccessibleText("Tendance sur six mois");
+        return p;
+    }
+
+    public static StackPane avatar(String initials, int colorIndex) {
+        StackPane a = new StackPane(label(initials));
+        a.getStyleClass().addAll("avatar-lg", "avatar-" + Math.floorMod(colorIndex, 4));
+        return a;
+    }
+
+    public static Region divider() {
+        Region r = new Region();
+        r.getStyleClass().add("divider");
+        return r;
     }
 
     public static Region spacer() {

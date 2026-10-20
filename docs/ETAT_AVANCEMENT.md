@@ -1,18 +1,19 @@
-# État réel d'avancement — Lot 1
+# État réel d'avancement — Lot 1.1
 
-**20 octobre 2026.** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
+**20 octobre 2026 (mis à jour après l'audit de l'ancien dépôt et la refonte du design).** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
 Aucune autorisation CAMTEL, aucun avis DSIR ou DS et aucune mise en production ne sont revendiqués.
 
 ## Ce qui fonctionne réellement (preuves exécutées)
 
 | Élément | Commande | Résultat obtenu |
 |---|---|---|
-| Migrations SQL V1–V3 sur PostgreSQL 16 + PostGIS 3.4 | `infra/db/tests/run_db_tests.sh` | 3 migrations appliquées sur base vierge |
-| Tests d'intégrité de la base | idem | **32 tests réussis** : unicité, démo interdite en production, révocation des sessions, auto-attribution refusée, chevauchements, bons (auto-validation, transitions, solde, reçu répété, montant), facture 55 L / reçu 50 L, GPS hors mission, rejeu GPS, chat (séquence, doublon, intrus), pas de statut « fraude », licence 3D, journal chaîné et immuable |
+| Migrations SQL V1–V4 sur PostgreSQL 16 + PostGIS 3.4 | `infra/db/tests/run_db_tests.sh` | 4 migrations appliquées sur base vierge (V4 = parité avec l'ancien NexFleet) |
+| Tests d'intégrité de la base | idem | **43 tests réussis** : contrôle 12 points, clôture de maintenance, vidange sans double coût, historique des pneus, échéances unifiées, budget, réimport sans doublon ; unicité, démo interdite en production, révocation des sessions, auto-attribution refusée, chevauchements, bons (auto-validation, transitions, solde, reçu répété, montant), facture 55 L / reçu 50 L, GPS hors mission, rejeu GPS, chat (séquence, doublon, intrus), pas de statut « fraude », licence 3D, journal chaîné et immuable |
 | Concurrence sur un bon (CAR-01) | idem | Deux sessions simultanées 40 L et 30 L sur un bon de 60 L : **un seul plein accepté**, solde jamais dépassé |
 | Noyau métier Java 21 (sans dépendance) | `tools/build-offline.sh` | Compilation `-Xlint:all -Werror` ; **27 tests JUnit 5 réussis** |
-| Client JavaFX | idem | Compilation ; **7 tests réussis** (passerelle démo, validation du formulaire, client HTTP contre faux serveur local) |
-| Parcours visuel | `tools/screenshots.sh` | **11 captures** 1440×900 dans `docs/design-reference/captures-lot1/` |
+| Client JavaFX | idem | Compilation ; **9 tests réussis** (passerelle démo, échéances unifiées, conducteurs, validation du formulaire, client HTTP contre faux serveur local) |
+| Parcours visuel | `tools/screenshots.sh` | **16 captures** 1440×900 et **4 GIF d'animation** dans `docs/design-reference/captures-lot1/` |
+| Ancien dépôt `rito27959-arch/nexfleet` | `pytest` (backend Flask) | **78 tests réussis** ; registre de parité : `docs/REGISTRE_PARITE.md` |
 | Contrastes | `python3 tools/check_contrast.py` | 13 couples conformes |
 | Contrat OpenAPI lot 1 | `openapi-spec-validator` | Valide (11 chemins, 14 schémas) |
 
@@ -24,6 +25,12 @@ Aucune autorisation CAMTEL, aucun avis DSIR ou DS et aucune mise en production n
 | `HttpFleetGateway` contre la vraie API | Testé contre un faux serveur local seulement | Test de bout en bout bureau ↔ API |
 | `infra/compose.local.yaml`, `infra/ci/pipeline.yml` | Non exécutés (Docker et CI indisponibles) | Exécution sur le poste DSIR |
 | Paquets DEB / MSI / EXE | Procédure documentée, aucun paquet produit | `docs/BUILD.md` §3 sur chaque OS |
+
+## Nouveautés du lot 1.1
+
+- Écrans **Échéances** (assurance, vignette, contrôle technique, permis, CNI ; compte à rebours) et **Conducteurs** (matricule, permis, CNI, véhicule affecté), repris de l'ancien NexFleet.
+- Fiche véhicule en feuille latérale à ressort, avec ses échéances ; toasts ; badge du nombre d'échéances dans la navigation.
+- Système de mouvement complet et réduction de mouvement : `docs/DESIGN_ET_MOUVEMENT.md`.
 
 ## Ce qui n'est pas commencé
 

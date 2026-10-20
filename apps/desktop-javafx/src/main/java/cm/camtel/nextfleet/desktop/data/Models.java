@@ -57,6 +57,35 @@ public final class Models {
                                 List<MonthlyConsumption> consumptionSeries, List<Alert> alerts,
                                 List<Vehicle> recentVehicles, Instant refreshedAt) { }
 
+    /** Conducteur (NF-12 ; champs repris de l'ancien NexFleet : matricule, permis, CNI). */
+    public record Driver(UUID id, String fullName, String staffNumber, String phone, String licenseNumber,
+                         List<String> licenseCategories, LocalDate licenseExpiresOn, LocalDate idCardExpiresOn,
+                         String assignedVehicle, String site) {
+        public String initials() {
+            String[] p = fullName.trim().split("\\s+");
+            String a = p.length > 0 && !p[0].isEmpty() ? p[0].substring(0, 1) : "";
+            String b = p.length > 1 ? p[p.length - 1].substring(0, 1) : "";
+            return (a + b).toUpperCase(java.util.Locale.FRANCE);
+        }
+    }
+
+    public enum DueKind {
+        ASSURANCE("Assurance"), VIGNETTE("Vignette"), CONTROLE_TECHNIQUE("Contrôle technique"),
+        CARTE_GRISE("Carte grise"), PERMIS("Permis de conduire"), CNI("Carte d'identité"), VIDANGE("Vidange");
+
+        public final String label;
+
+        DueKind(String label) {
+            this.label = label;
+        }
+    }
+
+    public enum DueLevel { EXPIRE, A_ECHEANCE, A_JOUR }
+
+    /** Échéance unifiée (vue v_due_date) : même date et même niveau partout (NF-11). */
+    public record DueItem(DueKind kind, String subject, String subjectDetail, boolean vehicle, LocalDate dueOn,
+                          long daysLeft, DueLevel level) { }
+
     public record Page<T>(List<T> items, int page, int size, long total) { }
 
     public record VehicleDraft(String registration, String vin, String make, String model, Integer modelYear,

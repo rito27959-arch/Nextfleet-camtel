@@ -127,6 +127,17 @@ final class VehicleFormView extends ScrollPane {
         save.fire();
     }
 
+    /** Pour la recette visuelle : saisie valide puis enregistrement (toast de confirmation). */
+    void fillValidForTest() {
+        registration.setText("CE 2026 NF");
+        make.setText("Toyota");
+        model.setText("Hilux");
+        year.setText("2026");
+        tank.setText("80");
+        category.setText("Pick-up");
+        save.fire();
+    }
+
     private void showFieldError(String key, String message) {
         Label l = errorLabels.get(key);
         if (l != null) {

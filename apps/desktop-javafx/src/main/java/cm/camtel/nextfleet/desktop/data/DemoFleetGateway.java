@@ -46,6 +46,7 @@ public final class DemoFleetGateway implements FleetGateway {
     private final Clock clock;
     private final Duration latency;
     private final List<Vehicle> vehicles = new CopyOnWriteArrayList<>();
+    private final List<Models.Driver> drivers = new CopyOnWriteArrayList<>();
     private final Map<UUID, List<FuelFillRecord>> fills = new LinkedHashMap<>();
     private final Map<UUID, BigDecimal> monthCostByVehicle = new LinkedHashMap<>();
     private final Map<UUID, BigDecimal> previousMonthCostByVehicle = new LinkedHashMap<>();
@@ -194,6 +195,25 @@ public final class DemoFleetGateway implements FleetGateway {
                     daysToMaint == null ? null : today.plusDays(daysToMaint), (String) r[11], 1));
             seedFills(id, i++, BigDecimal.valueOf((Integer) r[8]));
         }
+        String[][] people = {
+                {"Jean Nguema", "MAT-0412", "CE 4401 LT", "Yaoundé", "40", "620"},
+                {"Alain Mbarga", "MAT-0388", "LT 5520 CE", "Douala", "210", "15"},
+                {"Serge Fone", "MAT-0275", "BK 7280 LT", "Yaoundé", "-6", "300"},
+                {"Martin Fotsing", "MAT-0517", "CE 1188 LT", "Bafoussam", "18", "-30"},
+                {"Paul Tchoua", "MAT-0109", "LT 7710 CE", "Douala", "400", "800"},
+                {"René Etoa", "MAT-0623", "CE 3205 KJ", "Yaoundé", "95", "130"},
+                {"Lucie Abena", "MAT-0731", "CE 4210 MK", "Kribi", "27", "540"},
+                {"Claire Ngono", "MAT-0802", "OU 1180 PL", "Bafoussam", "365", "720"},
+                {"Éric Ondoa", "MAT-0455", "LT 6603 QP", "Douala", "150", "60"},
+                {"Félix Kamga", "MAT-0690", "CE 7302 RT", "Ebolowa", "12", "410"},
+                {"Brice Atangana", "MAT-0911", null, "Yaoundé", "700", null},
+        };
+        for (String[] p : people) {
+            drivers.add(new Models.Driver(UUID.nameUUIDFromBytes(("drv-" + p[1]).getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+                    p[0], p[1], "6 99 00 " + p[1].substring(4, 6) + " " + p[1].substring(6), "CM-" + p[1].substring(4) + "-B",
+                    List.of("B", p[1].endsWith("2") || p[1].endsWith("8") ? "C" : "B1"),
+                    today.plusDays(Long.parseLong(p[4])), p[5] == null ? null : today.plusDays(Long.parseLong(p[5])), p[2], p[3]));
+        }
     }
 
     /** Pleins fictifs sur 7 mois : un plein complet toutes les ~2 semaines, parfois un partiel intermédiaire. */
@@ -285,9 +305,66 @@ public final class DemoFleetGateway implements FleetGateway {
         vehicles.stream().filter(v -> v.fuelLevelPercent() != null && v.fuelLevelPercent() > 0 && v.fuelLevelPercent() < 20)
                 .limit(1).forEach(v -> out.add(new Alert(AlertKind.FUEL_LOW, "Niveau de carburant bas",
                         v.registration() + " · Réservoir déclaré à " + v.fuelLevelPercent() + " %", "Hier", "warning")));
-        out.add(new Alert(AlertKind.INSURANCE, "Assurance à renouveler", "CE 1188 LT · Échéance dans 12 jours",
-                "Dans 12 jours", "info"));
+        // Échéance documentaire la plus proche : issue de la même source que l'écran Échéances (NF-11)
+        dueDates(30).stream().filter(d -> d.vehicle() && d.level() != Models.DueLevel.A_JOUR).findFirst()
+                .ifPresent(d -> out.add(new Alert(AlertKind.INSURANCE, d.kind().label + (d.level() == Models.DueLevel.EXPIRE
+                        ? " expirée" : " à renouveler"), d.subject() + " · " + d.subjectDetail(), dueLabel(today, d.dueOn()),
+                        d.level() == Models.DueLevel.EXPIRE ? "danger" : "info")));
         return out;
+    }
+
+    // ------------------------------------------------------------------ conducteurs et échéances (parité ancien NexFleet)
+
+    @Override
+    public List<Models.Driver> drivers(String query) {
+        pause();
+        requireSession();
+        String q = query == null ? "" : query.strip().toLowerCase(Locale.ROOT);
+        return drivers.stream().filter(d -> q.isEmpty() || d.fullName().toLowerCase(Locale.ROOT).contains(q)
+                        || d.staffNumber().toLowerCase(Locale.ROOT).contains(q))
+                .sorted(Comparator.comparing(Models.Driver::fullName)).toList();
+    }
+
+    @Override
+    public List<Models.DueItem> dueDates(int thresholdDays) {
+        requireSession();
+        LocalDate today = LocalDate.now(clock.withZone(DOUALA));
+        List<Models.DueItem> out = new ArrayList<>();
+        for (Vehicle v : vehicles) {
+            out.addAll(vehicleDue(v, today, thresholdDays));
+        }
+        for (Models.Driver d : drivers) {
+            out.add(due(Models.DueKind.PERMIS, d.fullName(), "Permis " + d.licenseNumber(), false, d.licenseExpiresOn(), today, thresholdDays));
+            if (d.idCardExpiresOn() != null) {
+                out.add(due(Models.DueKind.CNI, d.fullName(), "Matricule " + d.staffNumber(), false, d.idCardExpiresOn(), today, thresholdDays));
+            }
+        }
+        out.sort(Comparator.comparing(Models.DueItem::dueOn).thenComparing(Models.DueItem::subject));
+        return out;
+    }
+
+    @Override
+    public List<Models.DueItem> vehicleDueDates(UUID vehicleId) {
+        pause();
+        requireSession();
+        LocalDate today = LocalDate.now(clock.withZone(DOUALA));
+        return vehicle(vehicleId) == null ? List.of() : vehicleDue(vehicle(vehicleId), today, 30);
+    }
+
+    private List<Models.DueItem> vehicleDue(Vehicle v, LocalDate today, int threshold) {
+        int h = Math.abs(v.registration().hashCode());
+        List<Models.DueItem> out = new ArrayList<>();
+        out.add(due(Models.DueKind.ASSURANCE, v.registration(), v.label(), true, today.plusDays((h % 240) - 20), today, threshold));
+        out.add(due(Models.DueKind.VIGNETTE, v.registration(), v.label(), true, today.plusDays(((h / 7) % 300) - 8), today, threshold));
+        out.add(due(Models.DueKind.CONTROLE_TECHNIQUE, v.registration(), v.label(), true, today.plusDays(((h / 13) % 200) + 3), today, threshold));
+        return out;
+    }
+
+    private static Models.DueItem due(Models.DueKind k, String subject, String detail, boolean vehicle, LocalDate on,
+                                      LocalDate today, int threshold) {
+        long days = ChronoUnit.DAYS.between(today, on);
+        Models.DueLevel level = days < 0 ? Models.DueLevel.EXPIRE : days <= threshold ? Models.DueLevel.A_ECHEANCE : Models.DueLevel.A_JOUR;
+        return new Models.DueItem(k, subject, detail, vehicle, on, days, level);
     }
 
     private static String dueLabel(LocalDate today, LocalDate due) {

@@ -9,15 +9,15 @@ Plateforme de gestion du parc automobile CAMTEL : API Java 21 / Spring Boot, Pos
 ## Arborescence
 
 ```
-apps/desktop-javafx/       Client bureau JavaFX (connexion, tableau de bord, véhicules, ajout) — compilé et testé
+apps/desktop-javafx/       Client bureau JavaFX (connexion, tableau de bord, véhicules, échéances, conducteurs) — compilé et testé
 services/nextfleet-domain/ Noyau métier sans dépendance (plein-à-plein, bons, règles CAR, GPS, accès) — compilé et testé
 services/nextfleet-api/    API Spring Boot (identité, parc, carburant, audit) — écrite, NON compilée
 shared/api-contract/       Contrat OpenAPI 3 du lot 1 — validé
 shared/ui-tokens/          Jetons du design system (p. 17 / p. 18)
-infra/db/migrations/       Migrations Flyway V1–V3 — testées sur PostgreSQL 16 + PostGIS
-infra/db/tests/            Campagne de tests de la base (32 tests + concurrence)
+infra/db/migrations/       Migrations Flyway V1–V4 — testées sur PostgreSQL 16 + PostGIS
+infra/db/tests/            Campagne de tests de la base (43 tests + concurrence)
 infra/compose.local.yaml   PostGIS, API, Traccar en local (non exécuté)
-docs/                      Audit et matrice, état d'avancement, construction, captures
+docs/                      Audit, registre de parité avec l'ancien NexFleet, design et mouvement, état d'avancement, captures et GIF
 tools/                     Construction hors ligne, captures, contrôle des contrastes
 ```
 

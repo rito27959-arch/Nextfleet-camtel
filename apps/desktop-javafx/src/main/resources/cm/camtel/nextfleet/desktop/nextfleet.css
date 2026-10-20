@@ -180,7 +180,7 @@
 }
 .nav-item .icon { -fx-fill: transparent; -fx-stroke: #A9BAC5; -fx-stroke-width: 1.6; }
 .nav-item:hover { -fx-background-color: rgba(255, 255, 255, 0.06); }
-.nav-item:selected { -fx-background-color: -nf-green; -fx-text-fill: white; -fx-font-weight: 600; }
+.nav-item:selected { -fx-background-color: transparent; -fx-text-fill: white; -fx-font-weight: 600; }
 .nav-item:selected .icon { -fx-stroke: white; }
 .nav-item:focus-visible { -fx-border-color: -nf-focus; -fx-border-radius: 12; -fx-border-width: 2; }
 .nav-item.unavailable { -fx-text-fill: #7E93A0; }
@@ -228,12 +228,14 @@
 .scroll-pane { -fx-padding: 0; -fx-background-insets: 0; }
 .card {
     -fx-background-color: -nf-surface;
-    -fx-background-radius: 16;
+    -fx-background-radius: 18;
     -fx-border-color: -nf-border;
-    -fx-border-radius: 16;
+    -fx-border-radius: 18;
     -fx-padding: 18 20;
-    -fx-effect: dropshadow(gaussian, rgba(16, 38, 49, 0.04), 10, 0, 0, 2);
+    -fx-effect: dropshadow(gaussian, rgba(16, 38, 49, 0.06), 22, 0.0, 0, 6);
 }
+.card:hover { -fx-effect: dropshadow(gaussian, rgba(16, 38, 49, 0.10), 28, 0.0, 0, 10); }
+.root.dark .card { -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 22, 0.0, 0, 6); }
 .card-dark {
     -fx-background-color: -nf-navy;
     -fx-background-radius: 16;
@@ -370,3 +372,79 @@
 .step-active .step-label { -fx-text-fill: -nf-text; -fx-font-weight: 600; }
 .step-unavailable .step-label { -fx-text-fill: -nf-muted; -fx-font-style: italic; }
 .step-line { -fx-background-color: -nf-border; -fx-pref-height: 1; -fx-max-height: 1; -fx-min-width: 24; }
+
+
+/* ============================================================ LOT 1.1 — finitions et mouvement */
+/* Indicateur de navigation qui glisse sous l'élément actif (ressort) */
+.nav-indicator {
+    -fx-background-color: linear-gradient(to right, #00A891, -nf-green);
+    -fx-background-radius: 12;
+    -fx-effect: dropshadow(gaussian, rgba(0, 155, 135, 0.45), 16, 0, 0, 4);
+}
+.nav-count { -fx-background-color: rgba(255,255,255,0.12); -fx-background-radius: 999; -fx-padding: 1 7;
+             -fx-text-fill: #D5E1E8; -fx-font-size: 10px; -fx-font-weight: bold; }
+.nav-count-alert { -fx-background-color: #E5484D; -fx-text-fill: white; }
+
+/* Barre supérieure translucide */
+.topbar { -fx-background-color: rgba(255, 255, 255, 0.86); }
+.root.dark .topbar { -fx-background-color: rgba(21, 35, 44, 0.92); }
+.icon-toggle:selected { -fx-background-color: -nf-green-soft; }
+
+/* Toasts */
+.toast {
+    -fx-background-color: -nf-navy; -fx-background-radius: 14; -fx-padding: 12 16; -fx-spacing: 10;
+    -fx-effect: dropshadow(gaussian, rgba(16, 38, 49, 0.30), 26, 0, 0, 10); -fx-alignment: center-left;
+}
+.toast .label { -fx-text-fill: white; -fx-font-size: 13px; }
+.toast .muted { -fx-text-fill: -nf-on-navy-muted; -fx-font-size: 12px; }
+
+/* Jauges et micro-graphiques */
+.sparkline { -fx-stroke: -nf-green; -fx-stroke-width: 2; -fx-fill: transparent; -fx-stroke-line-cap: round; -fx-stroke-line-join: round; }
+.sparkline-danger { -fx-stroke: -nf-danger; }
+.sparkline-dark { -fx-stroke: #3FD8C1; }
+
+/* Compte à rebours d'échéance (repris de l'ancien NexFleet, dans la charte claire) */
+.due-chip { -fx-background-radius: 999; -fx-padding: 3 10; -fx-font-size: 11px; -fx-font-weight: bold; }
+.due-expire { -fx-background-color: -nf-danger; -fx-text-fill: white; }
+.due-soon { -fx-background-color: -nf-warning-soft; -fx-text-fill: #8A5A12; }
+.due-ok { -fx-background-color: -nf-green-soft; -fx-text-fill: -nf-green-strong; }
+.root.dark .due-soon { -fx-text-fill: -nf-warning; }
+
+/* Synthèse des échéances */
+.summary-tile { -fx-background-radius: 18; -fx-padding: 16 18; -fx-spacing: 6; }
+.summary-expire { -fx-background-color: linear-gradient(to bottom right, #C2393E, #A42A2F); }
+.summary-soon { -fx-background-color: linear-gradient(to bottom right, #F1B44C, #DA9526); }
+.summary-ok { -fx-background-color: linear-gradient(to bottom right, #00A891, #007F70); }
+.summary-tile .label { -fx-text-fill: white; }
+.summary-tile .summary-value { -fx-font-size: 34px; -fx-font-weight: bold; }
+.summary-soon .label { -fx-text-fill: #3B2604; }
+
+.timeline-row { -fx-padding: 12 4; -fx-spacing: 14; -fx-alignment: center-left;
+                -fx-border-color: transparent transparent -nf-border transparent; }
+.timeline-row:hover { -fx-background-color: -nf-surface-2; -fx-background-radius: 12; }
+.date-block { -fx-background-color: -nf-surface-2; -fx-background-radius: 12; -fx-min-width: 54; -fx-pref-width: 54;
+              -fx-padding: 6 0; -fx-alignment: center; }
+.date-block .day { -fx-font-size: 18px; -fx-font-weight: bold; }
+.date-block .month { -fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: -nf-muted; }
+.group-title { -fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: -nf-muted; -fx-padding: 14 0 4 4; }
+
+/* Cartes conducteurs */
+.driver-card { -fx-pref-width: 300; -fx-spacing: 12; }
+.avatar-lg { -fx-background-radius: 999; -fx-min-width: 46; -fx-min-height: 46; -fx-max-width: 46; -fx-max-height: 46; -fx-alignment: center; }
+.avatar-lg .label { -fx-text-fill: white; -fx-font-size: 15px; -fx-font-weight: bold; }
+.avatar-0 { -fx-background-color: linear-gradient(to bottom right, #00A891, #007A6A); }
+.avatar-1 { -fx-background-color: linear-gradient(to bottom right, #3B6FD8, #2457C5); }
+.avatar-2 { -fx-background-color: linear-gradient(to bottom right, #102631, #2B4B5A); }
+.avatar-3 { -fx-background-color: linear-gradient(to bottom right, #D88A1E, #B7791F); }
+.kv-caption { -fx-font-size: 11px; -fx-text-fill: -nf-muted; }
+.kv-value { -fx-font-size: 12px; -fx-font-weight: 600; }
+.divider { -fx-background-color: -nf-border; -fx-min-height: 1; -fx-max-height: 1; }
+
+/* Voile derrière une feuille latérale */
+.scrim { -fx-background-color: rgba(16, 38, 49, 0.18); }
+.root.dark .scrim { -fx-background-color: rgba(0, 0, 0, 0.45); }
+.sheet { -fx-background-radius: 0; }
+.sheet-section { -fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: -nf-muted; }
+
+/* Squelettes */
+.skeleton { -fx-background-color: linear-gradient(to right, -nf-surface-2, -nf-border, -nf-surface-2); }

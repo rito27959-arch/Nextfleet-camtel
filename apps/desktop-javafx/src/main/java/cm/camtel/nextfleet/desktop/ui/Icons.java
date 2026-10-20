@@ -35,6 +35,11 @@ public final class Icons {
     public static final String DOC = "M7 3.5 H14 L18 7.5 V20.5 H7 Z M10 12 H15 M10 15.5 H15";
     public static final String PLUS = "M12 5 V19 M5 12 H19";
     public static final String CLOSE = "M6 6 L18 18 M18 6 L6 18";
+    public static final String CHECK = "M5 12.5 L10 17.5 L19 7";
+    public static final String SHIELD = "M12 3 L19 6 V11.5 C19 16 15.8 19.6 12 21 C8.2 19.6 5 16 5 11.5 V6 Z M9 12 L11.2 14.2 L15.2 10";
+    public static final String MOTION = "M4 12 H9 M12 7 H20 M12 17 H20 M15 12 H20 M9 12 A3 3 0 1 0 15 12 A3 3 0 1 0 9 12";
+    public static final String PHONE = "M7 3.5 H17 V20.5 H7 Z M11 17.5 H13";
+    public static final String ID_CARD = "M3.5 6 H20.5 V18 H3.5 Z M7 10 H11 M7 13.5 H10 M14.5 11.5 A2 2 0 1 0 14.51 11.5";
     public static final String WIFI_OFF = "M3 3 L21 21 M8.5 16.5 A5 5 0 0 1 15.5 16.5 M5 13 A10 10 0 0 1 10 10.2 M14 10.2 A10 10 0 0 1 19 13 M12 20 H12.01";
     public static final String LOCK = "M6 11 H18 V20 H6 Z M8.5 11 V8 A3.5 3.5 0 0 1 15.5 8 V11";
     public static final String MOON = "M19.5 14.5 A8 8 0 1 1 9.5 4.5 A6.5 6.5 0 0 0 19.5 14.5 Z";

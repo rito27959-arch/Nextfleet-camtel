@@ -16,16 +16,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.function.Consumer;
 
 /**
- * Parcours automatique de recette visuelle (REC-11, REC-UX-01) : enchaîne les écrans réellement exécutés
- * et enregistre des captures 1440×900. Aucun écran n'est fabriqué pour la capture.
+ * Parcours automatique de recette visuelle (REC-11, REC-UX-01) : enchaîne les écrans réellement exécutés,
+ * enregistre des captures 1440×900 et des GIF des animations. Aucun écran n'est fabriqué pour la capture.
  */
 public final class ScreenshotTour {
 
     private final NextfleetDesktopApp app;
     private final Path dir;
-    private final Deque<Runnable> steps = new ArrayDeque<>();
+    private final Deque<Consumer<Runnable>> steps = new ArrayDeque<>();
 
     public ScreenshotTour(NextfleetDesktopApp app, Path dir) {
         this.app = app;
@@ -40,18 +41,28 @@ public final class ScreenshotTour {
         }
         add(() -> shot("01-connexion"));
         add(() -> login("gestionnaire"));
+        record("anim-01-entree-tableau-de-bord", () -> shell().show(AppShell.Section.OVERVIEW), 30, 50);
         add(() -> shot("02-tableau-de-bord"));
-        add(() -> app.toggleTheme());
+        record("anim-02-theme-sombre", app::toggleTheme, 10, 40);
         add(() -> shot("02b-tableau-de-bord-sombre"));
-        add(() -> app.toggleTheme());
+        add(app::toggleTheme);
         add(() -> shell().show(AppShell.Section.VEHICLES));
         add(() -> shot("03-liste-vehicules"));
-        add(() -> find(VehiclesView.class).selectFirstForTest());
-        add(() -> shot("10-fiche-vehicule-panneau"));
+        record("anim-03-fiche-vehicule-ressort", () -> find(VehiclesView.class).selectFirstForTest(), 16, 40);
+        add(() -> shot("10-fiche-vehicule-echeances"));
         add(() -> shell().show(AppShell.Section.VEHICLES));
         add(() -> find(VehiclesView.class).openFormForTest());
         add(() -> find(VehicleFormView.class).fillInvalidForTest());
         add(() -> shot("04-ajout-vehicule-erreurs"));
+        add(() -> find(VehicleFormView.class).fillValidForTest());
+        add(() -> shot("04b-ajout-vehicule-confirme"));
+        record("anim-04-echeances", () -> shell().show(AppShell.Section.DUE), 22, 50);
+        add(() -> shot("05-echeances"));
+        add(() -> shell().show(AppShell.Section.DRIVERS));
+        add(() -> shot("06-conducteurs"));
+        add(() -> app.toggleTheme());
+        add(() -> shot("06b-conducteurs-sombre"));
+        add(() -> app.toggleTheme());
         add(() -> shell().openVehicles("hilux"));
         add(() -> shot("03b-recherche-hilux"));
         add(() -> ((DemoFleetGateway) app.gateway()).setNetworkDown(true));
@@ -66,21 +77,45 @@ public final class ScreenshotTour {
         add(() -> shot("etat-droits-auditeur"));
         add(() -> app.showLogin("Votre session a expiré. Reconnectez-vous pour continuer."));
         add(() -> shot("01b-session-expiree"));
+        add(() -> {
+            LoginView v = (LoginView) app.scene().getRoot();
+            v.prefill("gestionnaire", "faux");
+            v.submitForTest();
+        });
+        add(() -> shot("01c-connexion-refusee"));
         add(Platform::exit);
         next();
     }
 
     private void add(Runnable r) {
-        steps.add(r);
+        steps.add(done -> {
+            r.run();
+            PauseTransition p = new PauseTransition(Duration.millis(1100));
+            p.setOnFinished(e -> done.run());
+            p.play();
+        });
+    }
+
+    private void record(String name, Runnable action, int frames, int everyMs) {
+        steps.add(done -> {
+            GifRecorder rec = new GifRecorder(app.scene(), 0.5);
+            rec.record(action, frames, everyMs, () -> {
+                try {
+                    rec.write(dir.resolve(name + ".gif"), everyMs);
+                    System.out.println("animation " + name + ".gif (" + rec.frameCount() + " images)");
+                } catch (IOException e) {
+                    throw new IllegalStateException(e);
+                }
+                PauseTransition p = new PauseTransition(Duration.millis(600));
+                p.setOnFinished(e -> done.run());
+                p.play();
+            });
+        });
     }
 
     private void next() {
-        Runnable r = steps.poll();
-        if (r == null) return;
-        r.run();
-        PauseTransition p = new PauseTransition(Duration.millis(900));
-        p.setOnFinished(e -> next());
-        p.play();
+        Consumer<Runnable> s = steps.poll();
+        if (s != null) s.accept(this::next);
     }
 
     private void login(String user) {

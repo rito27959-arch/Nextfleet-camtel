@@ -93,6 +93,9 @@ public final class LoginView extends HBox {
         getChildren().addAll(brandPane, right);
 
         submit.setOnAction(e -> attempt(gateway, onLogin));
+        Motion.enter(form, javafx.util.Duration.millis(80), 18);
+        Motion.stagger(java.util.List.of(brandRow, pitch, sub));
+        Motion.pressable(submit);
         password.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ENTER) attempt(gateway, onLogin);
         });
@@ -125,6 +128,7 @@ public final class LoginView extends HBox {
             password.clear();
             showError(err.kind() == GatewayException.Kind.NETWORK ? err.getMessage()
                     : "Identifiants invalides ou compte indisponible.");
+            shake(form());
             password.requestFocus();
         });
     }
@@ -137,6 +141,22 @@ public final class LoginView extends HBox {
 
     public void submitForTest() {
         submit.fire();
+    }
+
+    private javafx.scene.Node form() {
+        return submit.getParent().getParent();
+    }
+
+    /** Refus : légère secousse horizontale (convention iOS), désactivée si la réduction de mouvement est active. */
+    private static void shake(javafx.scene.Node n) {
+        if (Motion.isReduced()) return;
+        javafx.animation.Timeline t = new javafx.animation.Timeline();
+        double[] xs = {0, -10, 9, -7, 5, -3, 0};
+        for (int i = 0; i < xs.length; i++) {
+            t.getKeyFrames().add(new javafx.animation.KeyFrame(javafx.util.Duration.millis(i * 55),
+                    new javafx.animation.KeyValue(n.translateXProperty(), xs[i], Motion.EASE_IN_OUT)));
+        }
+        t.play();
     }
 
     private void setBusy(boolean busy) {

@@ -21,7 +21,8 @@ import java.util.Locale;
  */
 final class VehicleSheet extends VBox {
 
-    VehicleSheet(Vehicle v, boolean demo, Runnable onClose) {
+    VehicleSheet(Vehicle v, cm.camtel.nextfleet.desktop.data.FleetGateway gateway, Runnable onClose) {
+        boolean demo = gateway.isDemo();
         getStyleClass().add("sheet");
         Button close = new Button(null, Icons.stroke(Icons.CLOSE, 16, "-nf-muted"));
         close.getStyleClass().add("icon-button");
@@ -62,6 +63,21 @@ final class VehicleSheet extends VBox {
             warn.setStyle("-fx-background-color: -nf-warning-soft; -fx-background-radius: 12; -fx-padding: 10;");
             getChildren().add(warn);
         }
+
+        // Échéances du véhicule : même source et mêmes niveaux que l'écran Échéances (NF-11)
+        VBox dues = new VBox(6, Ui.label("ÉCHÉANCES", "sheet-section"), Ui.skeleton(-1, 18), Ui.skeleton(-1, 18));
+        getChildren().add(dues);
+        Ui.async(() -> gateway.vehicleDueDates(v.id()), list -> {
+            dues.getChildren().setAll(Ui.label("ÉCHÉANCES", "sheet-section"));
+            DateTimeFormatter df = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.FRANCE);
+            for (cm.camtel.nextfleet.desktop.data.Models.DueItem d : list) {
+                HBox row = new HBox(10, Ui.label(d.kind().label, "t-12", "w-600"), Ui.spacer(),
+                        Ui.label(d.dueOn().format(df), "muted", "t-12"), Ui.dueChip(d));
+                row.setAlignment(Pos.CENTER_LEFT);
+                dues.getChildren().add(row);
+            }
+            Motion.stagger(dues.getChildren().subList(1, dues.getChildren().size()));
+        }, err -> dues.getChildren().setAll(Ui.label("ÉCHÉANCES", "sheet-section"), Ui.label(err.getMessage(), "muted", "t-12")));
 
         Label tabs = Ui.label("Vue 3D, photos, documents et historique : prévus aux lots 2 et 4 (écrans 08 à 13).", "muted", "t-12");
         tabs.setWrapText(true);

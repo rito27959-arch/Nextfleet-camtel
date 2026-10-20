@@ -93,6 +93,40 @@ class DesktopLogicTest {
     }
 
     @Test
+    @DisplayName("NF-11 : échéances unifiées — niveaux cohérents, tri par date, tableau de bord alimenté par la même source")
+    void dueDates() {
+        DemoFleetGateway g = demo();
+        g.login("gestionnaire", "demo".toCharArray());
+        var all = g.dueDates(30);
+        assertFalse(all.isEmpty());
+        for (int i = 1; i < all.size(); i++) assertFalse(all.get(i).dueOn().isBefore(all.get(i - 1).dueOn()), "tri par date");
+        for (var d : all) {
+            var expected = d.daysLeft() < 0 ? cm.camtel.nextfleet.desktop.data.Models.DueLevel.EXPIRE
+                    : d.daysLeft() <= 30 ? cm.camtel.nextfleet.desktop.data.Models.DueLevel.A_ECHEANCE
+                    : cm.camtel.nextfleet.desktop.data.Models.DueLevel.A_JOUR;
+            assertEquals(expected, d.level(), d.toString());
+        }
+        // Serge Fone : permis expiré depuis 6 jours dans le jeu fictif
+        assertTrue(all.stream().anyMatch(d -> d.subject().equals("Serge Fone")
+                && d.kind() == cm.camtel.nextfleet.desktop.data.Models.DueKind.PERMIS && d.daysLeft() == -6));
+        var v = g.vehicles("CE 9021", null, 0, 1).items().get(0);
+        var vd = g.vehicleDueDates(v.id());
+        assertEquals(3, vd.size());
+        assertTrue(all.containsAll(vd), "la fiche et l'écran Échéances affichent les mêmes échéances");
+    }
+
+    @Test
+    @DisplayName("NF-12 : conducteurs — recherche par nom ou matricule, initiales")
+    void drivers() {
+        DemoFleetGateway g = demo();
+        g.login("gestionnaire", "demo".toCharArray());
+        assertEquals(11, g.drivers("").size());
+        assertEquals(1, g.drivers("mat-0412").size());
+        assertEquals("JN", g.drivers("nguema").get(0).initials());
+        assertEquals("ÉO", g.drivers("ondoa").get(0).initials());
+    }
+
+    @Test
     @DisplayName("Formulaire 04 : champs obligatoires, année, capacité et VIN validés")
     void formValidation() {
         VehicleFormValidator v = new VehicleFormValidator();

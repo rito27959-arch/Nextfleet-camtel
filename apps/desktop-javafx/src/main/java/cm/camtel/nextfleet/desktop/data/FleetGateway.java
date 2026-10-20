@@ -46,4 +46,12 @@ public interface FleetGateway {
     Vehicle vehicle(UUID id);
 
     Vehicle createVehicle(VehicleDraft draft);
+
+    java.util.List<Models.Driver> drivers(String query);
+
+    /** Échéances du périmètre, triées par date ; {@code thresholdDays} = seuil d'alerte approuvé. */
+    java.util.List<Models.DueItem> dueDates(int thresholdDays);
+
+    /** Échéances d'un véhicule donné. */
+    java.util.List<Models.DueItem> vehicleDueDates(UUID vehicleId);
 }

@@ -6,7 +6,7 @@
 
 | Point | Constat | Conséquence |
 |---|---|---|
-| Dépôt existant (Flask/SQLite/Flutter cité au cahier v2) | **Non fourni.** Aucun fichier source, archive ou schéma de l'application actuelle n'était disponible. | La colonne « Existant » est marquée **❓ non vérifiable**. Le taux de 70 % du questionnaire reste déclaratif (cahier V4, chap. 01). Aucune fonction n'est réputée préservée tant que le code n'a pas été audité. |
+| Dépôt existant (Flask/SQLite/Flutter cité au cahier v2) | **Retrouvé le 20/10 : `rito27959-arch/nexfleet`.** 84 routes, 78 tests backend réussis, 12 vues web, 8 écrans Flutter. | Correspondance détaillée et défauts : **`docs/REGISTRE_PARITE.md`** (fait foi sur la colonne « Existant » ci-dessous, établie avant l'accès au dépôt). |
 | Secrets et données réelles du dépôt de référence (cahier V4, chap. 14) | Non vérifiable sans le dépôt. | L'assainissement reste un prérequis de lancement. Le nouveau dépôt ne contient **aucun secret ni donnée réelle** (mot de passe de base de développement uniquement dans le script de test local). |
 | Environnement de réalisation | Maven Central, dépôts Google/Gradle et Docker Hub **bloqués** par le réseau. JDK 21, PostgreSQL 16 + PostGIS, OpenJFX (paquet Ubuntu) et JUnit 5 disponibles. | Spring Boot et Android **non compilables ici**. Le noyau métier, la base et le client JavaFX ont été compilés et testés avec une chaîne hors ligne (`tools/build-offline.sh`). |
 | Marque | Le PDF écrit « NexFleet » ; la planche de 15 écrans écrit « Nextfleet ». | Les interfaces utilisent **NexFleet** (actifs officiels du cahier). Décision de marque à confirmer par le BUT. |

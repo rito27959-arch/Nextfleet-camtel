@@ -66,7 +66,7 @@ public final class DashboardView extends ScrollPane {
 
     private Node header(DashboardData d) {
         String who = session.displayName().replaceAll("\\s*\\(.*\\)", "").toUpperCase(FR);
-        Label overline = Ui.label("BONJOUR, " + who, "overline");
+        Label overline = Ui.label(AppShell.greeting() + ", " + who, "overline");
         Label title = Ui.label("Votre flotte, en un regard.", "h1");
         Label sub = Ui.label("Disponibilité, coûts et alertes. L'essentiel, au même endroit.", "muted");
         VBox left = new VBox(4, overline, title, sub);
@@ -101,6 +101,7 @@ public final class DashboardView extends ScrollPane {
 
     private void render(DashboardData d) {
         root.getChildren().setAll(header(d), kpiRow(d), middleRow(d), recentTable(d.recentVehicles()), footnote(d));
+        Motion.stagger(root.getChildren());
     }
 
     // ------------------------------------------------------------------ indicateurs
@@ -112,7 +113,8 @@ public final class DashboardView extends ScrollPane {
         // Carte sombre : véhicules actifs
         Label t1 = new Label("Véhicules actifs", Icons.stroke(Icons.CAR, 16, "white"));
         t1.getStyleClass().add("t-12");
-        Label v1 = Ui.label(String.valueOf(d.activeVehicles()), "kpi-value");
+        Label v1 = Ui.label("", "kpi-value");
+        Motion.countUp(v1, d.activeVehicles(), x -> String.valueOf(Math.round(x)));
         Label u1 = Ui.label(" / " + d.totalVehicles(), "kpi-unit");
         HBox val1 = new HBox(v1, u1);
         val1.setAlignment(Pos.BASELINE_LEFT);
@@ -121,15 +123,19 @@ public final class DashboardView extends ScrollPane {
         HBox c1 = new HBox(left1, Ui.spacer(), Ui.ring(ratio, pct + " %", 26));
         c1.setAlignment(Pos.CENTER_LEFT);
         c1.getStyleClass().add("card-dark");
+        Motion.hoverLift(c1);
         c1.setAccessibleText(d.activeVehicles() + " véhicules actifs sur " + d.totalVehicles() + ", soit " + pct + " pour cent");
 
-        Node c2 = kpi(Icons.WRENCH, "Entretiens à venir", String.valueOf(d.upcomingMaintenance()), "",
+        Node c2 = kpi(Icons.WRENCH, "Entretiens à venir", d.upcomingMaintenance(), x -> String.valueOf(Math.round(x)), "",
                 Ui.trend(BigDecimal.valueOf(d.maintenanceDelta()), true, "sur le mois dernier", ""),
                 Ui.bubble(Icons.CALENDAR, "green", "-nf-green-strong"), "Échéances à 30 jours");
-        Node c3 = kpi(Icons.FUEL, "Consommation moyenne", Ui.decimal(d.avgConsumption(), 1), " L / 100 km",
+        Node c3 = kpi(Icons.FUEL, "Consommation moyenne", d.avgConsumption() == null ? Double.NaN : d.avgConsumption().doubleValue(),
+                x -> Double.isNaN(x) ? "—" : Ui.decimal(BigDecimal.valueOf(x), 1), " L / 100 km",
                 Ui.trend(d.consumptionTrendPercent(), true, "sur le mois dernier"),
-                Ui.bubble(Icons.BARS_UP, "green", "-nf-green-strong"), d.consumptionNote());
-        Node c4 = kpi(Icons.COINS, "Coûts du mois", Ui.compactXaf(d.monthCostXaf()), " FCFA",
+                Ui.sparkline(d.consumptionSeries().stream().filter(m -> m.litersPer100Km() != null)
+                        .map(m -> m.litersPer100Km().doubleValue()).toList(), 64, 30, "sparkline"), d.consumptionNote());
+        Node c4 = kpi(Icons.COINS, "Coûts du mois", d.monthCostXaf() == null ? Double.NaN : d.monthCostXaf().doubleValue(),
+                x -> Double.isNaN(x) ? "—" : Ui.compactXaf(BigDecimal.valueOf(x)), " FCFA",
                 Ui.trend(d.costTrendPercent(), true, "sur le mois dernier"),
                 Ui.bubble(Icons.BARS_UP, "danger", "-nf-danger"), "Carburant et entretien validés (données fictives)");
 
@@ -142,16 +148,30 @@ public final class DashboardView extends ScrollPane {
         return row;
     }
 
-    private Node kpi(String icon, String title, String value, String unit, Node trend, Node bubble, String help) {
+    private Node kpi(String icon, String title, double target, java.util.function.DoubleFunction<String> format,
+                     String unit, Node trend, Node bubble, String help) {
         Label t = new Label(title, Icons.stroke(icon, 16, "-nf-text"));
         t.getStyleClass().addAll("t-12", "w-500");
-        Label v = Ui.label(value, "kpi-value");
+        Label v = Ui.label("", "kpi-value");
+        if (Double.isNaN(target)) v.setText("—"); else Motion.countUp(v, target, format);
+        String value = v.getAccessibleText() == null ? "—" : v.getAccessibleText();
         Label u = Ui.label(unit, "kpi-unit");
         HBox val = new HBox(v, u);
         val.setAlignment(Pos.BASELINE_LEFT);
-        VBox left = new VBox(8, t, val, trend);
-        HBox card = new HBox(left, Ui.spacer(), bubble);
+        boolean spark = bubble.getStyleClass().isEmpty() && !(bubble instanceof javafx.scene.layout.StackPane);
+        HBox card;
+        if (spark) {   // micro-courbe : alignée avec la tendance, sous la valeur, pour ne jamais chevaucher le titre
+            HBox bottom = new HBox(8, trend, Ui.spacer(), bubble);
+            bottom.setAlignment(Pos.BOTTOM_LEFT);
+            VBox left = new VBox(8, t, val, bottom);
+            HBox.setHgrow(left, Priority.ALWAYS);
+            card = new HBox(left);
+        } else {
+            VBox left = new VBox(8, t, val, trend);
+            card = new HBox(left, Ui.spacer(), bubble);
+        }
         card.getStyleClass().add("card");
+        Motion.hoverLift(card);
         Tooltip.install(card, new Tooltip(help));
         card.setAccessibleText(title + " : " + value + unit);
         return card;
@@ -234,6 +254,18 @@ public final class DashboardView extends ScrollPane {
             }
         }
         chart.getData().add(s);
+        // Tracé de gauche à droite (720 ms) : la courbe « se dessine », les axes restent fixes.
+        javafx.application.Platform.runLater(() -> {
+            Node plot = chart.lookup(".plot-content");
+            if (plot == null || Motion.isReduced()) return;
+            javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle(-10, -10, 0, 2000);
+            plot.setClip(clip);
+            javafx.animation.Timeline tl = new javafx.animation.Timeline(new javafx.animation.KeyFrame(
+                    javafx.util.Duration.millis(720), new javafx.animation.KeyValue(clip.widthProperty(), plot.getBoundsInLocal().getMaxX() + 20, Motion.EASE_OUT)));
+            tl.setDelay(javafx.util.Duration.millis(180));
+            tl.setOnFinished(e -> plot.setClip(null));
+            tl.play();
+        });
         chart.setAccessibleText("Graphique de consommation moyenne mensuelle en litres aux 100 km");
         return chart;
     }
