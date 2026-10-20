@@ -1,5 +1,6 @@
 package cm.camtel.nextfleet.gps;
 
+import cm.camtel.nextfleet.domain.gps.MissionToken;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.sql.DriverManager;

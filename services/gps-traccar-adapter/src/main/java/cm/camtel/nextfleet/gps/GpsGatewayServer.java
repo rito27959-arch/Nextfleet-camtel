@@ -1,5 +1,6 @@
 package cm.camtel.nextfleet.gps;
 
+import cm.camtel.nextfleet.domain.gps.MissionToken;
 import cm.camtel.nextfleet.domain.gps.GpsFix;
 import cm.camtel.nextfleet.gps.GpsIngestionService.Channel;
 import cm.camtel.nextfleet.gps.GpsIngestionService.Outcome;

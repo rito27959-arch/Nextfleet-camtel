@@ -1,4 +1,4 @@
-package cm.camtel.nextfleet.gps;
+package cm.camtel.nextfleet.domain.gps;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;

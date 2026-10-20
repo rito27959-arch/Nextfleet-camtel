@@ -46,3 +46,11 @@ springdoc:
     path: /api/v1/openapi
   swagger-ui:
     enabled: ${NF_SWAGGER_UI:false}
+
+# GPS : la clé HMAC des jetons de mission est PARTAGÉE avec la passerelle (même variable NF_MISSION_TOKEN_KEY, base64 ≥ 32 octets).
+# Sans clé, le démarrage de mission répond 409 « Passerelle GPS non configurée » : aucune collecte possible.
+nextfleet.gps:
+  mission-token-key: ${NF_MISSION_TOKEN_KEY:}
+  mission-token-ttl: ${NF_MISSION_TOKEN_TTL:PT12H}
+  gateway-public-url: ${NF_GPS_PUBLIC_URL:}
+  notice-versions: ${NF_GPS_NOTICE_VERSIONS:NOTICE-GPS-v1}

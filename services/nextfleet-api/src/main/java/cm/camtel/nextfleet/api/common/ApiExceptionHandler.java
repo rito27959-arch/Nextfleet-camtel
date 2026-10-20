@@ -57,6 +57,22 @@ public class ApiExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT", e.getMessage());
     }
 
+    /** Transition d'état impossible (mission déjà démarrée, non autorisée…) ou service non configuré. */
+    @ExceptionHandler(IllegalStateException.class)
+    ProblemDetail conflict(IllegalStateException e) {
+        return problem(HttpStatus.CONFLICT, "INVALID_STATE", e.getMessage());
+    }
+
+    /** Refus d'un trigger de sécurité (SQLSTATE 42501 insufficient_privilege) : 403 sans détail SQL. */
+    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
+    ProblemDetail dataAccess(org.springframework.dao.DataAccessException e) {
+        Throwable c = e.getMostSpecificCause();
+        if (c instanceof java.sql.SQLException s && "42501".equals(s.getSQLState())) {
+            return problem(HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Vous n'avez pas les droits nécessaires pour cette action.");
+        }
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "DATA_ACCESS", "Erreur d'accès aux données.");
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ProblemDetail invalid(MethodArgumentNotValidException e) {
         Map<String, String> fields = new LinkedHashMap<>();

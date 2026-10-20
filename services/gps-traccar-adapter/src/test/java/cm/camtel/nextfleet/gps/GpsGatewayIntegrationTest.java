@@ -1,5 +1,6 @@
 package cm.camtel.nextfleet.gps;
 
+import cm.camtel.nextfleet.domain.gps.MissionToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;

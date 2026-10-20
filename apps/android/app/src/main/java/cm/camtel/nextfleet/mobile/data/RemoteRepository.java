@@ -50,7 +50,7 @@ public final class RemoteRepository implements Repository {
     @Override
     public Session login(String login, char[] password) {
         try {
-            JSONObject body = new JSONObject().put("login", login).put("password", new String(password));
+            JSONObject body = new JSONObject().put("login", login).put("password", new String(password)).put("clientKind", "ANDROID");
             Arrays.fill(password, '\0');
             JSONObject r = new JSONObject(call("POST", "/api/v1/auth/login", body.toString(), null));
             JSONObject u = r.getJSONObject("user");
