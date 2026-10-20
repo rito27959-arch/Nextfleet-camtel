@@ -1,0 +1,8 @@
+# Surcharge utilisée par la CI pour éprouver la pile complète sans DNS ni HTTPS (ports locaux, images construites sur place).
+services:
+  api:
+    ports: ["127.0.0.1:8080:8080"]
+  gps-gateway:
+    ports: ["127.0.0.1:8090:8090"]
+  traccar:
+    ports: ["127.0.0.1:8082:8082"]

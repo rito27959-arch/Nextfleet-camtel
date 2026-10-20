@@ -103,6 +103,15 @@ jobs:
             && docker build -q -f infra/docker/gateway.Dockerfile -t nexfleet-gps-gateway . \
             && docker build -q -f infra/docker/traccar.Dockerfile -t nexfleet-traccar . ; } 2>&1 | tee build.log
           echo "::notice title=Images Docker::$(docker images --format '{{.Repository}} {{.Size}}' | grep nexfleet | tr '\n' ' ')"
+      - name: Essai de bout en bout de la pile d'hébergement CAMTEL
+        run: |
+          for img in nexfleet-api nexfleet-gps-gateway nexfleet-traccar; do docker tag "$img" "$REGISTRY/$img:ci"; done
+          set -o pipefail
+          tools/smoke-stack.sh 2>&1 | tee smoke.log
+          echo "::notice title=Pile d'hébergement::$(grep -E '^(OK|Pile)' smoke.log | awk 'BEGIN{ORS="%0A"} {print}')"
+      - name: Annotations de l'essai
+        if: failure()
+        run: tools/ci-annotate.sh smoke.log "Pile d'hébergement"
       - name: Publier sur GitHub Container Registry (branche main)
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         run: |

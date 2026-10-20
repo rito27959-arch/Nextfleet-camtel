@@ -1,0 +1,108 @@
+# NexFleet CAMTEL — hébergement sur un serveur CAMTEL (Linux + Docker Engine + Compose v2).
+#   cp .env.example .env && nano .env        # renseigner domaines et secrets (jamais versionnés)
+#   docker compose up -d                     # démarre tout ; Caddy obtient les certificats HTTPS
+#   docker compose ps && docker compose logs -f api
+# Images construites et publiées par la CI GitHub (ghcr.io). Aucun port de base de données exposé.
+name: nexfleet
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nexfleet
+      POSTGRES_USER: nexfleet
+      POSTGRES_PASSWORD: ${NF_DB_PASSWORD:?NF_DB_PASSWORD requis}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexfleet -d nexfleet"]
+      interval: 10s
+      retries: 10
+    networks: [interne]
+
+  api:
+    image: ghcr.io/rito27959-arch/nexfleet-api:${NF_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      NF_DB_URL: jdbc:postgresql://db:5432/nexfleet
+      NF_DB_USER: nexfleet
+      NF_DB_PASSWORD: ${NF_DB_PASSWORD}
+      NF_ENVIRONMENT: ${NF_ENVIRONMENT:-PREPROD}
+      NF_BOOTSTRAP: "true"
+      NF_BOOTSTRAP_ADMIN_LOGIN: ${NF_BOOTSTRAP_ADMIN_LOGIN:-admin}
+      NF_BOOTSTRAP_ADMIN_PASSWORD: ${NF_BOOTSTRAP_ADMIN_PASSWORD:?mot de passe administrateur initial requis (12 caractères et plus)}
+      NF_DEMO_PASSWORD: ${NF_DEMO_PASSWORD:-}
+      NF_DEMO_SIMULATOR: ${NF_DEMO_SIMULATOR:-false}
+      NF_MISSION_TOKEN_KEY: ${NF_MISSION_TOKEN_KEY:?clé HMAC base64 requise (openssl rand -base64 48)}
+      NF_GPS_PUBLIC_URL: https://${NF_GPS_DOMAIN}
+      NF_TRACCAR_URL: http://traccar:8082
+      NF_TRACCAR_USER: ${NF_TRACCAR_USER:-service@nexfleet.local}
+      NF_TRACCAR_PASSWORD: ${NF_TRACCAR_PASSWORD:?mot de passe du compte de service Traccar requis}
+      PORT: "8080"
+    networks: [interne]
+
+  gps-gateway:
+    image: ghcr.io/rito27959-arch/nexfleet-gps-gateway:${NF_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      NF_DB_URL: jdbc:postgresql://db:5432/nexfleet
+      NF_DB_USER: nexfleet
+      NF_DB_PASSWORD: ${NF_DB_PASSWORD}
+      NF_MISSION_TOKEN_KEY: ${NF_MISSION_TOKEN_KEY}
+      NF_TRACCAR_FORWARD_SECRET: ${NF_TRACCAR_FORWARD_SECRET:?secret partagé Traccar → passerelle requis}
+      NF_TRACCAR_OSMAND_URL: http://traccar:5055
+      NF_GPS_BIND: "0.0.0.0:8090"
+    networks: [interne]
+
+  traccar:
+    image: ghcr.io/rito27959-arch/nexfleet-traccar:${NF_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      CONFIG_USE_ENVIRONMENT_VARIABLES: "true"
+      FORWARD_URL: http://gps-gateway:8090/gps/traccar/positions
+      FORWARD_HEADER: "Authorization: Bearer ${NF_TRACCAR_FORWARD_SECRET}"
+    volumes:
+      - traccar-data:/opt/traccar/data
+    # Boîtiers GPS véhicules : ouvrir ici le port de leur protocole (ex. 5013 pour H02) après décision DSIR.
+    networks: [interne]
+
+  caddy:
+    image: caddy:2.8
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      NF_API_DOMAIN: ${NF_API_DOMAIN:?domaine de l'API requis}
+      NF_GPS_DOMAIN: ${NF_GPS_DOMAIN:?domaine de la passerelle GPS requis}
+      NF_ACME_EMAIL: ${NF_ACME_EMAIL:-dsir@camtel.cm}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on: [api, gps-gateway]
+    networks: [interne]
+
+  backup:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      PGPASSWORD: ${NF_DB_PASSWORD}
+      RETENTION_DAYS: ${NF_BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - ./backups:/backups
+      - ./backup.sh:/backup.sh:ro
+    entrypoint: ["sh", "/backup.sh"]
+    networks: [interne]
+
+volumes:
+  db-data:
+  traccar-data:
+  caddy-data:
+
+networks:
+  interne:

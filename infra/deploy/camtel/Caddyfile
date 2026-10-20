@@ -1,0 +1,35 @@
+# Frontal HTTPS : certificats Let's Encrypt automatiques (ou certificat CAMTEL : voir README, directive tls).
+{
+	email {$NF_ACME_EMAIL}
+}
+
+{$NF_API_DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+	# Actuator : seule la santé est publique
+	@actuator path /actuator/*
+	handle @actuator {
+		@health path /actuator/health
+		handle @health {
+			reverse_proxy api:8080
+		}
+		respond 404
+	}
+	reverse_proxy api:8080
+}
+
+{$NF_GPS_DOMAIN} {
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000"
+	# Seuls les lots Android à jeton de mission sont publics ; le forward Traccar reste interne.
+	@android path /gps/android/fixes /health
+	handle @android {
+		reverse_proxy gps-gateway:8090
+	}
+	respond 404
+}
