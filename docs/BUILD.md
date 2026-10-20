@@ -5,7 +5,7 @@
 Prérequis Ubuntu 24.04 : `openjdk-21-jdk openjfx junit5 libjackson2-databind-java postgresql-16 postgresql-16-postgis-3 xvfb python3`.
 
 ```bash
-# Base de données : migrations V1–V3 + 32 tests d'intégrité + test de concurrence
+# Base de données : migrations V1–V7 + 63 tests d'intégrité + test de concurrence
 sudo -u postgres psql -c "create role nextfleet login password 'nextfleet_dev_only' createdb;"
 infra/db/tests/run_db_tests.sh
 
@@ -24,39 +24,35 @@ java --module-path /usr/share/openjfx/lib --add-modules javafx.controls,javafx.s
 tools/screenshots.sh
 ```
 
-## 2. Chaîne Maven (cible ; NON exécutée — Maven Central inaccessible lors de la réalisation)
+## 2. Chaîne Maven (exécutée par la CI GitHub Actions à chaque push)
 
 ```bash
-mvn -B verify                                   # domaine + API (Testcontainers : Docker requis) + bureau
-mvn -pl services/nextfleet-api spring-boot:run  # API ; variables NF_DB_URL, NF_DB_USER, NF_DB_PASSWORD
+mvn -B verify                                   # domaine, API (Testcontainers : Docker requis), passerelles, bureau
+mvn -pl services/nextfleet-api spring-boot:run  # API ; variables : docs/INSTALLATION.md §2
 mvn -pl apps/desktop-javafx javafx:run -Djavafx.args="--api=https://serveur/"
 ```
 
-## 3. Paquets bureau avec jpackage (à exécuter sur chaque système cible)
+## 3. Paquets bureau (jpackage, produits par la CI)
 
-`jpackage` ne produit un installateur que pour le système sur lequel il tourne : DEB sous Linux, MSI/EXE sous Windows.
-JavaFX doit être fourni sous forme de **jmods** (téléchargés depuis gluonhq.com/products/javafx pour la plateforme visée).
+`jpackage` ne produit un installateur que pour le système sur lequel il tourne. La CI le fait gratuitement sur des machines
+GitHub : DEB sur `ubuntu-24.04` (puis installation réelle du paquet pour vérification), EXE sur `windows-2022` (WiX préinstallé).
+JavaFX est pris dans les jars à classifieur de plateforme copiés par Maven (`jp/fx`), le JRE est réduit par `--add-modules`.
+La commande exacte est dans `.github/workflows/ci.yml`, job « Bureau ».
+
+Reproduire en local (Linux) :
 
 ```bash
-mvn -B -pl apps/desktop-javafx -am package -DskipTests
-# Linux (DEB)
-jpackage --type deb --name nexfleet --app-version 0.1.0 --vendor "CAMTEL" \
-  --input apps/desktop-javafx/target/libs --main-jar ../nextfleet-desktop-0.1.0-SNAPSHOT.jar \
-  --main-class cm.camtel.nextfleet.desktop.NextfleetDesktopApp \
-  --module-path "$JAVAFX_JMODS" --add-modules javafx.controls,javafx.swing,java.net.http \
-  --linux-shortcut --linux-menu-group Office
-# Windows (MSI ; EXE avec --type exe) — nécessite WiX Toolset
-jpackage --type msi --name NexFleet --app-version 0.1.0 --vendor "CAMTEL" ^
-  --input apps\desktop-javafx\target\libs --main-jar ..\nextfleet-desktop-0.1.0-SNAPSHOT.jar ^
-  --main-class cm.camtel.nextfleet.desktop.NextfleetDesktopApp ^
-  --module-path "%JAVAFX_JMODS%" --add-modules javafx.controls,javafx.swing,java.net.http ^
-  --win-menu --win-shortcut --win-dir-chooser
+mvn -B -ntp -pl apps/desktop-javafx -am package -DskipTests
+# puis les étapes « Préparer l'image d'application » et « jpackage » du workflow, avec matrix.type=deb
 ```
 
-Statut : **aucun DEB/EXE/MSI produit dans ce lot.** Les commandes ci-dessus sont à éprouver lors du premier build Maven.
+Non fait : signature de code Windows (certificat CAMTEL requis), paquet MSI (l'EXE suffit au pilote), paquet macOS.
 
-## 4. Android (APK)
+## 4. Android (APK, produit par la CI)
 
-Statut : **non commencé**. Le Gradle Android et le SDK exigent `services.gradle.org`, `dl.google.com` et `maven.google.com`,
-inaccessibles lors de la réalisation. Le lot 2 créera `apps/android-java` (Java + XML, ViewModel/Repository) avec :
-`./gradlew assembleDebug` (APK de vérification) ; APK de production signé uniquement avec les clés détenues par CAMTEL.
+```bash
+cd apps/android && gradle testDebugUnitTest lintDebug assembleDebug assembleRelease
+```
+
+Gradle 9.5.0, AGP 9.3.1, SDK 37. APK de débogage (installable pour essai) et APK de publication minifié, signé seulement si
+les secrets `NF_KEYSTORE_*` sont définis. Détails : [`MOBILE.md`](MOBILE.md).

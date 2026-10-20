@@ -132,9 +132,9 @@ final class UsersView extends ScrollPane {
         Button create = new Button("Nouveau compte", Icons.stroke(Icons.PLUS, 15, "white"));
         create.getStyleClass().add("btn-filled");
         create.setDisable(true);
-        Tooltip.install(create, new Tooltip("Création de compte : API d'administration du lot 2 (non compilée)."));
+        Tooltip.install(create, new Tooltip("Création de compte : non exposée par l'API (fédération OIDC / RH prévue) ; suspension et réactivation disponibles."));
         StackPane wrap = new StackPane(create);   // infobulle visible même bouton inactif
-        Tooltip.install(wrap, new Tooltip("Création de compte : API d'administration du lot 2 (non compilée)."));
+        Tooltip.install(wrap, new Tooltip("Création de compte : non exposée par l'API (fédération OIDC / RH prévue) ; suspension et réactivation disponibles."));
         HBox bar = new HBox(Ui.label(users.size() + " comptes", "title3"), Ui.spacer(), wrap);
         bar.setAlignment(Pos.CENTER_LEFT);
         return List.of(bar, Ui.insetGroup(null, rows,

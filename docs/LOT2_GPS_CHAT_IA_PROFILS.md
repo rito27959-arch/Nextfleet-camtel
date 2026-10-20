@@ -113,6 +113,6 @@ Boîtier véhicule (phase 2) ──protocole natif──▶ Traccar ──forwar
 
 - **Traccar réel non exécuté.** Le binaire n'est pas téléchargeable ici. Le format a été lu dans son code source, et un faux serveur OsmAnd vérifie le relais.
 - **Pas de téléphone.** L'application Android et son collecteur sont prévus au lot 3. En démonstration, le poste simule le téléphone et les tracés sont fictifs (itinéraires approximatifs).
-- **API Spring Boot non compilée** (Maven Central bloqué). En mode serveur, le client bureau affiche explicitement que ces fonctions passent par l'API du lot 2.
+- **Mise à jour 0.3.0** : l'API Spring Boot est compilée et testée en CI ; le client bureau utilise ses routes en mode serveur (voir ETAT_AVANCEMENT.md).
 - **Bibliothèque WebSocket.** La passerelle pilote utilise Java-WebSocket ; ici, le fichier jar vient d'un paquet Ubuntu. La version Maven (1.5.7) est à confirmer dans la nomenclature DSIR.
 - **Fond de carte, seuils GPS et notice d'information.** Ce sont des décisions DSIR / DS / métier.

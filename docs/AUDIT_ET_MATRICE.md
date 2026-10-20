@@ -102,7 +102,7 @@
 | Risque | Gravité | Mesure |
 |---|---|---|
 | Code existant inaccessible : fonctions oubliées | Élevée | Obtenir le dépôt ; registre de parité écran par écran avant tout retrait |
-| API Spring Boot non compilée | Élevée | Ouvrir Maven Central ; exécuter `mvn verify` (Testcontainers) avant de déclarer l'API livrée |
+| API Spring Boot | Résolu (0.3.0) | `mvn verify` vert en CI, Testcontainers PostGIS compris |
 | Android non démarré | Élevée | Ouvrir dl.google.com / maven.google.com / services.gradle.org ; lot 2 |
 | Seuils GPS et de règles non approuvés | Moyenne | Valeurs « démo » isolées dans `TrackPolicy.demoDefaults()` ; décision métier/DS |
 | Numérotation des bons par compteur journalier | Faible | Unicité garantie par la base ; séquence dédiée au lot 3 |

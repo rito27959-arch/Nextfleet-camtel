@@ -1,23 +1,25 @@
 # NexFleet CAMTEL
 
 Plateforme de gestion du parc automobile CAMTEL : API Java 21 / Spring Boot, PostgreSQL + PostGIS, client bureau JavaFX
-(Windows, Linux) et application Android Java (à venir). Référence : cahier des charges V4.0 et document d'architecture V5.0.
+(Windows, Linux) et application Android Java avec collecte GPS de mission et vues 3D Filament. Référence : cahier des charges V4.0 et document d'architecture V5.0.
 
-> **Statut : lot 2 — six profils, GPS Traccar, messagerie, assistant IA (lecture seule).** Voir [`docs/ETAT_AVANCEMENT.md`](docs/ETAT_AVANCEMENT.md) pour ce qui est réellement prouvé.
+> **Statut : version pilote 0.3.0 — API complète des lots 1 et 2, bureau DEB/EXE, Android APK, construits et testés par la CI.** Voir [`docs/ETAT_AVANCEMENT.md`](docs/ETAT_AVANCEMENT.md) pour ce qui est réellement prouvé.
 > Document de conception et code en cours de réalisation : ni homologation, ni avis DSIR/DS, ni mise en production.
 
 ## Arborescence
 
 ```
-apps/desktop-javafx/       Client bureau JavaFX : 6 profils, parc, échéances, missions et tracés, messagerie, assistant, comptes, audit — compilé et testé
+apps/desktop-javafx/       Client bureau JavaFX : 6 profils, parc, échéances, missions, messagerie, assistant, comptes, audit, catalogue 3D — paquets DEB et EXE
+apps/android/              Application Android Java : missions, collecteur GPS chiffré, messagerie, catalogue 3D (Filament) — APK
 services/nextfleet-domain/ Noyau métier sans dépendance (plein-à-plein, bons, règles CAR, GPS, accès) — compilé et testé
-services/nextfleet-api/    API Spring Boot (identité, parc, carburant, audit) — écrite, NON compilée
+services/nextfleet-api/    API Spring Boot : identité, parc, carburant, missions + jeton GPS, messagerie, assistant, administration, audit — testée (Testcontainers)
 services/gps-traccar-adapter/ Passerelle GPS : forward JSON de Traccar, lots Android à jeton de mission, relais OsmAnd — testée sur PostgreSQL
 services/chat-realtime/    Messagerie temps réel pilote (WebSocket) — testée sur PostgreSQL
 shared/api-contract/       Contrats OpenAPI 3 des lots 1 et 2 — validés
+shared/assets3d/           Modèles 3D GLB redistribuables et leurs licences
 shared/ui-tokens/          Jetons du design system (p. 17 / p. 18)
-infra/db/migrations/       Migrations Flyway V1–V5 — testées sur PostgreSQL 16 + PostGIS
-infra/db/tests/            Campagne de tests de la base (62 tests + concurrence) et jeu fictif d'intégration
+infra/db/migrations/       Migrations Flyway V1–V7 — testées sur PostgreSQL 16 + PostGIS
+infra/db/tests/            Campagne de tests de la base (63 tests + concurrence) et jeu fictif d'intégration
 infra/compose.local.yaml   PostGIS, API, Traccar, passerelles GPS et messagerie en local (non exécuté)
 infra/traccar/             Configuration Traccar (forward JSON vers NexFleet)
 docs/                      Audit, registre de parité avec l'ancien NexFleet, design et mouvement, état d'avancement, captures et GIF
@@ -33,7 +35,7 @@ tools/run-integration-tests.sh      # GPS et messagerie de bout en bout sur Post
 tools/screenshots.sh                # parcours visuel et captures
 ```
 
-Détails et paquets DEB/MSI/EXE : [`docs/BUILD.md`](docs/BUILD.md).
+Construction : [`docs/BUILD.md`](docs/BUILD.md) · installation des paquets DEB / EXE / APK : [`docs/INSTALLATION.md`](docs/INSTALLATION.md) · mobile : [`docs/MOBILE.md`](docs/MOBILE.md).
 
 ## Règles non négociables appliquées dans le code
 
@@ -47,7 +49,7 @@ Détails et paquets DEB/MSI/EXE : [`docs/BUILD.md`](docs/BUILD.md).
 
 ## Licences tierces embarquées
 
-Police Inter (SIL OFL 1.1) : `apps/desktop-javafx/src/main/resources/cm/camtel/nextfleet/desktop/fonts/OFL-1.1-Inter.txt`.
+Modèles 3D : `shared/assets3d/LICENCES.md` (créations originales et Khronos Toy Car CC0). Police Inter (SIL OFL 1.1) : `apps/desktop-javafx/src/main/resources/cm/camtel/nextfleet/desktop/fonts/OFL-1.1-Inter.txt`.
 
 ## Mode démonstration : six comptes
 

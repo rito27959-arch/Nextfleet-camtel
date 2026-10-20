@@ -112,7 +112,8 @@ jobs:
           for f in apps/android/app/build/outputs/apk/release/*.apk; do cp "$f" "dist/nexfleet-${APP_VERSION}-$(basename "$f" .apk | sed 's/^app-//').apk"; done
           ls -la dist
           T=$(find apps/android/app/build/test-results -name 'TEST-*.xml' -exec grep -ho 'tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' {} + | head -5 | tr '\n' ' ')
-          P=$("$ANDROID_HOME"/build-tools/*/aapt dump permissions dist/nexfleet-${APP_VERSION}-debug.apk 2>/dev/null | grep -o "name='[^']*'" | tr '\n' ' ' | head -c 1500)
+          AAPT2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)
+          P=$("$AAPT2" dump permissions dist/nexfleet-${APP_VERSION}-debug.apk 2>&1 | grep -oE "android\.permission\.[A-Z_]+|cm\.camtel[^' ]*" | sort -u | tr '\n' ' ')
           echo "::notice title=Android — bilan::APK : $(cd dist && ls -s --block-size=K *.apk | tr '\n' ' ')%0ATests unitaires : ${T}%0APermissions : ${P}"
       - uses: actions/upload-artifact@v4
         with: { name: nexfleet-android-apk, path: dist/*.apk }
@@ -179,7 +180,11 @@ jobs:
       - name: Essai d'installation du DEB
         if: matrix.type == 'deb'
         run: |
-          sudo apt-get install -y ./dist/*.deb
+          echo "::notice title=DEB — dépendances déclarées::$(dpkg-deb -f dist/*.deb Depends)"
+          sudo apt-get update -qq
+          if ! sudo apt-get install -y ./dist/*.deb > apt.log 2>&1; then
+            echo "::error title=DEB — échec d'installation::$(tail -25 apt.log | awk 'BEGIN{ORS="%0A"} {print}')"; exit 1
+          fi
           test -x /opt/nexfleet/bin/NexFleet
           dpkg -s nexfleet | grep -E '^(Package|Version|Installed-Size)'
           echo "::notice title=DEB installé::$(dpkg -s nexfleet | grep -E '^(Version|Installed-Size)' | tr '\n' ' ') ; lanceur /opt/nexfleet/bin/NexFleet présent"

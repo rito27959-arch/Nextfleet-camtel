@@ -1,59 +1,69 @@
-# État réel d'avancement — Lot 2
+# État réel d'avancement — version pilote 0.3.0
 
 **20 octobre 2026.** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
 Aucune autorisation CAMTEL, aucun avis DSIR ou DS et aucune mise en production ne sont revendiqués.
 
 ## Ce qui fonctionne réellement (preuves exécutées)
 
-| Élément | Commande | Résultat obtenu |
-|---|---|---|
-| Migrations SQL V1–V5 sur PostgreSQL 16 + PostGIS 3.4 | `infra/db/tests/run_db_tests.sh` | 5 migrations appliquées sur base vierge (V5 = profils, GPS Traccar, chat, assistant) |
-| Tests d'intégrité de la base | idem | **62 tests réussis**. Lot 1 : 12 points, maintenance, bons, sessions, journal chaîné, licence 3D… Lot 2 : six profils, admin sans pouvoir métier, auditeur sans écriture ni chat, chat sans doublon ni trou, curseurs monotones, rejets GPS sans position, activation de l'assistant sous conditions, interrogations journalisées |
-| Concurrence sur un bon (CAR-01) | idem | Un seul plein accepté sur deux simultanés ; solde jamais dépassé |
-| Noyau métier Java 21 | `tools/build-offline.sh` | `-Xlint:all -Werror` ; **42 tests JUnit 5 réussis** |
-| Passerelle GPS Traccar | idem + `tools/run-integration-tests.sh` | **9 tests** dont 5 de bout en bout sur PostgreSQL |
-| Messagerie temps réel (WebSocket pilote) | `tools/run-integration-tests.sh` | **4 tests de bout en bout** sur PostgreSQL avec de vrais clients WebSocket |
-| Client JavaFX | `tools/build-offline.sh` | **17 tests réussis** (lot 1 + profils, missions, messagerie, assistant, journal chaîné) |
-| Parcours visuels | `tools/screenshots.sh` (lot 1) ; `NF_TOUR=lot2 tools/screenshots.sh …` | Lot 1 : 23 captures, 6 GIF. Lot 2 : **21 captures, 2 GIF** dans `docs/design-reference/captures-lot2/` |
-| Contrats OpenAPI | `openapi-spec-validator` | `openapi.yaml` (lot 1) et `openapi-lot2.yaml` (12 chemins) valides |
-| Contrastes | `python3 tools/check_contrast.py` | 16 couples conformes |
-| Ancien dépôt `rito27959-arch/nexfleet` | `pytest` | 78 tests réussis ; registre de parité : `docs/REGISTRE_PARITE.md` |
+Toutes les lignes marquées **CI** sont rejouées à chaque push par GitHub Actions (`.github/workflows/ci.yml`) ; les
+résultats sont lisibles dans l'onglet Actions (annotations « bilan »).
 
-Détail du lot 2 : **`docs/LOT2_GPS_CHAT_IA_PROFILS.md`**.
+| Élément | Où | Résultat obtenu |
+|---|---|---|
+| Migrations V1–V7 sur PostgreSQL 16 + PostGIS 3.4 | CI + `infra/db/tests/run_db_tests.sh` | Appliquées sur base vierge |
+| Tests d'intégrité de la base | idem | **63 tests réussis** + concurrence CAR-01 (un seul plein accepté sur deux simultanés). Nouveau : journal vérifiable depuis un autre fuseau horaire (V7) |
+| Noyau métier Java 21 | CI (Maven) + `tools/build-offline.sh` | **42 tests** |
+| API Spring Boot | CI (Maven, Testcontainers PostGIS) | **6 tests d'intégration** : lot 1 (connexion, cloisonnement, doublons, chaîne carburant) et scénario lot 2 complet ci-dessous |
+| Passerelle GPS Traccar | CI | **9 tests** dont 5 de bout en bout sur PostgreSQL |
+| Messagerie temps réel (WebSocket pilote) | CI | **4 tests** de bout en bout avec de vrais clients WebSocket |
+| Client bureau JavaFX | CI + hors ligne | **21 tests** (dont client HTTP du lot 2 et catalogue 3D) |
+| Paquet **DEB** | CI (ubuntu-24.04) | Produit par jpackage, puis **installé** sur la machine de CI ; lanceur `/opt/nexfleet/bin/NexFleet` vérifié |
+| Paquet **EXE** Windows | CI (windows-2022) | Produit par jpackage + WiX (~51 Mo). Non signé ; pas lancé automatiquement |
+| Application **Android** | CI | Compilation, **lint bloquant**, **4 tests unitaires** ; APK de débogage (~36 Mo) et de publication minifié |
+| Contrats OpenAPI | CI | `openapi.yaml` et `openapi-lot2.yaml` (0.3.0, alignés sur l'implémentation) valides |
+| Captures | `tools/screenshots.sh` | Lot 2 : 22 captures + 2 GIF, dont `23-catalogue-3d.png` (rendu 3D JavaFX réel) |
+
+Scénario lot 2 de l'API (`MissionChatAssistantIntegrationTest`), exécuté sur PostGIS réel :
+création de mission → refus de l'auto-autorisation → autorisation par un tiers → cloisonnement Douala/Yaoundé →
+démarrage refusé au gestionnaire et avec une notice inconnue → démarrage par le conducteur avec **jeton de mission
+vérifié** (signature, mission) → second démarrage refusé → message envoyé deux fois sans doublon → états Envoyé, Distribué,
+Lu → conversation refusée à un non-participant et à l'auditeur → clôture → assistant désactivé par défaut, activation refusée
+au gestionnaire et avec un signataire identique, puis acceptée → question chiffrée, demande d'écriture refusée, conducteur
+sans droit refusé → comptes réservés à l'admin, journal lisible par l'auditeur, **chaîne vérifiée intacte par le serveur**.
 
 ## Ce qui est écrit mais pas encore prouvé
 
 | Élément | Statut | Condition pour le déclarer livré |
 |---|---|---|
-| API Spring Boot (lot 1 + contrat lot 2) | **Non compilée** : Maven Central bloqué | `mvn verify` vert, y compris Testcontainers |
-| Traccar Server réel | Configuration `infra/traccar/traccar.xml` écrite et clés vérifiées dans le code source ; **binaire non exécuté** | Traccar démarré, position d'un téléphone de test reçue par la passerelle |
-| Messagerie dans l'API (Spring WebSocket) | Protocole et stockage prouvés par la passerelle pilote | Portage dans l'API, WSS derrière le frontal DSIR |
-| `infra/compose.local.yaml`, `infra/ci/pipeline.yml` | Non exécutés (Docker et CI indisponibles) | Exécution sur le poste DSIR |
-| Paquets DEB / MSI / EXE | Procédure documentée, aucun paquet produit | `docs/BUILD.md` §3 sur chaque OS |
+| Collecte GPS sur un vrai téléphone | Code compilé et testé unitairement ; jamais exécuté sur un appareil | Essai terrain : téléphone + passerelle + API, positions reçues pendant la mission et refusées après |
+| Traccar Server réel | `infra/traccar/traccar.xml` écrit ; binaire non exécuté | Traccar démarré, position d'un boîtier reçue par la passerelle |
+| Vue 3D Android (Filament) | Compilée, lint vert ; rendu jamais observé sur écran | Capture sur un appareil OpenGL ES 3 |
+| Lancement de l'EXE | Installateur produit ; application non lancée sous Windows | Installation et connexion sur un poste Windows CAMTEL |
+| Bureau ↔ API réelle | Client HTTP testé contre un faux serveur ; routes testées côté API | Recette de bout en bout sur un serveur de test |
+| `infra/compose.local.yaml` | Non exécuté | `docker compose up` sur le poste DSIR |
 
 ## Ce qui n'est pas commencé
 
-Application Android et collecteur GPS (bloqués par l'accès réseau), pièces jointes du chat, écrans carburant / maintenance /
-budget / rapports, catalogue et vues 3D, photo / détourage / reconnaissance, modèle de langage local pour l'assistant,
-intégrations OIDC / RH. Répartition : `docs/AUDIT_ET_MATRICE.md`.
+Pièces jointes du chat, messagerie temps réel sur mobile (le mobile interroge l'API REST), écrans carburant / maintenance /
+budget / rapports côté bureau, création de comptes (fédération OIDC / RH), photo / détourage / reconnaissance de véhicule,
+modèle de langage local pour l'assistant (moteur de règles actuel `RULES_FR_V1`), signature de code Windows, APK signé
+avec la clé CAMTEL.
 
 ## Décisions attendues
 
 | Décision | Qui | Impact |
 |---|---|---|
+| Clé de signature Android et certificat de signature Windows | DSIR | APK et EXE de production |
 | Serveur de tuiles (interne ou OpenStreetMap selon licence) | DSIR | Fond de carte des écrans Missions |
 | Seuils GPS (précision, saut, arrêt, « en direct ») | Métier + DS | Remplacent `TrackPolicy.demoDefaults()` |
 | Texte de la notice d'information GPS (`NOTICE-GPS-v1`) | DS + juridique | Affichée avant chaque démarrage de mission |
 | Validation de sécurité de l'assistant | DS / RSSI | Référence exigée pour l'activer |
-| Version figée de Traccar et de Java-WebSocket | DSIR (nomenclature) | Compose et pom |
-| Marque « NexFleet » / « Nextfleet » | BUT | Libellés |
+| Durée de vie du jeton de mission (12 h par défaut) | DS | `NF_MISSION_TOKEN_TTL` |
 
-L'arbitrage de contraste du lot 1 est **résolu** (lot 1.2 : boutons pleins sur la menthe accessible #008575, 4,55:1).
+## Prochain lot proposé (lot 4), dans l'ordre
 
-## Prochain lot proposé (lot 3), dans l'ordre
-
-1. Ouvrir les domaines Maven, Google et Gradle, puis lancer `mvn verify` et corriger l'API jusqu'à ce que tout passe.
-2. Porter missions, GPS, messagerie et assistant dans l'API (même stockage, mêmes règles).
-3. Application Android Java : connexion, Mes missions, collecteur GPS à tampon chiffré, messagerie.
-4. Démarrer Traccar réel avec un téléphone de test (scénario B complet).
-5. Écrans carburant et maintenance (tables déjà prêtes en base).
+1. Essai terrain : un téléphone Android, la passerelle GPS et l'API sur un serveur de test CAMTEL (scénario B complet).
+2. Traccar réel avec un boîtier GPS véhicule.
+3. Messagerie WebSocket dans l'API et sur le mobile.
+4. Écrans carburant et maintenance (tables et règles déjà prêtes en base).
+5. Signature des paquets avec les clés CAMTEL et publication par étiquette `v0.4.0`.
