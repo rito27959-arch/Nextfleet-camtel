@@ -9,7 +9,7 @@ Chaque exécution réussie de la CI (onglet **Actions** du dépôt) publie ces a
 
 | Artefact | Contenu |
 |---|---|
-| `nexfleet-bureau-deb` | `nexfleet_0.3.0_amd64.deb` (Ubuntu 22.04+ / Debian 12+, JRE et JavaFX embarqués) |
+| `nexfleet-bureau-deb` | `nexfleet_0.3.0_amd64.deb` (construit sur Ubuntu 22.04 : Ubuntu 22.04 / 24.04, Debian 12+ ; JRE et JavaFX embarqués) |
 | `nexfleet-bureau-exe` | `NexFleet-0.3.0.exe` (Windows 10/11, installation par utilisateur, sans droits administrateur) |
 | `nexfleet-android-apk` | `nexfleet-0.3.0-debug.apk` et `nexfleet-0.3.0-release-unsigned.apk` (ou `-release.apk` si signé) |
 | `nexfleet-api-jar` | Jar exécutable de l'API Spring Boot |
@@ -44,7 +44,7 @@ aucune collecte n'est possible par erreur. L'API et la passerelle doivent être 
 ## 3. Poste bureau
 
 **Linux** : `sudo apt install ./nexfleet_0.3.0_amd64.deb`, puis menu Bureautique → NexFleet, ou `/opt/nexfleet/bin/NexFleet`.
-La CI installe réellement ce paquet sur Ubuntu 24.04 à chaque exécution.
+La CI installe réellement ce paquet, lance l'application installée sous Xvfb (parcours de démonstration complet), puis la désinstalle, à chaque exécution.
 
 **Windows** : double-cliquer sur `NexFleet-0.3.0.exe`, choisir le dossier, raccourci créé dans le menu Démarrer.
 Le paquet n'est pas signé (certificat de signature de code CAMTEL à fournir) : Windows SmartScreen demandera une confirmation.

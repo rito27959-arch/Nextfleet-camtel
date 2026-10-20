@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=NexFleet
+GenericName=Gestion de flotte
+Comment=NexFleet CAMTEL — parc automobile, missions, messagerie
+Exec=/opt/nexfleet/bin/NexFleet
+Icon=/opt/nexfleet/lib/NexFleet.png
+Terminal=false
+Type=Application
+Categories=Office;Utility;
+Keywords=flotte;véhicule;mission;CAMTEL;
+StartupWMClass=cm-camtel-nextfleet-desktop-NextfleetDesktopApp

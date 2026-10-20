@@ -1,0 +1,17 @@
+#!/bin/sh
+# prerm NexFleet — retrait de l'entrée de menu sans jamais bloquer la désinstallation.
+set -e
+DESKTOP=/opt/nexfleet/lib/nexfleet-NexFleet.desktop
+case "$1" in
+    remove|upgrade|deconfigure)
+        xdg-desktop-menu uninstall --novendor "$DESKTOP" 2>/dev/null || true
+        rm -f /usr/share/applications/nexfleet-NexFleet.desktop
+    ;;
+    failed-upgrade)
+    ;;
+    *)
+        echo "prerm appelé avec un argument inconnu : $1" >&2
+        exit 1
+    ;;
+esac
+exit 0

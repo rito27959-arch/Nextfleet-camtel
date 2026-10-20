@@ -1,0 +1,21 @@
+#!/bin/sh
+# postinst NexFleet — remplace le modèle de jpackage : l'entrée de menu ne doit jamais faire échouer l'installation
+# (xdg-desktop-menu échoue sur les systèmes sans répertoire de menus, ex. serveurs et images minimales).
+set -e
+DESKTOP=/opt/nexfleet/lib/nexfleet-NexFleet.desktop
+case "$1" in
+    configure)
+        if ! xdg-desktop-menu install --novendor "$DESKTOP" 2>/dev/null; then
+            mkdir -p /usr/share/applications
+            install -m 0644 "$DESKTOP" /usr/share/applications/nexfleet-NexFleet.desktop
+            command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database -q /usr/share/applications || true
+        fi
+    ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+    ;;
+    *)
+        echo "postinst appelé avec un argument inconnu : $1" >&2
+        exit 1
+    ;;
+esac
+exit 0
