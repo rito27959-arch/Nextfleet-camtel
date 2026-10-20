@@ -222,8 +222,13 @@ jobs:
             out/*.apk
             out/*.deb
             out/*.exe
-            out/nexfleet-api-*.jar
+            out/nextfleet-api-*.jar
           body: |
             NexFleet CAMTEL ${{ github.ref_name }} — paquets construits par la CI GitHub.
             Version de démonstration et de recette : ni homologation CAMTEL, ni mise en production.
             Voir docs/ETAT_AVANCEMENT.md et docs/INSTALLATION.md.
+
+            - nexfleet_*_amd64.deb : Ubuntu 22.04 / 24.04, Debian 12+ (sudo apt install ./nexfleet_*.deb)
+            - NexFleet-*.exe : Windows 10/11, installation par utilisateur (non signé : SmartScreen demandera confirmation)
+            - nexfleet-*-debug.apk : Android 8+, pour essai (signé avec une clé de débogage)
+            - nextfleet-api-*.jar : API Spring Boot (Java 21, PostgreSQL 16 + PostGIS)

@@ -17,9 +17,9 @@ résultats sont lisibles dans l'onglet Actions (annotations « bilan »).
 | Passerelle GPS Traccar | CI | **9 tests** dont 5 de bout en bout sur PostgreSQL |
 | Messagerie temps réel (WebSocket pilote) | CI | **4 tests** de bout en bout avec de vrais clients WebSocket |
 | Client bureau JavaFX | CI + hors ligne | **21 tests** (dont client HTTP du lot 2 et catalogue 3D) |
-| Paquet **DEB** | CI (ubuntu-24.04) | Produit par jpackage, puis **installé** sur la machine de CI ; lanceur `/opt/nexfleet/bin/NexFleet` vérifié |
-| Paquet **EXE** Windows | CI (windows-2022) | Produit par jpackage + WiX (~51 Mo). Non signé ; pas lancé automatiquement |
-| Application **Android** | CI | Compilation, **lint bloquant**, **4 tests unitaires** ; APK de débogage (~36 Mo) et de publication minifié |
+| Paquet **DEB** | CI (ubuntu-22.04) | Produit par jpackage (~38 Mo), **installé**, **application lancée** sous Xvfb (23 écrans du parcours de démonstration capturés par l'application installée), puis désinstallée proprement |
+| Paquet **EXE** Windows | CI (windows-2022) | Produit par jpackage + WiX (~51 Mo). Non signé ; pas encore installé ni lancé automatiquement |
+| Application **Android** | CI | Compilation, **lint bloquant**, **4 tests unitaires** ; APK de débogage (~36 Mo) et de publication minifié ; permissions vérifiées dans l'APK (aapt2) : pas de localisation en arrière-plan |
 | Contrats OpenAPI | CI | `openapi.yaml` et `openapi-lot2.yaml` (0.3.0, alignés sur l'implémentation) valides |
 | Captures | `tools/screenshots.sh` | Lot 2 : 22 captures + 2 GIF, dont `23-catalogue-3d.png` (rendu 3D JavaFX réel) |
 
