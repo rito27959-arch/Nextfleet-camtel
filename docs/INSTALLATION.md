@@ -14,8 +14,9 @@ Chaque exécution réussie de la CI (onglet **Actions** du dépôt) publie ces a
 | `nexfleet-android-apk` | `nexfleet-0.3.0-debug.apk` et `nexfleet-0.3.0-release-unsigned.apk` (ou `-release.apk` si signé) |
 | `nexfleet-api-jar` | Jar exécutable de l'API Spring Boot |
 
-Pour une **version publiée** avec les trois paquets attachés : pousser une étiquette, par exemple `git tag v0.3.0 && git push origin v0.3.0`.
-Le job « Publication » crée alors la release GitHub.
+**Version publiée** : la release [v0.3.0](https://github.com/rito27959-arch/Nextfleet-camtel/releases/tag/v0.3.0) contient
+l'APK, le DEB, l'EXE et le jar de l'API. Pour publier une version suivante : changer `APP_VERSION` dans
+`.github/workflows/ci.yml`, puis pousser une étiquette `vX.Y.Z` ou lancer le workflow « ci » à la main avec « publier » coché.
 
 ## 2. Serveur (API + base + passerelle GPS)
 
