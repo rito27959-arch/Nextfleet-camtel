@@ -34,18 +34,61 @@ public class TraccarClient {
 
     private final String base;
     private final String token;
+    private final String user;
+    private final String password;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(4)).build();
     private final ObjectMapper mapper;
 
     public TraccarClient(@Value("${nextfleet.traccar.url:}") String base, @Value("${nextfleet.traccar.token:}") String token,
+                         @Value("${nextfleet.traccar.user:}") String user, @Value("${nextfleet.traccar.password:}") String password,
                          ObjectMapper mapper) {
         this.base = base == null ? "" : base.replaceAll("/+$", "");
         this.token = token == null ? "" : token;
+        this.user = user == null ? "" : user;
+        this.password = password == null ? "" : password;
         this.mapper = mapper;
     }
 
     public boolean configured() {
-        return !base.isEmpty() && !token.isEmpty();
+        return !base.isEmpty() && (!token.isEmpty() || (!user.isEmpty() && !password.isEmpty()));
+    }
+
+    /**
+     * Instance Traccar neuve (aucun utilisateur) : crée le compte de service avec les identifiants du coffre. Traccar
+     * n'accepte cette inscription que s'il n'a encore aucun utilisateur (le premier devient administrateur) ; ensuite
+     * l'appel échoue sans effet. Réessaie tant que Traccar démarre.
+     */
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    public void bootstrapServiceAccount() {
+        if (base.isEmpty() || user.isEmpty() || password.isEmpty()) return;
+        CompletableFuture.runAsync(() -> {
+            for (int attempt = 0; attempt < 30; attempt++) {
+                try {
+                    HttpResponse<String> probe = http.send(req("/api/devices").GET().build(), HttpResponse.BodyHandlers.ofString());
+                    if (probe.statusCode() / 100 == 2) {
+                        LOG.info("Traccar : compte de service opérationnel");
+                        return;
+                    }
+                    String body = mapper.createObjectNode().put("name", "NexFleet (service)").put("email", user).put("password", password).toString();
+                    HttpResponse<String> r = http.send(HttpRequest.newBuilder(URI.create(base + "/api/users")).timeout(Duration.ofSeconds(8))
+                            .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body)).build(),
+                            HttpResponse.BodyHandlers.ofString());
+                    if (r.statusCode() / 100 == 2) {
+                        LOG.info("Traccar : compte de service créé sur l'instance neuve");
+                        return;
+                    }
+                    LOG.warn("Traccar : compte de service refusé ({}) — créer le compte dans Traccar ou fournir NF_TRACCAR_TOKEN", r.statusCode());
+                    return;
+                } catch (Exception e) {
+                    try {
+                        Thread.sleep(10_000);   // Traccar encore en démarrage
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
+        });
     }
 
     /** Crée l'appareil s'il n'existe pas ; asynchrone et sans effet bloquant sur le démarrage de mission. */
@@ -94,7 +137,9 @@ public class TraccarClient {
     }
 
     private HttpRequest.Builder req(String path) {
+        String auth = !token.isEmpty() ? "Bearer " + token
+                : "Basic " + java.util.Base64.getEncoder().encodeToString((user + ":" + password).getBytes(StandardCharsets.UTF_8));
         return HttpRequest.newBuilder(URI.create(base + path)).timeout(Duration.ofSeconds(8))
-                .header("Authorization", "Bearer " + token).header("Accept", "application/json");
+                .header("Authorization", auth).header("Accept", "application/json");
     }
 }

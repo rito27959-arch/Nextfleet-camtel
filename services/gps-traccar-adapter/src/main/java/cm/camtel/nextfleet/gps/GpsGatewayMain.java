@@ -21,7 +21,7 @@ public final class GpsGatewayMain {
         String url = env("NF_DB_URL");
         String user = env("NF_DB_USER");
         String password = env("NF_DB_PASSWORD");
-        String[] bind = System.getenv().getOrDefault("NF_GPS_BIND", "127.0.0.1:8090").split(":");
+        String[] bind = splitBind(System.getenv().getOrDefault("NF_GPS_BIND", "127.0.0.1:" + System.getenv().getOrDefault("PORT", "8090")));
         String osmand = System.getenv("NF_TRACCAR_OSMAND_URL");
         var ingestion = new GpsIngestionService(() -> {
             try {
@@ -35,6 +35,13 @@ public final class GpsGatewayMain {
                 osmand == null || osmand.isBlank() ? null : new OsmAndRelay(URI.create(osmand)), Clock.systemUTC());
         server.start();
         System.out.println("Passerelle GPS NexFleet à l'écoute sur " + bind[0] + ":" + server.port());
+    }
+
+    /** « hôte:port », y compris IPv6 entre crochets (« [::]:8090 », réseau privé Railway). */
+    static String[] splitBind(String v) {
+        int i = v.lastIndexOf(':');
+        String host = v.substring(0, i).replace("[", "").replace("]", "");
+        return new String[]{host.isEmpty() ? "0.0.0.0" : host, v.substring(i + 1)};
     }
 
     private static String env(String name) {

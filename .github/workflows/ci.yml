@@ -86,6 +86,22 @@ jobs:
           path: services/nextfleet-api/target/nextfleet-api-*.jar
           if-no-files-found: ignore
 
+  images:
+    name: Images Docker (API, passerelle GPS, Traccar)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Construire les trois images
+        run: |
+          set -o pipefail
+          { docker build -q -f infra/docker/api.Dockerfile -t nexfleet-api . \
+            && docker build -q -f infra/docker/gateway.Dockerfile -t nexfleet-gps-gateway . \
+            && docker build -q -f infra/docker/traccar.Dockerfile -t nexfleet-traccar . ; } 2>&1 | tee build.log
+          echo "::notice title=Images Docker::$(docker images --format '{{.Repository}} {{.Size}}' | grep nexfleet | tr '\n' ' ')"
+      - name: Annotations d'échec
+        if: failure()
+        run: tools/ci-annotate.sh build.log Docker
+
   android:
     name: Android — APK
     runs-on: ubuntu-24.04

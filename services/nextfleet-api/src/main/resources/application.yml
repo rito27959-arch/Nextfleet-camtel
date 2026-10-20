@@ -18,7 +18,9 @@ spring:
       enabled: true
 
 server:
-  port: ${NF_PORT:8080}
+  port: ${PORT:${NF_PORT:8080}}
+  forward-headers-strategy: native
+  shutdown: graceful
   error:
     include-stacktrace: never
     include-message: never
@@ -59,3 +61,14 @@ nextfleet.gps:
 nextfleet.traccar:
   url: ${NF_TRACCAR_URL:}
   token: ${NF_TRACCAR_TOKEN:}
+  user: ${NF_TRACCAR_USER:}
+  password: ${NF_TRACCAR_PASSWORD:}
+
+# Amorçage d'une instance neuve (désactivé par défaut) et démonstration hébergée.
+nextfleet.bootstrap:
+  enabled: ${NF_BOOTSTRAP:false}
+  admin-login: ${NF_BOOTSTRAP_ADMIN_LOGIN:}
+  admin-password: ${NF_BOOTSTRAP_ADMIN_PASSWORD:}
+  demo-password: ${NF_DEMO_PASSWORD:}
+nextfleet.demo:
+  simulator: ${NF_DEMO_SIMULATOR:false}

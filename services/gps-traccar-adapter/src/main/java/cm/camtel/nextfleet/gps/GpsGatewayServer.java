@@ -59,6 +59,11 @@ public final class GpsGatewayServer {
         server = HttpServer.create(bind, 0);
         server.createContext("/gps/traccar/positions", this::traccar);
         server.createContext("/gps/android/fixes", this::android);
+        server.createContext("/health", ex -> {
+            try (ex) {
+                reply(ex, 200, json.createObjectNode().put("status", "UP"));
+            }
+        });
         server.setExecutor(Executors.newFixedThreadPool(4));
     }
 
