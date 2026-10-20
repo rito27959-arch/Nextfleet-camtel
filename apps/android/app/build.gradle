@@ -1,0 +1,80 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'cm.camtel.nextfleet.mobile'
+    compileSdk 37
+
+    defaultConfig {
+        applicationId 'cm.camtel.nextfleet.mobile'
+        minSdk 26
+        targetSdk 36
+        versionCode 3
+        versionName '0.3.0'
+    }
+
+    // Signature de publication : uniquement si le coffre de la CI fournit la clé (secrets GitHub). Sinon l'APK
+    // de publication reste non signé et seul l'APK de débogage (signé avec la clé de débogage) est installable.
+    def ks = System.getenv('NF_KEYSTORE_BASE64')
+    if (ks) {
+        def f = new File(buildDir, 'nexfleet-release.jks')
+        f.parentFile.mkdirs()
+        f.bytes = ks.decodeBase64()
+        signingConfigs {
+            release {
+                storeFile f
+                storePassword System.getenv('NF_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('NF_KEY_ALIAS')
+                keyPassword System.getenv('NF_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (ks) signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled true
+    }
+
+    sourceSets {
+        main {
+            // catalogue 3D partagé avec le bureau (modèles à licence redistribuable)
+            assets.srcDirs += ['../../../shared/assets3d']
+        }
+    }
+
+    androidResources {
+        noCompress += ['glb']
+    }
+
+    lint {
+        abortOnError true
+        warningsAsErrors false
+        checkReleaseBuilds true
+        disable += ['GradleDependency', 'NewerVersionAvailable', 'OldTargetApi', 'AndroidGradlePluginVersion']
+    }
+
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
+}
+
+dependencies {
+    implementation project(':domain')
+    implementation 'com.google.android.filament:filament-android:1.77.1'
+    implementation 'com.google.android.filament:gltfio-android:1.77.1'
+    implementation 'com.google.android.filament:filament-utils-android:1.77.1'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+}

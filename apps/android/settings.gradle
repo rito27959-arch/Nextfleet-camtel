@@ -1,0 +1,17 @@
+// NexFleet CAMTEL — application Android (Java natif). Construite par la CI GitHub (gradle assembleDebug).
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = 'nexfleet-android'
+include ':app', ':domain'

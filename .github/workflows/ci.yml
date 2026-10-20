@@ -53,7 +53,7 @@ jobs:
       - name: mvn verify
         run: |
           set -o pipefail
-          mvn -B -ntp verify -Dnf.db.url=jdbc:postgresql://localhost:5432/nextfleet_it -Dnf.db.user=nextfleet \
+          mvn -B -ntp -fae verify -Dnf.db.url=jdbc:postgresql://localhost:5432/nextfleet_it -Dnf.db.user=nextfleet \
             -Dnf.db.password=ci_only 2>&1 | tee build.log
       - name: Annotations d'échec
         if: failure()

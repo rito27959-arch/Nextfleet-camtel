@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NexFleet</string>
+    <string name="channel_mission">Mission en cours</string>
+    <string name="channel_mission_desc">Indique que la localisation est active pendant une mission autorisée.</string>
+</resources>

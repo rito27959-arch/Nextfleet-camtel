@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Jetons NexFleet × Apple HIG (shared/ui-tokens/tokens.json) -->
+<resources>
+    <color name="nf_navy">#102631</color>
+    <color name="nf_brand">#009B87</color>
+    <color name="nf_accent">#008575</color>
+    <color name="nf_bg">#F2F4F7</color>
+    <color name="nf_surface">#FFFFFF</color>
+    <color name="nf_text">#102434</color>
+    <color name="nf_muted">#616E78</color>
+</resources>

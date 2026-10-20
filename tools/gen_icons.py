@@ -47,8 +47,9 @@ if __name__ == "__main__":
         p = res / f"mipmap-{name}"
         p.mkdir(parents=True, exist_ok=True)
         icon(px).save(p / "ic_launcher.png")
-        fg = Image.new("RGBA", (px, px), (0, 0, 0, 0))
-        im = icon(int(px * 0.6), background=False)
-        fg.paste(im, ((px - im.width) // 2, (px - im.height) // 2), im)
+        fpx = px * 108 // 48                       # icône adaptative : calque de 108 dp, zone sûre de 66 dp
+        fg = Image.new("RGBA", (fpx, fpx), (0, 0, 0, 0))
+        im = icon(int(fpx * 0.56), background=False)
+        fg.paste(im, ((fpx - im.width) // 2, (fpx - im.height) // 2), im)
         fg.save(p / "ic_launcher_foreground.png")
     print("icônes générées")

@@ -1,0 +1,4 @@
+// Versions alignées sur Filament 1.77.1 (AGP 9.3.1, compileSdk 37) — voir docs/MOBILE.md.
+plugins {
+    id 'com.android.application' version '9.3.1' apply false
+}

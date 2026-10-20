@@ -1,0 +1,14 @@
+// Noyau métier partagé (même code que l'API et le bureau), compilé pour Android en Java 17.
+plugins {
+    id 'java-library'
+}
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+sourceSets {
+    main {
+        java { srcDirs = ['../../../services/nextfleet-domain/src/main/java'] }
+    }
+}
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
