@@ -64,8 +64,11 @@ public class MissionService {
     private final AuditService audit;
     private final GpsProperties gps;
     private final Clock clock;
+    private final cm.camtel.nextfleet.api.live.TraccarClient traccar;
 
-    public MissionService(NamedParameterJdbcTemplate jdbc, AccessService access, AuditService audit, GpsProperties gps, Clock clock) {
+    public MissionService(NamedParameterJdbcTemplate jdbc, AccessService access, AuditService audit, GpsProperties gps, Clock clock,
+                          cm.camtel.nextfleet.api.live.TraccarClient traccar) {
+        this.traccar = traccar;
         this.jdbc = jdbc;
         this.access = access;
         this.audit = audit;
@@ -175,6 +178,15 @@ public class MissionService {
                 VALUES (:m, :d, now(), :notice, now())""",
                 new MapSqlParameterSource("m", id).addValue("d", deviceId).addValue("notice", noticeVersion));
         audit.record(u.userId(), "MISSION_STARTED", "mission", id.toString(), noticeVersion, null, deviceId);
+        // Après validation seulement : l'appareil est déclaré dans Traccar pour que le relais OsmAnd y soit accepté.
+        String label = r.view().reference() + " · " + r.view().registration();
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        traccar.ensureDeviceAsync(deviceId, label);
+                    }
+                });
         String token = new MissionToken(Base64.getDecoder().decode(gps.missionTokenKey()))
                 .issue(id, deviceId, clock.instant(), gps.missionTokenTtl());
         return new StartResult(row(id).view(), token, gps.gatewayPublicUrl());
@@ -211,7 +223,7 @@ public class MissionService {
                 SELECT client_fix_id, recorded_at, ST_Y(position::geometry) AS lat, ST_X(position::geometry) AS lon, accuracy_m, speed_mps
                   FROM location_point WHERE mission_id = :id ORDER BY recorded_at LIMIT 20000""",
                 new MapSqlParameterSource("id", id), (rs, i) -> new TrackPoint(rs.getString(1), rs.getTimestamp(2).toInstant(),
-                        rs.getDouble(3), rs.getDouble(4), rs.getDouble(5), (Double) rs.getObject(6) == null ? null : rs.getDouble(6)));
+                        rs.getDouble(3), rs.getDouble(4), rs.getDouble(5), rs.getObject(6) == null ? null : rs.getDouble(6)));
     }
 
     private static Instant ts(Timestamp t) {

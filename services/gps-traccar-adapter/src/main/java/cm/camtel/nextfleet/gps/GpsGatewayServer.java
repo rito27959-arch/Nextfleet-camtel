@@ -100,6 +100,10 @@ public final class GpsGatewayServer {
                 reply(ex, 400, error(e.getMessage()));
                 return;
             }
+            if (p.isRelayEcho()) {   // point relayé par NexFleet puis renvoyé par Traccar : déjà stocké, jamais en double
+                reply(ex, 200, json.createObjectNode().put("outcome", Status.DUPLICATE.name()).put("reason", "ECHO_RELAIS_NEXFLEET"));
+                return;
+            }
             if (!p.valid()) {   // fix GPS déclaré invalide par l'émetteur : ni stocké ni rejoué
                 reply(ex, 200, outcome(new Outcome(Status.REJECTED, cm.camtel.nextfleet.domain.gps.MissionTrackingGate.Reason.DONNEE_INVALIDE, null)));
                 return;

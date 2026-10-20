@@ -16,9 +16,14 @@ import java.util.Locale;
  * Paramètres conformes à {@code OsmAndProtocolDecoder} (source Traccar) : {@code id}, {@code timestamp} (secondes
  * epoch), {@code lat}, {@code lon}, {@code speed} (nœuds, unité par défaut du protocole), {@code bearing},
  * {@code accuracy}. Seuls les points validés par la passerelle mission sont relayés : Traccar ne reçoit jamais un
- * point hors mission.
+ * point hors mission. Le paramètre supplémentaire {@code nfFix} (identifiant client du point) est conservé par Traccar
+ * comme attribut de position : quand Traccar renvoie ce point à la passerelle (forward JSON), il est reconnu comme un
+ * écho du relais et n'est pas stocké une seconde fois.
  */
 public final class OsmAndRelay {
+
+    /** Attribut de position Traccar marquant un point déjà stocké par NexFleet. */
+    public static final String ECHO_ATTRIBUTE = "nfFix";
 
     private final URI base;
     private final HttpClient http;
@@ -37,6 +42,7 @@ public final class OsmAndRelay {
         if (fix.speedMps() != null) add(q, "speed", fmt(fix.speedMps() / TraccarForwardParser.MPS_PER_KNOT));
         if (bearingDeg != null) add(q, "bearing", fmt(bearingDeg));
         add(q, "accuracy", fmt(fix.accuracyM()));
+        add(q, ECHO_ATTRIBUTE, fix.clientFixId());
         String path = base.getPath() == null || base.getPath().isEmpty() ? "/" : base.getPath();
         return URI.create(base.getScheme() + "://" + base.getAuthority() + path + "?" + q);
     }

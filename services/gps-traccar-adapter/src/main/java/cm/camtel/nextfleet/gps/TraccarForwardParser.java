@@ -23,8 +23,13 @@ public final class TraccarForwardParser {
     public static final double MPS_PER_KNOT = 0.514444;
 
     /** Position Traccar réduite aux champs utiles ; {@code fix} est la forme métier. */
+    /** @param relayedFixId identifiant client si le point vient du relais NexFleet (attribut {@code nfFix}), sinon {@code null} */
     public record TraccarPosition(String uniqueId, long traccarPositionId, String protocol, boolean valid, GpsFix fix,
-                                  Double courseDeg) { }
+                                  Double courseDeg, String relayedFixId) {
+        public boolean isRelayEcho() {
+            return relayedFixId != null && !relayedFixId.isBlank();
+        }
+    }
 
     public static final class InvalidPayload extends RuntimeException {
         private static final long serialVersionUID = 1L;
@@ -60,7 +65,9 @@ public final class TraccarForwardParser {
         Double course = p.path("course").isNumber() ? p.path("course").asDouble() : null;
         try {
             GpsFix fix = new GpsFix("traccar:" + id, fixTime, lat, lon, Math.max(0, accuracy), speedMps);
-            return new TraccarPosition(uniqueId.strip(), id, text(p, "protocol"), p.path("valid").asBoolean(true), fix, course);
+            JsonNode echo = p.path("attributes").path(OsmAndRelay.ECHO_ATTRIBUTE);
+            return new TraccarPosition(uniqueId.strip(), id, text(p, "protocol"), p.path("valid").asBoolean(true), fix, course,
+                    echo.isMissingNode() || echo.isNull() ? null : echo.asText());
         } catch (IllegalArgumentException e) {
             throw new InvalidPayload(e.getMessage());
         }

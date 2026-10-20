@@ -155,7 +155,12 @@ class GpsGatewayIntegrationTest {
         assertEquals(1, traccarReceived.size(), "seul le point accepté est relayé");
         String q = traccarReceived.get(0);
         assertTrue(q.startsWith("id=AND-7F3K&timestamp=" + t.getEpochSecond() + "&lat=3.5201&lon=11.4987&speed=24.298"), q);
-        assertTrue(q.endsWith("&bearing=182&accuracy=5"), q);
+        assertTrue(q.endsWith("&bearing=182&accuracy=5&nfFix=and-1"), q);
+        assertEquals(2, count("SELECT count(*) FROM location_point"));
+        // Traccar renvoie le point relayé (forward JSON avec l'attribut nfFix) : reconnu comme écho, jamais stocké deux fois
+        String echo = forward(1010, "AND-7F3K", t, 3.5201, 11.4987).replace("\"motion\":true}", "\"motion\":true,\"nfFix\":\"and-1\"}");
+        var e = post("/gps/traccar/positions", "Bearer " + SECRET, echo);
+        assertEquals("DUPLICATE", JSON.readTree(e.body()).path("outcome").asText(), e.body());
         assertEquals(2, count("SELECT count(*) FROM location_point"));
     }
 

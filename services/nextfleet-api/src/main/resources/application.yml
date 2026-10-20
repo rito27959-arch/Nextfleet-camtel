@@ -54,3 +54,8 @@ nextfleet.gps:
   mission-token-ttl: ${NF_MISSION_TOKEN_TTL:PT12H}
   gateway-public-url: ${NF_GPS_PUBLIC_URL:}
   notice-versions: ${NF_GPS_NOTICE_VERSIONS:NOTICE-GPS-v1}
+
+# Traccar (facultatif) : compte de service à droits limités. Les clients ne parlent jamais à Traccar.
+nextfleet.traccar:
+  url: ${NF_TRACCAR_URL:}
+  token: ${NF_TRACCAR_TOKEN:}

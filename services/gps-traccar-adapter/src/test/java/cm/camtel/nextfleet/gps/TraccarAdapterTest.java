@@ -51,8 +51,17 @@ class TraccarAdapterTest {
     void osmAndRelayUsesTheParametersTraccarDecodes() {
         var fix = new GpsFix("f-1", Instant.parse("2026-10-20T08:15:00Z"), 3.5172, 11.5003, 6, 11.112);
         URI u = new OsmAndRelay(URI.create("http://traccar.interne:5055")).uriFor("AND-7F3K", fix, 184.0);
-        assertEquals("http://traccar.interne:5055/?id=AND-7F3K&timestamp=1792484100&lat=3.5172&lon=11.5003&speed=21.600019&bearing=184&accuracy=6",
+        assertEquals("http://traccar.interne:5055/?id=AND-7F3K&timestamp=1792484100&lat=3.5172&lon=11.5003&speed=21.600019&bearing=184&accuracy=6&nfFix=f-1",
                 u.toString());
+    }
+
+    @Test
+    void relayEchoIsRecognisedFromTraccarAttributes() {
+        var parser = new TraccarForwardParser();
+        assertFalse(parser.parse(FORWARD).isRelayEcho());
+        var echo = parser.parse(FORWARD.replace("\"motion\":true}", "\"motion\":true,\"nfFix\":\"and-1\"}"));
+        assertTrue(echo.isRelayEcho());
+        assertEquals("and-1", echo.relayedFixId());
     }
 
     @Test
