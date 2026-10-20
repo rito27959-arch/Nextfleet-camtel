@@ -1,4 +1,4 @@
-# Installation — NexFleet CAMTEL 0.4.0
+# Installation — NexFleet CAMTEL 0.5.0
 
 Ce guide couvre les trois livrables produits par la CI GitHub Actions (gratuite pour ce dépôt public) et le serveur.
 Aucune autorisation CAMTEL n'est revendiquée : c'est une version pilote à installer sur des postes et des serveurs de test.
@@ -9,12 +9,12 @@ Chaque exécution réussie de la CI (onglet **Actions** du dépôt) publie ces a
 
 | Artefact | Contenu |
 |---|---|
-| `nexfleet-bureau-deb` | `nexfleet_0.4.0_amd64.deb` (construit sur Ubuntu 22.04 : Ubuntu 22.04 / 24.04, Debian 12+ ; JRE et JavaFX embarqués) |
-| `nexfleet-bureau-exe` | `NexFleet-0.4.0.exe` (Windows 10/11, installation par utilisateur, sans droits administrateur) |
-| `nexfleet-android-apk` | `nexfleet-0.4.0-debug.apk` et `nexfleet-0.4.0-release-unsigned.apk` (ou `-release.apk` si signé) |
+| `nexfleet-bureau-deb` | `nexfleet_0.5.0_amd64.deb` (construit sur Ubuntu 22.04 : Ubuntu 22.04 / 24.04, Debian 12+ ; JRE et JavaFX embarqués) |
+| `nexfleet-bureau-exe` | `NexFleet-0.5.0.exe` (Windows 10/11, installation par utilisateur, sans droits administrateur) |
+| `nexfleet-android-apk` | `nexfleet-0.5.0-debug.apk` et `nexfleet-0.5.0-release-unsigned.apk` (ou `-release.apk` si signé) |
 | `nexfleet-api-jar` | Jar exécutable de l'API Spring Boot |
 
-**Version publiée** : la release [v0.4.0](https://github.com/rito27959-arch/Nextfleet-camtel/releases/tag/v0.4.0) contient
+**Version publiée** : la release [v0.5.0](https://github.com/rito27959-arch/Nextfleet-camtel/releases/tag/v0.5.0) contient
 l'APK, le DEB, l'EXE et le jar de l'API. Pour publier une version suivante : changer `APP_VERSION` dans
 `.github/workflows/ci.yml`, puis pousser une étiquette `vX.Y.Z` ou lancer le workflow « ci » à la main avec « publier » coché.
 
@@ -38,10 +38,10 @@ Sans `NF_MISSION_TOKEN_KEY`, l'API refuse tout démarrage de mission (409) : auc
 
 ## 3. Poste bureau
 
-**Linux** : `sudo apt install ./nexfleet_0.4.0_amd64.deb`, puis menu Bureautique → NexFleet, ou `/opt/nexfleet/bin/NexFleet`.
+**Linux** : `sudo apt install ./nexfleet_0.5.0_amd64.deb`, puis menu Bureautique → NexFleet, ou `/opt/nexfleet/bin/NexFleet`.
 La CI installe réellement ce paquet, lance l'application installée sous Xvfb (parcours de démonstration complet), puis la désinstalle, à chaque exécution.
 
-**Windows** : double-cliquer sur `NexFleet-0.4.0.exe`, choisir le dossier, raccourci créé dans le menu Démarrer.
+**Windows** : double-cliquer sur `NexFleet-0.5.0.exe`, choisir le dossier, raccourci créé dans le menu Démarrer.
 Le paquet n'est pas signé (certificat de signature de code CAMTEL à fournir) : Windows SmartScreen demandera une confirmation.
 
 Lancement :

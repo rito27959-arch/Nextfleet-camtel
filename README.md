@@ -3,7 +3,7 @@
 Plateforme de gestion du parc automobile CAMTEL : API Java 21 / Spring Boot, PostgreSQL + PostGIS, client bureau JavaFX
 (Windows, Linux) et application Android Java avec collecte GPS de mission et vues 3D Filament. Référence : cahier des charges V4.0 et document d'architecture V5.0.
 
-> **Statut : version pilote 0.4.0 — suivi GPS en direct (Traccar, WebSocket, cartes MapLibre / tuiles), pile d'hébergement Docker éprouvée en CI, bureau DEB/EXE, Android APK.** Voir [`docs/ETAT_AVANCEMENT.md`](docs/ETAT_AVANCEMENT.md) pour ce qui est réellement prouvé.
+> **Statut : version pilote 0.5.0 — refonte « Liquid Glass teinté » façon iOS 26 (bureau et Android, voir [`docs/RECHERCHE_DESIGN_IOS26.md`](docs/RECHERCHE_DESIGN_IOS26.md)), suivi GPS en direct (Traccar, WebSocket, cartes MapLibre / tuiles), pile d'hébergement Docker éprouvée en CI, bureau DEB/EXE, Android APK.** Voir [`docs/ETAT_AVANCEMENT.md`](docs/ETAT_AVANCEMENT.md) pour ce qui est réellement prouvé.
 > Document de conception et code en cours de réalisation : ni homologation, ni avis DSIR/DS, ni mise en production.
 
 ## Arborescence

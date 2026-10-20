@@ -92,6 +92,14 @@ public final class MainActivity extends Activity {
         boolean debuggable = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
         int tab = debuggable ? getIntent().getIntExtra("captureTab", 0) : 0;
         show(Math.max(0, Math.min(pages.size() - 1, tab)));
+        if (debuggable && state == null) {
+            // Recette visuelle (APK de débogage uniquement) : écrans secondaires non exportés, ouverts depuis l'app.
+            String thread = getIntent().getStringExtra("captureThread");
+            String model = getIntent().getStringExtra("captureModel");
+            if (thread != null) startActivity(new Intent(this, ThreadActivity.class).putExtra("id", thread)
+                    .putExtra("title", thread.replace("conv-", "MIS-2026-")));
+            else if (model != null) startActivity(new Intent(this, ModelViewerActivity.class).putExtra("id", model));
+        }
     }
 
     @Override

@@ -1,4 +1,4 @@
-# État réel d'avancement — version pilote 0.4.0
+# État réel d'avancement — version pilote 0.5.0
 
 **20 octobre 2026.** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
 Aucune autorisation CAMTEL, aucun avis DSIR ou DS et aucune mise en production ne sont revendiqués.
@@ -21,8 +21,9 @@ résultats sont lisibles dans l'onglet Actions (annotations « bilan »).
 | Paquet **EXE** Windows | CI (windows-2022) | Produit par jpackage + WiX (~51 Mo). Non signé ; pas encore installé ni lancé automatiquement |
 | Application **Android** | CI | Compilation, **lint bloquant**, **4 tests unitaires** ; APK ~66 Mo (MapLibre + Filament natifs) ; onglet **Carte** MapLibre en direct ; permissions vérifiées dans l'APK (aapt2) : pas de localisation en arrière-plan |
 | **Pile d'hébergement complète** | CI (`tools/smoke-stack.sh`) | Les 3 images Docker démarrent avec PostGIS via le kit CAMTEL : carte de flotte alimentée, mission démarrée par le conducteur, lot Android accepté, relais Traccar **sans doublon**, téléphone **déclaré automatiquement dans Traccar**, position refusée après clôture |
-| Images Docker | CI → GHCR | `ghcr.io/rito27959-arch/nexfleet-{api,gps-gateway,traccar}:0.4.0` publiées à chaque version |
+| Images Docker | CI → GHCR | `ghcr.io/rito27959-arch/nexfleet-{api,gps-gateway,traccar}:0.5.0` publiées à chaque version |
 | Contrats OpenAPI | CI | `openapi.yaml` et `openapi-lot2.yaml` (0.3.0, alignés sur l'implémentation) valides |
+| **Refonte « Liquid Glass teinté » (iOS 26)** | CI + `docs/RECHERCHE_DESIGN_IOS26.md` | Bureau et Android redessinés écran par écran (verre teinté sur la navigation seulement, capsules, rayons concentriques, typographie iOS, alertes iOS 26, réglage « Réduire la transparence »). Contrastes du verre au pire cas vérifiés par `tools/check_contrast.py` ; captures bureau dans `docs/design-reference/captures-v2-ios26/` ; captures Android prises sur émulateur (Pixel 7, API 34) par la CI, branche `captures-android` |
 | Captures | `tools/screenshots.sh` | Lot 2 : 22 captures + 2 GIF, dont `23-catalogue-3d.png` (rendu 3D JavaFX réel) |
 
 Scénario lot 2 de l'API (`MissionChatAssistantIntegrationTest`), exécuté sur PostGIS réel :
@@ -70,4 +71,4 @@ avec la clé CAMTEL.
 2. Essai terrain : un téléphone Android démarre MIS-2026-015 et apparaît en direct sur le bureau et la carte mobile.
 3. Boîtier GPS véhicule raccordé à Traccar ; messagerie WebSocket sur le mobile.
 4. Écrans carburant et maintenance (tables et règles déjà prêtes en base).
-5. Signature des paquets avec les clés CAMTEL et publication par étiquette `v0.4.0`.
+5. Signature des paquets avec les clés CAMTEL et publication par étiquette `v0.5.0`.

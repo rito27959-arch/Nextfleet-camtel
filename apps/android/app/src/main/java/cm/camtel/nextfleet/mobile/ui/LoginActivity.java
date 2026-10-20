@@ -39,7 +39,9 @@ public final class LoginActivity extends Activity {
         if (auto != null && Models.demoLogins().contains(auto)) {
             NexFleetApp.get().logout();
             NexFleetApp.get().setSession(NexFleetApp.get().repository(true, "").login(auto, "demo".toCharArray()));
-            startActivity(new Intent(this, MainActivity.class).putExtra("captureTab", getIntent().getIntExtra("captureTab", 0)));
+            startActivity(new Intent(this, MainActivity.class).putExtra("captureTab", getIntent().getIntExtra("captureTab", 0))
+                    .putExtra("captureThread", getIntent().getStringExtra("captureThread"))
+                    .putExtra("captureModel", getIntent().getStringExtra("captureModel")));
             finish();
             return;
         }
