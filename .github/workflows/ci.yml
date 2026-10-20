@@ -176,6 +176,44 @@ jobs:
             apps/android/app/build/test-results/
           if-no-files-found: ignore
 
+  android-captures:
+    name: Android — recette visuelle sur émulateur
+    needs: [android]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with: { name: nexfleet-android-apk, path: apk }
+      - name: Activer KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Émulateur Android 14 (Pixel 7) et captures
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_7
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash tools/android-captures.sh "$(ls apk/*-debug.apk)" android-shots
+      - name: Publier les captures sur la branche captures-android
+        run: |
+          N=$(ls android-shots/*.png | wc -l)
+          echo "::notice title=Android — captures::$N écrans capturés sur émulateur"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan captures-android
+          git rm -rfq --cached . >/dev/null
+          git add -f android-shots/*.png
+          git commit -qm "Captures Android ${GITHUB_SHA::7}"
+          git push -qf origin captures-android
+
   bureau-paquets:
     name: Bureau — ${{ matrix.label }}
     needs: java

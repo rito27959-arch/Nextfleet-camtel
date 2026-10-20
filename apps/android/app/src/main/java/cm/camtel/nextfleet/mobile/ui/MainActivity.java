@@ -89,7 +89,9 @@ public final class MainActivity extends Activity {
                 Gravity.BOTTOM));
         Ui.applyInsets(barHost, false, true);
         setContentView(root);
-        show(0);
+        boolean debuggable = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        int tab = debuggable ? getIntent().getIntExtra("captureTab", 0) : 0;
+        show(Math.max(0, Math.min(pages.size() - 1, tab)));
     }
 
     @Override

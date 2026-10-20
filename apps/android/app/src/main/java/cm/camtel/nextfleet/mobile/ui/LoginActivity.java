@@ -34,6 +34,15 @@ public final class LoginActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        // Recette visuelle automatisée (CI, APK de débogage UNIQUEMENT) : connexion de démonstration par intention.
+        String auto = isDebuggable() ? getIntent().getStringExtra("captureDemoLogin") : null;
+        if (auto != null && Models.demoLogins().contains(auto)) {
+            NexFleetApp.get().logout();
+            NexFleetApp.get().setSession(NexFleetApp.get().repository(true, "").login(auto, "demo".toCharArray()));
+            startActivity(new Intent(this, MainActivity.class).putExtra("captureTab", getIntent().getIntExtra("captureTab", 0)));
+            finish();
+            return;
+        }
         if (NexFleetApp.get().session() != null) {
             open();
             return;
@@ -188,6 +197,10 @@ public final class LoginActivity extends Activity {
     private void showError(String m) {
         error.setText(m);
         error.setVisibility(View.VISIBLE);
+    }
+
+    private boolean isDebuggable() {
+        return (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
     }
 
     private void open() {
