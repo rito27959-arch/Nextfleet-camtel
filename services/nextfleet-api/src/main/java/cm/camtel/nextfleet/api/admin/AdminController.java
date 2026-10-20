@@ -38,6 +38,11 @@ public class AdminController {
         return service.setStatus(id, r.status(), r.reason(), r.version());
     }
 
+    @GetMapping("/audit/verify")
+    public AdminService.ChainCheck verify() {
+        return service.verifyChain();
+    }
+
     @GetMapping("/audit")
     public List<AdminService.AuditView> audit(@RequestParam(required = false) String objectType,
                                               @RequestParam(required = false) String objectId,

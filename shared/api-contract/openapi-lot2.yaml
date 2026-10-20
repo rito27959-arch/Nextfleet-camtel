@@ -1,12 +1,11 @@
 openapi: 3.0.3
 info:
   title: NexFleet CAMTEL API — lot 2 (missions et GPS, messagerie, assistant, administration, audit)
-  version: 0.2.0-lot2
+  version: 0.3.0
   description: |
     Complète openapi.yaml (lot 1). Horodatages UTC ; affichage Africa/Douala.
-    STATUT : la passerelle GPS (/gps/...) et la messagerie WebSocket sont IMPLÉMENTÉES et testées contre PostgreSQL
-    (services/gps-traccar-adapter, services/chat-realtime). Les chemins /api/v1/... de ce fichier sont un contrat de
-    conception pour l'API Spring Boot, pas encore compilée ; le client bureau les sert en mode démonstration.
+    STATUT : tous les chemins sont IMPLÉMENTÉS. /gps/... : services/gps-traccar-adapter ; /api/v1/... : API Spring Boot
+    (services/nextfleet-api), couverts par MissionChatAssistantIntegrationTest sur PostgreSQL/PostGIS réel (CI).
     Messagerie temps réel : protocole JSON décrit dans docs/LOT2_GPS_CHAT_IA_PROFILS.md (section 3).
 servers:
   - url: https://nextfleet.example.invalid
@@ -30,6 +29,37 @@ paths:
       responses:
         '200': { description: Liste, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Mission' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Missions et GPS]
+      summary: 'Création (mission:manage) ; crée aussi la conversation privée de mission'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vehicleId, driverId, purpose, plannedStart, plannedEnd]
+              properties:
+                vehicleId: { type: string, format: uuid }
+                driverId: { type: string, format: uuid }
+                purpose: { type: string, maxLength: 300 }
+                origin: { type: string, maxLength: 120 }
+                destination: { type: string, maxLength: 120 }
+                plannedStart: { type: string, format: date-time }
+                plannedEnd: { type: string, format: date-time }
+      responses:
+        '201': { description: Mission en brouillon, content: { application/json: { schema: { $ref: '#/components/schemas/Mission' } } } }
+        '400': { description: 'Dates incohérentes' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/missions/{id}/authorize:
+    post:
+      tags: [Missions et GPS]
+      summary: 'Autorisation par un gestionnaire DISTINCT du créateur'
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Mission autorisée, content: { application/json: { schema: { $ref: '#/components/schemas/Mission' } } } }
+        '400': { description: 'Auto-approbation refusée' }
+        '409': { description: 'Mission non en brouillon' }
   /api/v1/missions/{id}/track:
     get:
       tags: [Missions et GPS]
@@ -42,7 +72,7 @@ paths:
     post:
       tags: [Missions et GPS]
       summary: 'Démarrage par le conducteur affecté après information explicite ; renvoie le jeton de mission éphémère'
-      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
       requestBody:
         required: true
         content:
@@ -63,13 +93,15 @@ paths:
                 properties:
                   mission: { $ref: '#/components/schemas/Mission' }
                   missionToken: { type: string, description: 'HMAC-SHA256, lié à (mission, émetteur), expire' }
+                  gatewayUrl: { type: string, nullable: true, description: 'Adresse publique de la passerelle GPS' }
+        '400': { description: 'Notice inconnue ou identifiant d''émetteur invalide' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { description: 'Mission non autorisée, déjà démarrée ou version périmée' }
+        '409': { description: 'Mission non autorisée, déjà démarrée, ou passerelle GPS non configurée' }
   /api/v1/missions/{id}/finish:
     post:
       tags: [Missions et GPS]
       summary: 'Clôture : révoque immédiatement l''autorisation de collecte'
-      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
       responses:
         '200': { description: Mission terminée, content: { application/json: { schema: { $ref: '#/components/schemas/Mission' } } } }
         '409': { description: 'Mission non en cours' }
@@ -143,7 +175,8 @@ paths:
       summary: 'Historique ; reprise après coupure avec afterSeq'
       parameters:
         - { $ref: '#/components/parameters/Id' }
-        - { name: afterSeq, in: query, schema: { type: integer, format: int64, minimum: 0 } }
+        - { name: after, in: query, schema: { type: integer, format: int64, minimum: 0, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 200 } }
       responses:
         '200': { description: Messages, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Message' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -162,9 +195,23 @@ paths:
                 clientMessageId: { type: string, maxLength: 80 }
                 body: { type: string, minLength: 1, maxLength: 8000 }
       responses:
-        '200': { description: 'Accusé après persistance', content: { application/json: { schema: { $ref: '#/components/schemas/Ack' } } } }
+        '201': { description: 'Accusé après persistance', content: { application/json: { schema: { $ref: '#/components/schemas/Ack' } } } }
+        '200': { description: 'Réémission reconnue : même message renvoyé', content: { application/json: { schema: { $ref: '#/components/schemas/Ack' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
-  /api/v1/assistant/query:
+  /api/v1/conversations/{id}/read:
+    post:
+      tags: [Messagerie]
+      summary: 'Lu jusqu''à upTo (ou jusqu''au dernier message)'
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, properties: { upTo: { type: integer, format: int64 } } }
+      responses:
+        '204': { description: Curseur de lecture avancé }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/assistant/ask:
     post:
       tags: [Assistant]
       summary: 'Question en lecture seule (assistant:use) ; réponse chiffrée avec période, filtres et sources'
@@ -178,9 +225,9 @@ paths:
   /api/v1/assistant/activation:
     get:
       tags: [Assistant]
-      summary: 'Historique des décisions (admin:settings ou audit:read)'
+      summary: 'Décision en vigueur (désactivé tant qu''aucune décision n''existe) ; l''historique est dans le journal d''audit'
       responses:
-        '200': { description: Décisions, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AssistantDecision' } } } } }
+        '200': { description: Décision en vigueur, content: { application/json: { schema: { $ref: '#/components/schemas/AssistantDecision' } } } }
     post:
       tags: [Assistant]
       summary: 'Nouvelle décision (admin:settings) ; activer exige une validation de sécurité et un signataire distinct'
@@ -190,27 +237,70 @@ paths:
           application/json:
             schema:
               type: object
-              required: [enabled, reason]
+              required: [enable, reason]
               properties:
-                enabled: { type: boolean }
+                enable: { type: boolean }
                 securityReviewRef: { type: string, example: DS-2026-041 }
                 approvedBy: { type: string }
                 reason: { type: string, minLength: 5 }
       responses:
-        '201': { description: Décision enregistrée (ajout seul), content: { application/json: { schema: { $ref: '#/components/schemas/AssistantDecision' } } } }
+        '200': { description: Décision enregistrée (ajout seul), content: { application/json: { schema: { $ref: '#/components/schemas/AssistantDecision' } } } }
+        '400': { description: 'Référence ou signataire manquant, signataire identique à l''administrateur' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '422': { description: 'Référence ou signataire manquant, signataire identique à l''administrateur' }
   /api/v1/admin/users:
     get:
       tags: [Administration]
-      summary: 'Comptes, rôles et périmètres (admin:users)'
+      summary: 'Comptes et rôles du périmètre (admin:users) ; jamais de mot de passe'
+      parameters: [{ name: q, in: query, schema: { type: string } }]
       responses:
         '200': { description: Comptes, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/UserAccount' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
-  /api/v1/audit:
+  /api/v1/admin/users/{id}/status:
+    post:
+      tags: [Administration]
+      summary: 'ACTIVE ↔ SUSPENDED avec motif et version ; jamais sur son propre compte ; suspension = sessions révoquées'
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status, reason, version]
+              properties:
+                status: { type: string, enum: [ACTIVE, SUSPENDED] }
+                reason: { type: string, minLength: 5 }
+                version: { type: integer, format: int64 }
+      responses:
+        '200': { description: Compte mis à jour, content: { application/json: { schema: { $ref: '#/components/schemas/UserAccount' } } } }
+        '409': { description: 'Version obsolète' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/admin/audit/verify:
+    get:
+      tags: [Audit]
+      summary: 'Recalcul serveur de TOUTE la chaîne (chaînage et contenu, fonction nf_audit_verify)'
+      responses:
+        '200':
+          description: Résultat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events: { type: integer, format: int64 }
+                  firstBrokenId: { type: integer, format: int64, nullable: true }
+                  intact: { type: boolean }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/admin/audit:
     get:
       tags: [Audit]
       summary: 'Journal chaîné (audit:read) ; jamais le contenu des messages'
+      parameters:
+        - { name: objectType, in: query, schema: { type: string } }
+        - { name: objectId, in: query, schema: { type: string } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 200 } }
       responses:
         '200': { description: Événements, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AuditEvent' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -234,6 +324,8 @@ components:
         origin: { type: string }
         destination: { type: string }
         registration: { type: string }
+        vehicleLabel: { type: string }
+        category: { type: string, nullable: true }
         driverName: { type: string }
         status: { type: string, enum: [DRAFT, AUTHORIZED, ACTIVE, FINISHED, CANCELLED] }
         plannedStart: { type: string, format: date-time }
@@ -299,13 +391,16 @@ components:
         id: { type: string }
         kind: { type: string, enum: [DIRECT, MISSION, VEHICLE, SERVICE] }
         title: { type: string }
-        lastAt: { type: string, format: date-time }
+        subtitle: { type: string, nullable: true }
+        lastBody: { type: string, nullable: true }
+        lastAt: { type: string, format: date-time, nullable: true }
         unread: { type: integer }
     Message:
       type: object
       properties:
         serverSeq: { type: integer, format: int64 }
-        senderId: { type: string }
+        senderName: { type: string }
+        mine: { type: boolean }
         clientMessageId: { type: string }
         body: { type: string }
         createdAt: { type: string, format: date-time }
@@ -313,9 +408,9 @@ components:
     Ack:
       type: object
       properties:
-        clientMessageId: { type: string }
         serverSeq: { type: integer, format: int64 }
         duplicate: { type: boolean }
+        createdAt: { type: string, format: date-time }
     AssistantAnswer:
       type: object
       properties:
@@ -338,26 +433,26 @@ components:
     UserAccount:
       type: object
       properties:
+        id: { type: string, format: uuid }
         login: { type: string }
         displayName: { type: string }
+        email: { type: string, nullable: true }
+        orgUnit: { type: string }
         status: { type: string, enum: [ACTIVE, SUSPENDED, DISABLED] }
-        grants:
-          type: array
-          items:
-            type: object
-            properties:
-              role: { type: string, enum: [FLEET_MANAGER, DRIVER, MAINTENANCE, CONTROLLER, ADMIN, AUDITOR] }
-              scope: { type: string }
-              until: { type: string, format: date, nullable: true }
-              delegation: { type: boolean }
+        roles: { type: array, items: { type: string, enum: [FLEET_MANAGER, DRIVER, MAINTENANCE, CONTROLLER, ADMIN, AUDITOR] } }
+        lockedUntil: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        version: { type: integer, format: int64 }
     AuditEvent:
       type: object
       properties:
-        seq: { type: integer, format: int64 }
-        at: { type: string, format: date-time }
+        id: { type: integer, format: int64 }
+        occurredAt: { type: string, format: date-time }
         actor: { type: string }
         action: { type: string }
-        object: { type: string }
-        detail: { type: string }
-        hash: { type: string, description: 'SHA-256(précédent | contenu)' }
-        previousHash: { type: string }
+        objectType: { type: string }
+        objectId: { type: string }
+        reason: { type: string, nullable: true }
+        requestId: { type: string, nullable: true }
+        hash: { type: string, description: 'SHA-256 hexadécimal (formule canonique V7)' }
+        previousHash: { type: string, nullable: true }

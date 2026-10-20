@@ -1,6 +1,5 @@
 package cm.camtel.nextfleet.desktop.ui;
 
-import cm.camtel.nextfleet.desktop.data.AuditChain;
 import cm.camtel.nextfleet.desktop.data.Ops.AuditEntry;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -68,7 +67,7 @@ final class AuditView extends ScrollPane {
         col.getChildren().addAll(title, Ui.skeleton(-1, 44), seg, rows);
         Ui.async(() -> shell.gateway().auditTrail(), list -> {
             entries = list;
-            long broken = AuditChain.firstBroken(list);
+            long broken = shell.gateway().auditFirstBroken(list);
             Label l = Ui.label(broken < 0 ? "Chaîne intègre · " + list.size() + " événements vérifiés (SHA-256)"
                     : "Chaîne rompue à l'événement n° " + broken, broken < 0 ? "" : "error-text");
             HBox banner = new HBox(10, Icons.stroke(broken < 0 ? Icons.CHAIN : Icons.CLOSE, 18, broken < 0 ? "-nf-green-text" : "-nf-red-text"), l);

@@ -322,6 +322,12 @@ VALUES ('00000000-0000-0000-0000-000000000001','UPDATE','vehicle','b1','Correcti
 INSERT INTO audit_event(actor_id, action, object_type, object_id) VALUES ('00000000-0000-0000-0000-000000000002','EXPORT','audit','*');
 SELECT pg_temp.expect_true('SEC-08 chaînage des empreintes',
  (SELECT b.prev_hash = a.row_hash FROM audit_event a, audit_event b WHERE b.id = a.id + 1 ORDER BY a.id LIMIT 1));
+SET TimeZone = 'Africa/Douala';
+INSERT INTO audit_event(actor_id, action, object_type, object_id, reason) VALUES ('00000000-0000-0000-0000-000000000001','VIEW','mission','m1','test fuseau');
+SET TimeZone = 'America/New_York';
+SELECT pg_temp.expect_true('SEC-08 chaîne vérifiée depuis un autre fuseau (empreinte canonique V7)',
+ (SELECT first_broken_id IS NULL AND events >= 3 FROM nf_audit_verify()));
+RESET TimeZone;
 SELECT pg_temp.expect_error('SEC-08 modification du journal interdite',
  $$UPDATE audit_event SET reason = 'falsifié'$$, 'ajout seul');
 

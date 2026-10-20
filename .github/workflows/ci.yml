@@ -17,7 +17,7 @@ env:
 
 jobs:
   base-de-donnees:
-    name: Base PostgreSQL + PostGIS (62 tests)
+    name: Base PostgreSQL + PostGIS (63 tests)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -27,7 +27,7 @@ jobs:
           sudo apt-get install -y -q postgresql-16-postgis-3
           sudo systemctl start postgresql
           sudo -u postgres psql -c "CREATE ROLE nextfleet LOGIN PASSWORD 'nextfleet_dev_only' CREATEDB;"
-      - name: Migrations V1–V5 et campagne de tests
+      - name: Migrations V1–V7 et campagne de tests
         run: infra/db/tests/run_db_tests.sh
 
   java:
@@ -58,6 +58,11 @@ jobs:
       - name: Annotations d'échec
         if: failure()
         run: tools/ci-annotate.sh build.log Maven
+      - name: Bilan des tests (annotation)
+        if: always()
+        run: |
+          B=$(grep -E "^\[(INFO|ERROR|WARNING)\] (Tests run:|Building NexFleet)" build.log | grep -v " -- in " | sed 's/^\[[A-Z]*\] //' | awk 'BEGIN{ORS="%0A"} {print}')
+          echo "::notice title=Maven — bilan::${B}"
       - name: Contrastes et contrats
         run: |
           python3 tools/check_contrast.py
@@ -106,6 +111,9 @@ jobs:
           cp apps/android/app/build/outputs/apk/debug/app-debug.apk dist/nexfleet-${APP_VERSION}-debug.apk
           for f in apps/android/app/build/outputs/apk/release/*.apk; do cp "$f" "dist/nexfleet-${APP_VERSION}-$(basename "$f" .apk | sed 's/^app-//').apk"; done
           ls -la dist
+          T=$(find apps/android/app/build/test-results -name 'TEST-*.xml' -exec grep -ho 'tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' {} + | head -5 | tr '\n' ' ')
+          P=$("$ANDROID_HOME"/build-tools/*/aapt dump permissions dist/nexfleet-${APP_VERSION}-debug.apk 2>/dev/null | grep -o "name='[^']*'" | tr '\n' ' ' | head -c 1500)
+          echo "::notice title=Android — bilan::APK : $(cd dist && ls -s --block-size=K *.apk | tr '\n' ' ')%0ATests unitaires : ${T}%0APermissions : ${P}"
       - uses: actions/upload-artifact@v4
         with: { name: nexfleet-android-apk, path: dist/*.apk }
       - uses: actions/upload-artifact@v4
@@ -167,6 +175,14 @@ jobs:
             --icon apps/desktop-javafx/packaging/${{ matrix.icon }} \
             --dest dist "${EXTRA[@]}"
           ls -la dist
+          echo "::notice title=Bureau ${{ matrix.type }} — paquet::$(cd dist && ls -s --block-size=K | tr '\n' ' ')"
+      - name: Essai d'installation du DEB
+        if: matrix.type == 'deb'
+        run: |
+          sudo apt-get install -y ./dist/*.deb
+          test -x /opt/nexfleet/bin/NexFleet
+          dpkg -s nexfleet | grep -E '^(Package|Version|Installed-Size)'
+          echo "::notice title=DEB installé::$(dpkg -s nexfleet | grep -E '^(Version|Installed-Size)' | tr '\n' ' ') ; lanceur /opt/nexfleet/bin/NexFleet présent"
       - name: Annotations d'échec
         if: failure()
         run: tools/ci-annotate.sh build.log "Bureau ${{ matrix.type }}"

@@ -27,7 +27,10 @@ public class AdminService {
                            List<String> roles, Instant lockedUntil, Instant createdAt, long version) { }
 
     public record AuditView(long id, Instant occurredAt, String actor, String action, String objectType, String objectId,
-                            String reason, String requestId) { }
+                            String reason, String requestId, String hash, String previousHash) { }
+
+    /** Résultat de la vérification serveur de la chaîne (fonction nf_audit_verify : chaînage et contenu). */
+    public record ChainCheck(long events, Long firstBrokenId, boolean intact) { }
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AccessService access;
@@ -98,11 +101,22 @@ public class AdminService {
         if (from != null) { where.add("e.occurred_at >= :from"); p.addValue("from", Timestamp.from(from)); }
         if (to != null) { where.add("e.occurred_at < :to"); p.addValue("to", Timestamp.from(to)); }
         String sql = """
-                SELECT e.id, e.occurred_at, coalesce(u.display_name, 'Système'), e.action, e.object_type, e.object_id, e.reason, e.request_id
+                SELECT e.id, e.occurred_at, coalesce(u.display_name, 'Système'), e.action, e.object_type, e.object_id, e.reason, e.request_id,
+                       encode(e.row_hash, 'hex'), encode(e.prev_hash, 'hex')
                   FROM audit_event e LEFT JOIN app_user u ON u.id = e.actor_id
                 """ + (where.isEmpty() ? "" : " WHERE " + String.join(" AND ", where)) + " ORDER BY e.id DESC LIMIT :lim";
         return jdbc.query(sql, p, (rs, i) -> new AuditView(rs.getLong(1), rs.getTimestamp(2).toInstant(), rs.getString(3), rs.getString(4),
-                rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8)));
+                rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8), rs.getString(9), rs.getString(10)));
+    }
+
+    /** Recalcule toute la chaîne côté base (formule de nf_audit_chain) : chaînage ET contenu de chaque ligne. */
+    @Transactional(readOnly = true, noRollbackFor = AccessDeniedException.class)
+    public ChainCheck verifyChain() {
+        scope("audit:read");
+        return jdbc.queryForObject("SELECT events, first_broken_id FROM nf_audit_verify()", new MapSqlParameterSource(), (rs, i) -> {
+            Long broken = (Long) rs.getObject(2);
+            return new ChainCheck(rs.getLong(1), broken, broken == null);
+        });
     }
 
     private static Instant ts(Timestamp t) {

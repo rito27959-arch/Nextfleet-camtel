@@ -217,6 +217,59 @@ class DesktopLogicTest {
                 assertThrows(GatewayException.class, () -> down.login("g", "x".toCharArray())).kind());
     }
 
+    @Test
+    @DisplayName("Client HTTP lot 2 : missions, messagerie idempotente, assistant, journal vérifié par le serveur")
+    void httpGatewayLot2() throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> posted = new AtomicReference<>();
+        server.createContext("/api/v1/auth/login", ex -> reply(ex, 200,
+                "{\"token\":\"tok-123456789012345678901\",\"user\":{\"login\":\"g\",\"displayName\":\"G\",\"roles\":[{\"role\":\"FLEET_MANAGER\"}]}}"));
+        server.createContext("/api/v1/missions", ex -> reply(ex, 200, "[{\"id\":\"00000000-0000-0000-0000-0000000000e1\",\"reference\":\"MIS-2026-001\","
+                + "\"status\":\"ACTIVE\",\"plannedStart\":\"2026-10-20T07:00:00Z\",\"startedAt\":\"2026-10-20T07:05:00Z\",\"deviceId\":\"AND-1\","
+                + "\"conversationId\":\"00000000-0000-0000-0000-0000000000f1\",\"version\":2}]"));
+        server.createContext("/api/v1/conversations", ex -> {
+            String path = ex.getRequestURI().getPath();
+            if (path.endsWith("/messages") && "POST".equals(ex.getRequestMethod())) {
+                posted.set(new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+                reply(ex, 201, "{\"serverSeq\":7,\"duplicate\":false,\"createdAt\":\"2026-10-20T08:00:00Z\"}");
+            } else if (path.endsWith("/messages")) {
+                reply(ex, 200, "[{\"serverSeq\":6,\"senderName\":\"Vous\",\"body\":\"ok\",\"createdAt\":\"2026-10-20T07:59:00Z\",\"mine\":true,\"state\":\"LU\",\"clientMessageId\":\"c6\"}]");
+            } else {
+                reply(ex, 200, "[{\"id\":\"00000000-0000-0000-0000-0000000000f1\",\"kind\":\"MISSION\",\"title\":\"MIS-2026-001\",\"unread\":2}]");
+            }
+        });
+        server.createContext("/api/v1/assistant/ask", ex -> reply(ex, 200, "{\"intent\":\"COUT\",\"refused\":false,\"text\":\"Coût : 42 000 XAF.\","
+                + "\"figures\":[{\"label\":\"Total\",\"value\":\"42 000 XAF\"}],\"period\":\"octobre 2026\",\"filters\":[],"
+                + "\"sources\":[{\"ref\":\"fuel_fill:1\",\"description\":\"Plein\"}]}"));
+        server.createContext("/api/v1/admin/audit", ex -> {
+            if (ex.getRequestURI().getPath().endsWith("/verify")) reply(ex, 200, "{\"events\":2,\"firstBrokenId\":null,\"intact\":true}");
+            else reply(ex, 200, "[{\"id\":2,\"occurredAt\":\"2026-10-20T08:00:00Z\",\"actor\":\"G\",\"action\":\"MISSION_STARTED\","
+                    + "\"objectType\":\"mission\",\"objectId\":\"e1\",\"hash\":\"ab\",\"previousHash\":\"cd\"}]");
+        });
+        server.start();
+        try {
+            HttpFleetGateway g = new HttpFleetGateway(URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/"));
+            g.login("g", "x".toCharArray());
+            var m = g.missions().get(0);
+            assertEquals(cm.camtel.nextfleet.desktop.data.Ops.MissionStatus.ACTIVE, m.status());
+            assertEquals("AND-1", m.deviceId());
+            assertEquals(GatewayException.Kind.VALIDATION, assertThrows(GatewayException.class,
+                    () -> g.startMission(m.id(), "NOTICE-GPS-v1")).kind(), "le bureau n'est pas un émetteur GPS");
+            assertEquals(2, g.conversations().get(0).unread());
+            assertEquals(cm.camtel.nextfleet.domain.chat.Chat.DeliveryState.LU, g.messages(m.conversationId()).get(0).state());
+            assertEquals(7, g.sendMessage(m.conversationId(), "cid-1", "Bien reçu").seq());
+            assertTrue(posted.get().contains("\"clientMessageId\":\"cid-1\""));
+            var a = g.askAssistant("Combien a coûté CE 4401 LT ?");
+            assertEquals("42 000 XAF", a.figures().get(0).value());
+            assertEquals("fuel_fill:1", a.sources().get(0).ref());
+            var trail = g.auditTrail();
+            assertEquals(1, trail.size());
+            assertEquals(-1, g.auditFirstBroken(trail), "intégrité décidée par le serveur sur tout le journal");
+        } finally {
+            server.stop(0);
+        }
+    }
+
     private static void reply(com.sun.net.httpserver.HttpExchange ex, int status, String body) throws IOException {
         byte[] b = body.getBytes(StandardCharsets.UTF_8);
         ex.getResponseHeaders().add("Content-Type", "application/json");

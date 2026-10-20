@@ -208,5 +208,6 @@ class MissionChatAssistantIntegrationTest {
         assertNotNull(events);
         assertTrue(events.toString().contains("MISSION_STARTED") && events.toString().contains("MISSION_FINISHED"), events.toString());
         call(get("/api/v1/admin/audit"), drv, null).andExpect(status().isForbidden());
+        call(get("/api/v1/admin/audit/verify"), auditor, null).andExpect(status().isOk()).andExpect(jsonPath("$.intact").value(true));
     }
 }

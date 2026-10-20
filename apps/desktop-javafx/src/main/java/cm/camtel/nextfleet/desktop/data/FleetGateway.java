@@ -63,8 +63,8 @@ public interface FleetGateway {
     java.util.List<Models.DueItem> vehicleDueDates(UUID vehicleId);
 
     // ------------------------------------------------------------------ lot 2 : missions et GPS
-    // Côté serveur, ces services passent par l'API (non compilée à ce jour) : en mode serveur, le client le dit
-    // explicitement au lieu de simuler.
+    // Mode serveur : HttpFleetGateway appelle l'API du lot 2 ; les valeurs par défaut ci-dessous ne servent qu'aux
+    // passerelles qui n'implémentent pas encore une fonction (le client le dit au lieu de simuler).
 
     default java.util.List<Ops.Mission> missions() {
         throw notYet("Les missions");
@@ -132,8 +132,13 @@ public interface FleetGateway {
         throw notYet("Le journal d'audit");
     }
 
+    /** Premier événement dont l'empreinte ne correspond pas (-1 si la chaîne est intègre). */
+    default long auditFirstBroken(java.util.List<Ops.AuditEntry> shown) {
+        return AuditChain.firstBroken(shown);
+    }
+
     static GatewayException notYet(String what) {
-        return new GatewayException(GatewayException.Kind.SERVER, what + " passe par l'API du lot 2, qui n'est pas encore "
-                + "compilée. Cette fonction est disponible en mode démonstration.");
+        return new GatewayException(GatewayException.Kind.SERVER, what + " n'est pas disponible avec ce serveur. "
+                + "Cette fonction reste consultable en mode démonstration.");
     }
 }
