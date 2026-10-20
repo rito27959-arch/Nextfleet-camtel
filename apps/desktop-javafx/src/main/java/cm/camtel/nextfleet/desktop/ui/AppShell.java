@@ -41,7 +41,7 @@ public final class AppShell extends StackPane {
 
     public enum Section {
         MY_MISSIONS("Mes missions", Icons.ROUTE), WORKSHOP("Atelier", Icons.WRENCH), USERS("Comptes et rôles", Icons.USERS),
-        OVERVIEW("Vue d'ensemble", Icons.HOME), MISSIONS("Missions", Icons.ROUTE), MESSAGES("Messages", Icons.BUBBLE),
+        OVERVIEW("Vue d'ensemble", Icons.HOME), TRACKING("Suivi GPS", Icons.LOCATION), MISSIONS("Missions", Icons.ROUTE), MESSAGES("Messages", Icons.BUBBLE),
         ASSISTANT("Assistant", Icons.SPARK), VEHICLES("Véhicules", Icons.CAR), DUE("Échéances", Icons.CALENDAR),
         DRIVERS("Conducteurs", Icons.USER), CATALOGUE("Catalogue 3D", Icons.CUBE), AUDIT("Journal d'audit", Icons.LIST), MAINTENANCE("Entretiens", Icons.WRENCH),
         FUEL("Carburant", Icons.FUEL), COSTS("Coûts", Icons.CHART), REPORTS("Rapports", Icons.REPORT),
@@ -124,6 +124,7 @@ public final class AppShell extends StackPane {
             case USERS -> session.can(ADMIN_USERS);
             case OVERVIEW -> session.can(VEHICLE_READ) && session.can(COST_READ);
             case MISSIONS -> session.can(MISSION_MANAGE) || session.can(GPS_READ);
+            case TRACKING -> session.can(MISSION_MANAGE) || session.can(GPS_READ);
             case MESSAGES -> session.can(CHAT_USE);
             case ASSISTANT -> session.can(ASSISTANT_USE);
             case VEHICLES, DUE -> session.can(VEHICLE_READ);
@@ -419,6 +420,7 @@ public final class AppShell extends StackPane {
             case WORKSHOP -> new WorkshopView(this);
             case USERS -> new UsersView(this);
             case MISSIONS -> new MissionsView(this);
+            case TRACKING -> new FleetTrackingView(this);
             case MESSAGES -> new MessagesView(this, null);
             case ASSISTANT -> new AssistantView(this);
             case AUDIT -> new AuditView(this);

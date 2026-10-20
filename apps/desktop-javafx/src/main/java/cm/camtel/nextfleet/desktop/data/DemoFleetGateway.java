@@ -475,6 +475,11 @@ public final class DemoFleetGateway implements FleetGateway {
     }
 
     @Override
+    public List<Ops.VehicleLive> fleetLive() {
+        return ops().fleetLive(requireSession());
+    }
+
+    @Override
     public List<cm.camtel.nextfleet.domain.gps.GpsFix> missionTrack(UUID missionId) {
         pause();
         return ops().track(requireSession(), missionId);

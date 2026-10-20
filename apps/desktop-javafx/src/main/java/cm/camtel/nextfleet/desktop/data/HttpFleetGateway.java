@@ -180,6 +180,110 @@ public final class HttpFleetGateway implements FleetGateway {
                 n.path("noticeVersion").asText(null), n.path("conversationId").asText(null), n.path("version").asLong());
     }
 
+    // ------------------------------------------------------------------ suivi GPS en direct
+
+    @Override
+    public List<Ops.VehicleLive> fleetLive() {
+        List<Ops.VehicleLive> out = new ArrayList<>();
+        send("GET", "/api/v1/fleet/live", null, true).forEach(n -> out.add(toVehicleLive(n)));
+        return out;
+    }
+
+    static Ops.VehicleLive toVehicleLive(JsonNode n) {
+        Ops.LiveState st;
+        try {
+            st = Ops.LiveState.valueOf(n.path("state").asText());
+        } catch (IllegalArgumentException e) {
+            st = Ops.LiveState.SIGNAL_ANCIEN;
+        }
+        return new Ops.VehicleLive(n.path("vehicleId").asText(), n.path("registration").asText(), n.path("vehicleLabel").asText(""),
+                n.path("category").asText(""), n.path("missionId").asText(), n.path("missionRef").asText(""), n.path("missionStatus").asText(""),
+                n.path("driverName").asText(""), n.path("origin").asText(""), n.path("destination").asText(""), n.path("lat").asDouble(),
+                n.path("lon").asDouble(), n.path("accuracyM").asDouble(), n.hasNonNull("speedKmh") ? n.get("speedKmh").asDouble() : null,
+                n.hasNonNull("bearingDeg") ? n.get("bearingDeg").asDouble() : null, instant(n, "recordedAt"), n.path("ageSeconds").asLong(),
+                st, n.path("stateLabel").asText(st.label), instant(n, "startedAt"),
+                n.hasNonNull("distanceKm") ? n.get("distanceKm").asDouble() : null, n.path("openAnomalies").asInt());
+    }
+
+    /** Canal WebSocket du serveur (jeton en en-tête), reconnexion automatique avec attente progressive. */
+    @Override
+    public AutoCloseable subscribeLive(java.util.function.Consumer<Ops.LiveEvent> onEvent, java.util.function.Consumer<Boolean> onConnection) {
+        String scheme = "https".equals(base.getScheme()) ? "wss" : "ws";
+        URI ws = URI.create(scheme + "://" + base.getRawAuthority() + "/api/v1/live");
+        java.util.concurrent.atomic.AtomicBoolean open = new java.util.concurrent.atomic.AtomicBoolean(true);
+        java.util.concurrent.atomic.AtomicReference<java.net.http.WebSocket> current = new java.util.concurrent.atomic.AtomicReference<>();
+        Thread t = Thread.ofPlatform().daemon().name("nf-live-ws").start(() -> {
+            long backoff = 1000;
+            while (open.get()) {
+                String tok = token;
+                if (tok == null) return;
+                java.util.concurrent.CountDownLatch closed = new java.util.concurrent.CountDownLatch(1);
+                try {
+                    java.net.http.WebSocket socket = http.newWebSocketBuilder().header("Authorization", "Bearer " + tok)
+                            .connectTimeout(Duration.ofSeconds(8)).buildAsync(ws, new java.net.http.WebSocket.Listener() {
+                                final StringBuilder buf = new StringBuilder();
+
+                                @Override
+                                public java.util.concurrent.CompletionStage<?> onText(java.net.http.WebSocket w, CharSequence data, boolean last) {
+                                    buf.append(data);
+                                    if (last) {
+                                        try {
+                                            JsonNode e = json.readTree(buf.toString());
+                                            if ("position".equals(e.path("type").asText())) {
+                                                onEvent.accept(new Ops.LiveEvent(e.path("vehicleId").asText(), e.path("registration").asText(),
+                                                        e.path("missionRef").asText(""), e.path("lat").asDouble(), e.path("lon").asDouble(),
+                                                        e.hasNonNull("speedKmh") ? e.get("speedKmh").asDouble() : null, instant(e, "recordedAt")));
+                                            }
+                                        } catch (IOException | RuntimeException ignored) {
+                                            // message illisible : ignoré
+                                        }
+                                        buf.setLength(0);
+                                    }
+                                    w.request(1);
+                                    return null;
+                                }
+
+                                @Override
+                                public java.util.concurrent.CompletionStage<?> onClose(java.net.http.WebSocket w, int code, String reason) {
+                                    closed.countDown();
+                                    return null;
+                                }
+
+                                @Override
+                                public void onError(java.net.http.WebSocket w, Throwable error) {
+                                    closed.countDown();
+                                }
+                            }).get(10, java.util.concurrent.TimeUnit.SECONDS);
+                    current.set(socket);
+                    onConnection.accept(true);
+                    backoff = 1000;
+                    while (open.get() && !closed.await(25, java.util.concurrent.TimeUnit.SECONDS)) {
+                        socket.sendText("ping", true);   // maintient la connexion à travers les proxys
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                } catch (Exception e) {
+                    // serveur injoignable : on réessaie
+                }
+                onConnection.accept(false);
+                if (!open.get()) return;
+                try {
+                    Thread.sleep(backoff);
+                } catch (InterruptedException e) {
+                    return;
+                }
+                backoff = Math.min(backoff * 2, 30_000);
+            }
+        });
+        return () -> {
+            open.set(false);
+            java.net.http.WebSocket w = current.get();
+            if (w != null) w.abort();
+            t.interrupt();
+        };
+    }
+
     // ------------------------------------------------------------------ lot 2 : messagerie
 
     @Override

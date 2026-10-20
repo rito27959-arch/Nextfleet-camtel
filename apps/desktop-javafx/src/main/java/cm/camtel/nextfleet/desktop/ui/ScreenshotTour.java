@@ -52,6 +52,10 @@ public final class ScreenshotTour {
         add(app::toggleTheme);
         add(() -> shot("21c-missions-sombre"));
         add(app::toggleTheme);
+        add(() -> shell().show(AppShell.Section.TRACKING));
+        add(() -> { });
+        add(() -> { });
+        add(() -> shot("21d-suivi-gps-flotte"));
         add(() -> shell().show(AppShell.Section.CATALOGUE));
         add(() -> { });
         add(() -> shot("23-catalogue-3d"));

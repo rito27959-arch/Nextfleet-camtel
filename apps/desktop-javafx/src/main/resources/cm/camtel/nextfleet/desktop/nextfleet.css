@@ -597,3 +597,51 @@
 .root.dark .catalogue-item:selected { -fx-effect: null; -fx-background-color: -nf-fill-strong; }
 .viewer-stage { -fx-background-color: linear-gradient(to bottom, #F6F8FA, #E9EDF1); -fx-background-radius: 18; }
 .root.dark .viewer-stage { -fx-background-color: linear-gradient(to bottom, #1F2A31, #141B20); }
+
+/* ---------------------------------------------------------------- suivi GPS (carte à tuiles) */
+.tile-map {
+    -fx-background-color: #EEF1EA;
+    -fx-background-image: none;
+    -fx-background-radius: 14;
+    -fx-border-color: -nf-border; -fx-border-radius: 14;
+}
+.root.dark .tile-map { -fx-background-color: #1B2328; }
+.map-track { -fx-stroke: -nf-blue; -fx-stroke-width: 4; -fx-stroke-line-cap: round; -fx-stroke-line-join: round; -fx-opacity: 0.85; }
+.map-attribution { -fx-background-color: rgba(255,255,255,0.82); -fx-background-radius: 6 0 0 0; -fx-padding: 2 6; -fx-font-size: 10px; -fx-text-fill: #3C474F; }
+.map-zoom { -fx-background-color: -nf-overlay-surface; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(16,36,52,0.18), 10, 0, 0, 2); }
+.map-zoom-button { -fx-background-color: transparent; -fx-font-size: 18px; -fx-font-weight: 600; -fx-text-fill: -nf-text; -fx-min-width: 36; -fx-min-height: 36; -fx-cursor: hand; }
+.map-zoom-button:hover { -fx-background-color: -nf-fill; -fx-background-radius: 10; }
+
+.live-moving  { -fx-fill: -nf-green; }
+.live-stopped { -fx-fill: -nf-blue; }
+.live-stale   { -fx-fill: -nf-gray; }
+.live-check   { -fx-fill: -nf-orange; }
+.live-marker { -fx-stroke: white; -fx-stroke-width: 2.5; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.28), 6, 0, 0, 1); }
+.live-halo { -fx-opacity: 0.22; }
+.live-arrow { -fx-stroke: white; -fx-stroke-width: 1; }
+.live-tag { -fx-background-color: -nf-navy; -fx-text-fill: white; -fx-background-radius: 6; -fx-padding: 1 6; -fx-font-size: 11px; -fx-font-weight: 700; }
+.live-selected .live-tag { -fx-background-color: -nf-accent; }
+.live-selected .live-halo { -fx-opacity: 0.4; }
+.live-moving-text  { -fx-text-fill: -nf-green-text; }
+.live-stopped-text { -fx-text-fill: -nf-blue-text; }
+.live-stale-text   { -fx-text-fill: -nf-muted; }
+.live-check-text   { -fx-text-fill: -nf-orange-text; }
+.live-moving-pill  { -fx-background-color: -nf-green-tint; -fx-text-fill: -nf-green-text; }
+.live-stopped-pill { -fx-background-color: -nf-blue-tint; -fx-text-fill: -nf-blue-text; }
+.live-stale-pill   { -fx-background-color: -nf-fill; -fx-text-fill: -nf-muted; }
+.live-check-pill   { -fx-background-color: -nf-orange-tint; -fx-text-fill: -nf-orange-text; }
+
+.live-chip { -fx-background-radius: 999; -fx-padding: 3 10; -fx-font-size: 12px; -fx-font-weight: 600; -fx-background-color: -nf-fill; -fx-text-fill: -nf-muted; }
+.live-chip-on { -fx-background-color: -nf-green-tint; -fx-text-fill: -nf-green-text; }
+.live-chip-demo { -fx-background-color: -nf-orange-tint; -fx-text-fill: -nf-orange-text; }
+.live-chip-off { -fx-background-color: -nf-red-tint; -fx-text-fill: -nf-red-text; }
+
+.tracking-row { -fx-background-radius: 12; -fx-padding: 10 12; -fx-cursor: hand; }
+.tracking-row:hover { -fx-background-color: -nf-fill; }
+.tracking-row-selected, .tracking-row-selected:hover { -fx-background-color: -nf-surface; -fx-effect: dropshadow(gaussian, rgba(16,36,52,0.10), 14, 0, 0, 4); }
+.root.dark .tracking-row-selected { -fx-background-color: -nf-fill-strong; -fx-effect: null; }
+.tracking-panel { -fx-padding: 4 2 16 2; }
+.map-graticule { -fx-stroke: rgba(16,36,52,0.07); -fx-stroke-width: 1; }
+.root.dark .map-graticule { -fx-stroke: rgba(255,255,255,0.06); }
+.map-place-dot { -fx-fill: #8A969E; }
+.map-place { -fx-font-size: 11px; -fx-text-fill: #5E6B73; -fx-font-weight: 600; }

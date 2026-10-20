@@ -150,6 +150,47 @@ final class DemoOperations {
                 .toList();
     }
 
+    /** Carte de flotte FICTIVE : mêmes règles d'état que le serveur (FleetLiveService). */
+    List<Ops.VehicleLive> fleetLive(Session s) {
+        Instant now = clock.instant();
+        List<Ops.VehicleLive> out = new ArrayList<>();
+        for (Mission m : missions(s)) {
+            boolean active = m.status() == MissionStatus.ACTIVE;
+            boolean recent = m.status() == MissionStatus.FINISHED && m.finishedAt() != null
+                    && m.finishedAt().isAfter(now.minus(Duration.ofHours(12)));
+            if (!active && !recent) continue;
+            List<GpsFix> t = track(s, m.id());
+            if (t.isEmpty()) continue;
+            GpsFix last = t.get(t.size() - 1);
+            double km = 0;
+            for (int i = 1; i < t.size(); i++) {
+                km += TrackAnalyzer.distanceM(t.get(i - 1).latitude(), t.get(i - 1).longitude(), t.get(i).latitude(), t.get(i).longitude());
+            }
+            Double bearing = null;
+            if (t.size() > 1) {
+                GpsFix p = t.get(t.size() - 2);
+                double y = Math.sin(Math.toRadians(last.longitude() - p.longitude())) * Math.cos(Math.toRadians(last.latitude()));
+                double x = Math.cos(Math.toRadians(p.latitude())) * Math.sin(Math.toRadians(last.latitude()))
+                        - Math.sin(Math.toRadians(p.latitude())) * Math.cos(Math.toRadians(last.latitude()))
+                        * Math.cos(Math.toRadians(last.longitude() - p.longitude()));
+                bearing = (Math.toDegrees(Math.atan2(y, x)) + 360) % 360;
+            }
+            long age = Math.max(0, Duration.between(last.recordedAt(), now).getSeconds());
+            Double speedKmh = last.speedMps() == null ? null : Math.round(last.speedMps() * 36) / 10.0;
+            Ops.LiveState st = !active || age > 120 ? Ops.LiveState.SIGNAL_ANCIEN
+                    : last.speedMps() != null && last.speedMps() >= 1.5 ? Ops.LiveState.EN_MOUVEMENT : Ops.LiveState.ARRET;
+            String label = st == Ops.LiveState.SIGNAL_ANCIEN && !active ? "Mission terminée" : st.label;
+            String category = fleet.allVehicles().stream().filter(v -> v.registration().equals(m.registration()))
+                    .map(Models.Vehicle::category).filter(java.util.Objects::nonNull).findFirst().orElse("");
+            out.add(new Ops.VehicleLive(m.registration(), m.registration(), m.vehicleLabel(), category, m.id().toString(),
+                    m.reference(), m.status().name(), m.driverName(), m.origin(), m.destination(), last.latitude(), last.longitude(),
+                    last.accuracyM(), speedKmh, bearing, last.recordedAt(), age, st, label, m.startedAt(),
+                    Math.round(km / 100) / 10.0, 0));
+        }
+        out.sort(Comparator.comparing(Ops.VehicleLive::recordedAt).reversed());
+        return out;
+    }
+
     private static int order(MissionStatus s) {
         return switch (s) {
             case ACTIVE -> 0;
@@ -194,7 +235,7 @@ final class DemoOperations {
             double[] p = along(route, cum, travelled);
             double acc = 4 + ((k * 7 + seed) % 9);
             out.add(new GpsFix(m.deviceId() + ":" + k, m.startedAt().plusSeconds(t), p[0], p[1], acc, travelled >= total ? 0.0 : v));
-            if (travelled >= total && t > 60) break;
+            if (travelled >= total && t > 60 && m.finishedAt() != null) break;   // mission en cours : le véhicule garé émet toujours
         }
         return out;
     }

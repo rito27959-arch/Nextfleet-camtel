@@ -84,6 +84,42 @@ public interface FleetGateway {
         throw notYet("La clôture de mission");
     }
 
+    // ------------------------------------------------------------------ suivi GPS en direct
+
+    default java.util.List<Ops.VehicleLive> fleetLive() {
+        throw notYet("Le suivi GPS en direct");
+    }
+
+    /**
+     * Abonnement aux positions en direct. Par défaut : relecture de la carte de flotte toutes les 5 s (mode
+     * démonstration et serveurs sans canal temps réel) ; la passerelle HTTP utilise le WebSocket du serveur.
+     * {@code onConnection} reçoit l'état du canal (vrai = connecté). Fermer l'objet rendu arrête l'abonnement.
+     */
+    default AutoCloseable subscribeLive(java.util.function.Consumer<Ops.LiveEvent> onEvent,
+                                        java.util.function.Consumer<Boolean> onConnection) {
+        java.util.concurrent.ScheduledExecutorService ex = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "nf-live-poll");
+            t.setDaemon(true);
+            return t;
+        });
+        java.util.Map<String, java.time.Instant> last = new java.util.concurrent.ConcurrentHashMap<>();
+        ex.scheduleWithFixedDelay(() -> {
+            try {
+                for (Ops.VehicleLive v : fleetLive()) {
+                    java.time.Instant prev = last.put(v.vehicleId(), v.recordedAt());
+                    if (prev == null || v.recordedAt().isAfter(prev)) {
+                        onEvent.accept(new Ops.LiveEvent(v.vehicleId(), v.registration(), v.missionRef(), v.lat(), v.lon(),
+                                v.speedKmh(), v.recordedAt()));
+                    }
+                }
+                onConnection.accept(true);
+            } catch (RuntimeException e) {
+                onConnection.accept(false);
+            }
+        }, 5, 5, java.util.concurrent.TimeUnit.SECONDS);
+        return ex::shutdownNow;
+    }
+
     // ------------------------------------------------------------------ lot 2 : messagerie
 
     default java.util.List<Ops.Conversation> conversations() {

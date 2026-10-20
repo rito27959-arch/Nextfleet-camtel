@@ -41,6 +41,7 @@ public class NextfleetDesktopApp extends Application {
         boolean demo = getParameters().getUnnamed().contains("--demo") || !args.containsKey("api");
         dark = getParameters().getUnnamed().contains("--dark");
         cm.camtel.nextfleet.desktop.ui.Motion.setReduced(getParameters().getUnnamed().contains("--reduce-motion"));
+        cm.camtel.nextfleet.desktop.ui.FleetTrackingView.configureTiles(args.get("tiles"));
         String shots = args.get("screenshot");
         gateway = demo
                 ? new DemoFleetGateway(Clock.systemUTC(), shots != null ? Duration.ZERO : Duration.ofMillis(350))

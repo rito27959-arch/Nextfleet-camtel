@@ -49,4 +49,29 @@ public final class Ops {
     /** Événement du journal chaîné (SHA-256 du précédent + contenu) ; jamais le contenu d'un message. */
     public record AuditEntry(long seq, Instant at, String actor, String action, String object, String detail, String hash,
                              String previousHash) { }
+
+    /** États de la carte de flotte, calculés par le serveur (mêmes règles sur bureau et mobile). */
+    public enum LiveState {
+        EN_MOUVEMENT("En mouvement", "live-moving"), ARRET("À l'arrêt", "live-stopped"),
+        SIGNAL_ANCIEN("Signal ancien", "live-stale"), A_VERIFIER("À vérifier", "live-check");
+
+        public final String label;
+        public final String styleClass;
+
+        LiveState(String label, String styleClass) {
+            this.label = label;
+            this.styleClass = styleClass;
+        }
+    }
+
+    /** Dernière position acceptée d'un véhicule en mission (carte de flotte). */
+    public record VehicleLive(String vehicleId, String registration, String vehicleLabel, String category, String missionId,
+                              String missionRef, String missionStatus, String driverName, String origin, String destination,
+                              double lat, double lon, double accuracyM, Double speedKmh, Double bearingDeg, Instant recordedAt,
+                              long ageSeconds, LiveState state, String stateLabel, Instant startedAt, Double distanceKm,
+                              int openAnomalies) { }
+
+    /** Position poussée par le canal temps réel. */
+    public record LiveEvent(String vehicleId, String registration, String missionRef, double lat, double lon, Double speedKmh,
+                            Instant recordedAt) { }
 }
