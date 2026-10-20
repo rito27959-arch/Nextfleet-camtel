@@ -17,6 +17,7 @@ Outils : AGP 9.3.1, Gradle 9.5.0, compileSdk 37, targetSdk 36, minSdk 26, Java 1
 
 | Onglet | Profils | Contenu |
 |---|---|---|
+| Carte | gestionnaire, contrôleur | Flotte en direct (MapLibre) : marqueurs colorés **et** libellés, fiche du véhicule, état de la connexion |
 | Missions | conducteur, gestionnaire, contrôleur | Missions affectées ou du périmètre ; démarrage (conducteur affecté seulement) et clôture |
 | Trajet | conducteur | Tracé de la mission en cours, état du collecteur et du tampon |
 | Messages | profils avec la messagerie (pas l’admin ni l’auditeur) | Conversations de mission, envoi idempotent, états Envoyé / Distribué / Lu |
@@ -51,6 +52,13 @@ Volontairement **absent** : `ACCESS_BACKGROUND_LOCATION`. Aucune collecte hors m
 `allowBackup=false`, trafic HTTPS uniquement (clair autorisé seulement vers l'émulateur `10.0.2.2` et `localhost`),
 OpenGL ES 3 requis pour la vue 3D.
 
+## Carte en direct
+
+MapLibre Native 13.6.1, style vectoriel OpenFreeMap « liberty » (gratuit, sans clé, attribution OpenStreetMap affichée).
+Positions poussées par le canal WebSocket du serveur (`/api/v1/live`, OkHttp, reconnexion progressive), états calculés
+par le serveur : en mouvement (vert), à l'arrêt (bleu), signal ancien (gris), à vérifier (orange). Un serveur de tuiles
+CAMTEL pourra remplacer OpenFreeMap (constante `MapPage.STYLE`).
+
 ## Modèles 3D
 
 Rendu : Filament 1.77.1 (`filament-android`, `gltfio-android`, `filament-utils-android`), fichiers `.glb` non compressés dans l'APK.
@@ -61,4 +69,5 @@ modèle : `tools/import-3d-model.md`. Seuls les modèles redistribuables sont ch
 
 - Essai sur un téléphone physique avec la passerelle et Traccar réels (seuls les tests unitaires et la compilation sont exécutés en CI).
 - Comportement des surcouches constructeurs qui arrêtent les services de premier plan (Tecno, Infinix, Xiaomi…) : à mesurer.
-- Messagerie en temps réel : l'application interroge l'API REST ; le canal WebSocket n'est pas encore branché sur le mobile.
+- Messagerie en temps réel : l'application interroge l'API REST (le temps réel GPS, lui, passe par WebSocket).
+- Taille de l'APK : ~66 Mo (bibliothèques natives MapLibre et Filament pour ARM et x86_64) ; des APK par architecture la réduiraient de moitié.

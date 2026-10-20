@@ -1,4 +1,4 @@
-# Installation — NexFleet CAMTEL 0.3.0
+# Installation — NexFleet CAMTEL 0.4.0
 
 Ce guide couvre les trois livrables produits par la CI GitHub Actions (gratuite pour ce dépôt public) et le serveur.
 Aucune autorisation CAMTEL n'est revendiquée : c'est une version pilote à installer sur des postes et des serveurs de test.
@@ -9,51 +9,46 @@ Chaque exécution réussie de la CI (onglet **Actions** du dépôt) publie ces a
 
 | Artefact | Contenu |
 |---|---|
-| `nexfleet-bureau-deb` | `nexfleet_0.3.0_amd64.deb` (construit sur Ubuntu 22.04 : Ubuntu 22.04 / 24.04, Debian 12+ ; JRE et JavaFX embarqués) |
-| `nexfleet-bureau-exe` | `NexFleet-0.3.0.exe` (Windows 10/11, installation par utilisateur, sans droits administrateur) |
-| `nexfleet-android-apk` | `nexfleet-0.3.0-debug.apk` et `nexfleet-0.3.0-release-unsigned.apk` (ou `-release.apk` si signé) |
+| `nexfleet-bureau-deb` | `nexfleet_0.4.0_amd64.deb` (construit sur Ubuntu 22.04 : Ubuntu 22.04 / 24.04, Debian 12+ ; JRE et JavaFX embarqués) |
+| `nexfleet-bureau-exe` | `NexFleet-0.4.0.exe` (Windows 10/11, installation par utilisateur, sans droits administrateur) |
+| `nexfleet-android-apk` | `nexfleet-0.4.0-debug.apk` et `nexfleet-0.4.0-release-unsigned.apk` (ou `-release.apk` si signé) |
 | `nexfleet-api-jar` | Jar exécutable de l'API Spring Boot |
 
-**Version publiée** : la release [v0.3.0](https://github.com/rito27959-arch/Nextfleet-camtel/releases/tag/v0.3.0) contient
+**Version publiée** : la release [v0.4.0](https://github.com/rito27959-arch/Nextfleet-camtel/releases/tag/v0.4.0) contient
 l'APK, le DEB, l'EXE et le jar de l'API. Pour publier une version suivante : changer `APP_VERSION` dans
 `.github/workflows/ci.yml`, puis pousser une étiquette `vX.Y.Z` ou lancer le workflow « ci » à la main avec « publier » coché.
 
-## 2. Serveur (API + base + passerelle GPS)
+## 2. Serveur (API + base + passerelle GPS + Traccar)
 
-Prérequis : PostgreSQL 16 avec PostGIS 3.4, Java 21. Extensions créées par le DBA : `postgis`, `btree_gist`, `pgcrypto`.
+Utiliser le kit **[`infra/deploy/camtel`](../infra/deploy/camtel/README.md)** : Docker Compose, HTTPS automatique (Caddy),
+sauvegarde quotidienne, images publiées par la CI sur `ghcr.io/rito27959-arch/`. La même pile est démarrée et éprouvée
+de bout en bout à chaque exécution de la CI (`tools/smoke-stack.sh`).
 
-Variables d'environnement (aucun secret dans le dépôt) :
+Variables principales (détail dans `.env.example`) :
 
 | Variable | Rôle |
 |---|---|
-| `NF_DB_URL`, `NF_DB_USER`, `NF_DB_PASSWORD` | Connexion PostgreSQL |
-| `NF_ENVIRONMENT` | `DEV`, `TEST`, `DEMO`, `PREPROD` ou `PRODUCTION` (les données de démonstration sont refusées en production) |
-| `NF_MISSION_TOKEN_KEY` | Clé HMAC en base64, 32 octets minimum, **identique** pour l'API et la passerelle GPS. Générer : `openssl rand -base64 48` |
-| `NF_GPS_PUBLIC_URL` | Adresse HTTPS de la passerelle GPS vue par les téléphones (renvoyée au démarrage de mission) |
-| `NF_GPS_NOTICE_VERSIONS` | Versions de notice acceptées (défaut `NOTICE-GPS-v1`) |
-| `NF_TRACCAR_FORWARD_SECRET` | Secret partagé avec `infra/traccar/traccar.xml` (passerelle) |
+| `NF_ENVIRONMENT` | `PREPROD`, `PRODUCTION`, ou `DEMO` (données fictives autorisées) |
+| `NF_BOOTSTRAP_ADMIN_*` | Administrateur technique créé au premier démarrage |
+| `NF_MISSION_TOKEN_KEY` | Clé HMAC partagée par l'API et la passerelle (`openssl rand -base64 48`) |
+| `NF_TRACCAR_*` | Compte de service Traccar créé automatiquement sur une instance neuve ; secret du forward |
+| `NF_DEMO_PASSWORD`, `NF_DEMO_SIMULATOR` | Démonstration : comptes fictifs, véhicules simulés |
 
-```bash
-java -jar nextfleet-api-*.jar                     # applique les migrations Flyway V1–V7 au démarrage
-java -cp gps-traccar-adapter.jar:nextfleet-domain.jar:postgresql.jar:jackson-*.jar \
-     cm.camtel.nextfleet.gps.GpsGatewayMain        # écoute NF_GPS_BIND (défaut 127.0.0.1:8090)
-```
-
-Sans `NF_MISSION_TOKEN_KEY`, l'API démarre mais refuse tout démarrage de mission (409 « Passerelle GPS non configurée ») :
-aucune collecte n'est possible par erreur. L'API et la passerelle doivent être exposées en HTTPS par le frontal de la DSIR.
+Sans `NF_MISSION_TOKEN_KEY`, l'API refuse tout démarrage de mission (409) : aucune collecte n'est possible par erreur.
 
 ## 3. Poste bureau
 
-**Linux** : `sudo apt install ./nexfleet_0.3.0_amd64.deb`, puis menu Bureautique → NexFleet, ou `/opt/nexfleet/bin/NexFleet`.
+**Linux** : `sudo apt install ./nexfleet_0.4.0_amd64.deb`, puis menu Bureautique → NexFleet, ou `/opt/nexfleet/bin/NexFleet`.
 La CI installe réellement ce paquet, lance l'application installée sous Xvfb (parcours de démonstration complet), puis la désinstalle, à chaque exécution.
 
-**Windows** : double-cliquer sur `NexFleet-0.3.0.exe`, choisir le dossier, raccourci créé dans le menu Démarrer.
+**Windows** : double-cliquer sur `NexFleet-0.4.0.exe`, choisir le dossier, raccourci créé dans le menu Démarrer.
 Le paquet n'est pas signé (certificat de signature de code CAMTEL à fournir) : Windows SmartScreen demandera une confirmation.
 
 Lancement :
 
 - sans option → **mode démonstration** (badge DÉMO, six comptes, mot de passe `demo`) ;
-- `NexFleet --api=https://nexfleet.camtel.invalid/` → **mode serveur** (HTTPS obligatoire hors `localhost`).
+- `NexFleet --api=https://nexfleet.camtel.invalid/` → **mode serveur** (HTTPS obligatoire hors `localhost`) ;
+- `--tiles=https://tuiles.camtel.cm/{z}/{x}/{y}.png` → fond de carte CAMTEL (par défaut : OpenStreetMap, usage modéré).
 
 En mode serveur, le démarrage d'une mission se fait depuis le téléphone (le poste bureau n'est pas un émetteur GPS).
 

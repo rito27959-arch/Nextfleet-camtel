@@ -1,4 +1,4 @@
-# État réel d'avancement — version pilote 0.3.0
+# État réel d'avancement — version pilote 0.4.0
 
 **20 octobre 2026.** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
 Aucune autorisation CAMTEL, aucun avis DSIR ou DS et aucune mise en production ne sont revendiqués.
@@ -10,16 +10,18 @@ résultats sont lisibles dans l'onglet Actions (annotations « bilan »).
 
 | Élément | Où | Résultat obtenu |
 |---|---|---|
-| Migrations V1–V7 sur PostgreSQL 16 + PostGIS 3.4 | CI + `infra/db/tests/run_db_tests.sh` | Appliquées sur base vierge |
+| Migrations V1–V8 sur PostgreSQL 16 + PostGIS 3.4 | CI + `infra/db/tests/run_db_tests.sh` | Appliquées sur base vierge |
 | Tests d'intégrité de la base | idem | **63 tests réussis** + concurrence CAR-01 (un seul plein accepté sur deux simultanés). Nouveau : journal vérifiable depuis un autre fuseau horaire (V7) |
 | Noyau métier Java 21 | CI (Maven) + `tools/build-offline.sh` | **42 tests** |
-| API Spring Boot | CI (Maven, Testcontainers PostGIS) | **6 tests d'intégration** : lot 1 (connexion, cloisonnement, doublons, chaîne carburant) et scénario lot 2 complet ci-dessous |
-| Passerelle GPS Traccar | CI | **9 tests** dont 5 de bout en bout sur PostgreSQL |
+| API Spring Boot | CI (Maven, Testcontainers PostGIS) | **8 tests d'intégration** : lot 1, scénario lot 2 ci-dessous, **temps réel** (point accepté → WebSocket filtré par droits, autre entité exclue, carte de flotte calculée par PostGIS) et **amorçage DEMO** (comptes fictifs, simulateur visible sur la carte) |
+| Passerelle GPS Traccar | CI | **10 tests** dont 5 de bout en bout sur PostgreSQL ; l'écho d'un point relayé à Traccar n'est jamais stocké deux fois |
 | Messagerie temps réel (WebSocket pilote) | CI | **4 tests** de bout en bout avec de vrais clients WebSocket |
-| Client bureau JavaFX | CI + hors ligne | **21 tests** (dont client HTTP du lot 2 et catalogue 3D) |
+| Client bureau JavaFX | CI + hors ligne | **24 tests** (client HTTP lot 2, catalogue 3D, projection Web Mercator de la carte) ; écran **Suivi GPS** en direct |
 | Paquet **DEB** | CI (ubuntu-22.04) | Produit par jpackage (~38 Mo), **installé**, **application lancée** sous Xvfb (23 écrans du parcours de démonstration capturés par l'application installée), puis désinstallée proprement |
 | Paquet **EXE** Windows | CI (windows-2022) | Produit par jpackage + WiX (~51 Mo). Non signé ; pas encore installé ni lancé automatiquement |
-| Application **Android** | CI | Compilation, **lint bloquant**, **4 tests unitaires** ; APK de débogage (~36 Mo) et de publication minifié ; permissions vérifiées dans l'APK (aapt2) : pas de localisation en arrière-plan |
+| Application **Android** | CI | Compilation, **lint bloquant**, **4 tests unitaires** ; APK ~66 Mo (MapLibre + Filament natifs) ; onglet **Carte** MapLibre en direct ; permissions vérifiées dans l'APK (aapt2) : pas de localisation en arrière-plan |
+| **Pile d'hébergement complète** | CI (`tools/smoke-stack.sh`) | Les 3 images Docker démarrent avec PostGIS via le kit CAMTEL : carte de flotte alimentée, mission démarrée par le conducteur, lot Android accepté, relais Traccar **sans doublon**, téléphone **déclaré automatiquement dans Traccar**, position refusée après clôture |
+| Images Docker | CI → GHCR | `ghcr.io/rito27959-arch/nexfleet-{api,gps-gateway,traccar}:0.4.0` publiées à chaque version |
 | Contrats OpenAPI | CI | `openapi.yaml` et `openapi-lot2.yaml` (0.3.0, alignés sur l'implémentation) valides |
 | Captures | `tools/screenshots.sh` | Lot 2 : 22 captures + 2 GIF, dont `23-catalogue-3d.png` (rendu 3D JavaFX réel) |
 
@@ -36,15 +38,17 @@ sans droit refusé → comptes réservés à l'admin, journal lisible par l'audi
 | Élément | Statut | Condition pour le déclarer livré |
 |---|---|---|
 | Collecte GPS sur un vrai téléphone | Code compilé et testé unitairement ; jamais exécuté sur un appareil | Essai terrain : téléphone + passerelle + API, positions reçues pendant la mission et refusées après |
-| Traccar Server réel | `infra/traccar/traccar.xml` écrit ; binaire non exécuté | Traccar démarré, position d'un boîtier reçue par la passerelle |
-| Vue 3D Android (Filament) | Compilée, lint vert ; rendu jamais observé sur écran | Capture sur un appareil OpenGL ES 3 |
+| Boîtier GPS véhicule via Traccar | Traccar 6.16 réel exécuté en CI (relais, déclaration d'appareil) ; aucun boîtier physique | Un boîtier configuré sur le port de son protocole, position reçue |
+| Vue 3D (Filament) et carte (MapLibre) Android | Compilées, lint vert ; rendu jamais observé sur écran | Capture sur un appareil OpenGL ES 3 |
+| Fond de carte du bureau | Tuiles OpenStreetMap (usage modéré) ; non observé ici (réseau fermé), repères hors ligne affichés | Serveur de tuiles CAMTEL ou contrat d'usage |
+| Hébergement Railway | Prêt (images publiques) ; **création du projet refusée par Railway** : panne de leurs constructions le 20/10/2026 (« Deploys have been paused temporarily ») | Relancer quand Railway rétablit le service |
 | Lancement de l'EXE | Installateur produit ; application non lancée sous Windows | Installation et connexion sur un poste Windows CAMTEL |
-| Bureau ↔ API réelle | Client HTTP testé contre un faux serveur ; routes testées côté API | Recette de bout en bout sur un serveur de test |
-| `infra/compose.local.yaml` | Non exécuté | `docker compose up` sur le poste DSIR |
+| Bureau ↔ API réelle | Client HTTP et WebSocket testés contre un faux serveur ; routes testées côté API | Recette de bout en bout sur un serveur de test |
+| Kit CAMTEL avec HTTPS (Caddy) | Pile éprouvée en CI sans Caddy (ports locaux) | Installation sur un serveur CAMTEL avec ses noms DNS |
 
 ## Ce qui n'est pas commencé
 
-Pièces jointes du chat, messagerie temps réel sur mobile (le mobile interroge l'API REST), écrans carburant / maintenance /
+Pièces jointes du chat, messagerie temps réel sur mobile (le mobile interroge l'API REST ; le temps réel GPS, lui, est fait), écrans carburant / maintenance /
 budget / rapports côté bureau, création de comptes (fédération OIDC / RH), photo / détourage / reconnaissance de véhicule,
 modèle de langage local pour l'assistant (moteur de règles actuel `RULES_FR_V1`), signature de code Windows, APK signé
 avec la clé CAMTEL.
@@ -62,8 +66,8 @@ avec la clé CAMTEL.
 
 ## Prochain lot proposé (lot 4), dans l'ordre
 
-1. Essai terrain : un téléphone Android, la passerelle GPS et l'API sur un serveur de test CAMTEL (scénario B complet).
-2. Traccar réel avec un boîtier GPS véhicule.
-3. Messagerie WebSocket dans l'API et sur le mobile.
+1. Installer le kit `infra/deploy/camtel` sur un serveur de test CAMTEL (ou Railway quand le service revient).
+2. Essai terrain : un téléphone Android démarre MIS-2026-015 et apparaît en direct sur le bureau et la carte mobile.
+3. Boîtier GPS véhicule raccordé à Traccar ; messagerie WebSocket sur le mobile.
 4. Écrans carburant et maintenance (tables et règles déjà prêtes en base).
 5. Signature des paquets avec les clés CAMTEL et publication par étiquette `v0.4.0`.

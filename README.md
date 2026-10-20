@@ -3,7 +3,7 @@
 Plateforme de gestion du parc automobile CAMTEL : API Java 21 / Spring Boot, PostgreSQL + PostGIS, client bureau JavaFX
 (Windows, Linux) et application Android Java avec collecte GPS de mission et vues 3D Filament. Référence : cahier des charges V4.0 et document d'architecture V5.0.
 
-> **Statut : version pilote 0.3.0 — API complète des lots 1 et 2, bureau DEB/EXE, Android APK, construits et testés par la CI.** Voir [`docs/ETAT_AVANCEMENT.md`](docs/ETAT_AVANCEMENT.md) pour ce qui est réellement prouvé.
+> **Statut : version pilote 0.4.0 — suivi GPS en direct (Traccar, WebSocket, cartes MapLibre / tuiles), pile d'hébergement Docker éprouvée en CI, bureau DEB/EXE, Android APK.** Voir [`docs/ETAT_AVANCEMENT.md`](docs/ETAT_AVANCEMENT.md) pour ce qui est réellement prouvé.
 > Document de conception et code en cours de réalisation : ni homologation, ni avis DSIR/DS, ni mise en production.
 
 ## Arborescence
@@ -18,9 +18,10 @@ services/chat-realtime/    Messagerie temps réel pilote (WebSocket) — testée
 shared/api-contract/       Contrats OpenAPI 3 des lots 1 et 2 — validés
 shared/assets3d/           Modèles 3D GLB redistribuables et leurs licences
 shared/ui-tokens/          Jetons du design system (p. 17 / p. 18)
-infra/db/migrations/       Migrations Flyway V1–V7 — testées sur PostgreSQL 16 + PostGIS
+infra/db/migrations/       Migrations Flyway V1–V8 — testées sur PostgreSQL 16 + PostGIS
 infra/db/tests/            Campagne de tests de la base (63 tests + concurrence) et jeu fictif d'intégration
-infra/compose.local.yaml   PostGIS, API, Traccar, passerelles GPS et messagerie en local (non exécuté)
+infra/deploy/camtel/       Kit d'hébergement CAMTEL : Docker Compose, HTTPS (Caddy), sauvegardes — éprouvé en CI
+infra/docker/              Images API, passerelle GPS, Traccar (publiées sur ghcr.io)
 infra/traccar/             Configuration Traccar (forward JSON vers NexFleet)
 docs/                      Audit, registre de parité avec l'ancien NexFleet, design et mouvement, état d'avancement, captures et GIF
 tools/                     Construction hors ligne, captures, contrôle des contrastes
