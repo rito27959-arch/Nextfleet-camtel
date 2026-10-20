@@ -6,8 +6,8 @@ COPY pom.xml .
 COPY services services
 COPY apps/desktop-javafx/pom.xml apps/desktop-javafx/pom.xml
 COPY infra/db/migrations infra/db/migrations
-RUN mvn -B -ntp -q -pl services/gps-traccar-adapter -am package -DskipTests \
- && mvn -B -ntp -q -pl services/gps-traccar-adapter dependency:copy-dependencies -DincludeScope=runtime -DoutputDirectory=/out/lib \
+RUN mvn -B -ntp -q -pl services/gps-traccar-adapter -am package dependency:copy-dependencies -DskipTests \
+        -DincludeScope=runtime -DoutputDirectory=/out/lib \
  && cp services/gps-traccar-adapter/target/gps-traccar-adapter-*.jar /out/lib/
 
 FROM eclipse-temurin:21-jre

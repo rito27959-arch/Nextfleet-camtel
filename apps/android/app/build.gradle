@@ -64,6 +64,8 @@ android {
         warningsAsErrors false
         checkReleaseBuilds true
         disable += ['GradleDependency', 'NewerVersionAvailable', 'OldTargetApi', 'AndroidGradlePluginVersion']
+        textReport true
+        textOutput file('build/reports/lint-results-debug.txt')
     }
 
     testOptions {

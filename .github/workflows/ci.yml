@@ -125,7 +125,11 @@ jobs:
           NF_KEY_PASSWORD: ${{ secrets.NF_KEY_PASSWORD }}
       - name: Annotations d'échec
         if: failure()
-        run: tools/ci-annotate.sh apps/android/build.log Android
+        run: |
+          tools/ci-annotate.sh apps/android/build.log Android
+          for f in apps/android/app/build/reports/lint-results-*.txt; do
+            [ -f "$f" ] && echo "::error title=Android — lint::$(grep -v '^\s*$' "$f" | head -80 | cut -c1-300 | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"} {print}')"
+          done; true
       - name: Renommer les APK
         run: |
           mkdir -p dist
