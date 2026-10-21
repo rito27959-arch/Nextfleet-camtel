@@ -92,7 +92,7 @@ final class ProfilePage implements Page {
         device.addView(Ui.separator(a, 58));
         device.addView(Ui.groupRow(a, R.drawable.ic_tab_map, 0xFF6155F5, "Environnement", s.demo ? "Démonstration" : "Serveur", null));
         device.addView(Ui.separator(a, 58));
-        device.addView(Ui.groupRow(a, R.drawable.ic_tab_profile, 0xFF8E8E93, "Version", "0.5.0", null));
+        device.addView(Ui.groupRow(a, R.drawable.ic_tab_profile, 0xFF8E8E93, "Version", "0.5.1", null));
         col.addView(device);
         col.addView(footer("Police Inter (SIL OFL 1.1) · 3D Google Filament (Apache 2.0) · cartes MapLibre (BSD) et OpenStreetMap."));
 

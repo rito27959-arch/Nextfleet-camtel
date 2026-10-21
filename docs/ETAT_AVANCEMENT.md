@@ -1,4 +1,4 @@
-# État réel d'avancement — version pilote 0.5.0
+# État réel d'avancement — version pilote 0.5.1
 
 **20 octobre 2026.** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
 Aucune autorisation CAMTEL, aucun avis DSIR ou DS et aucune mise en production ne sont revendiqués.

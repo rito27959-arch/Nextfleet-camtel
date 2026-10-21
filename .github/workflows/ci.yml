@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 env:
-  APP_VERSION: 0.5.0
+  APP_VERSION: 0.5.1
 
 jobs:
   base-de-donnees:
@@ -247,25 +247,55 @@ jobs:
       - name: jpackage (${{ matrix.type }})
         run: |
           exec > >(tee -a build.log) 2>&1
-          EXTRA=()
-          if [ "${{ matrix.type }}" = deb ]; then
-            # postinst/prerm/.desktop propres : l'entrée de menu ne fait jamais échouer l'installation
-            EXTRA=(--linux-shortcut --linux-menu-group Office --linux-app-category misc --linux-package-name nexfleet
-                   --linux-deb-maintainer "dsir@camtel.invalid" --resource-dir apps/desktop-javafx/packaging/linux)
-          else
-            EXTRA=(--win-menu --win-menu-group NexFleet --win-shortcut --win-dir-chooser --win-per-user-install
-                   --win-upgrade-uuid 6c1f6a7e-3f0b-4f7e-9d0c-2b1a9c4d5e61)
-          fi
-          jpackage --type ${{ matrix.type }} --name NexFleet --app-version "$APP_VERSION" --vendor "CAMTEL" \
-            --description "NexFleet CAMTEL - gestion de flotte" --copyright "CAMTEL" \
+          COMMON=(--name NexFleet --app-version "$APP_VERSION" --vendor "CAMTEL"
+                  --description "NexFleet CAMTEL - gestion de flotte" --copyright "CAMTEL")
+          # 1. image d'application (runtime Java + JavaFX embarqué), commune à tous les formats
+          jpackage --type app-image "${COMMON[@]}" \
             --input jp/app --main-jar "$(cd jp/app && ls nextfleet-desktop-*.jar)" \
             --main-class cm.camtel.nextfleet.desktop.NextfleetDesktopApp \
             --module-path jp/fx \
             --add-modules javafx.controls,javafx.swing,java.net.http,java.sql,java.naming,java.logging,java.desktop,jdk.crypto.ec,jdk.localedata,jdk.unsupported,jdk.charsets \
             --icon apps/desktop-javafx/packaging/${{ matrix.icon }} \
-            --dest dist "${EXTRA[@]}"
+            --dest appimg
+          mkdir -p dist
+          if [ "${{ matrix.type }}" = deb ]; then
+            # postinst/prerm/.desktop propres : l'entrée de menu ne fait jamais échouer l'installation
+            jpackage --type deb "${COMMON[@]}" --app-image appimg/NexFleet --dest dist \
+              --linux-shortcut --linux-menu-group Office --linux-app-category misc --linux-package-name nexfleet \
+              --linux-deb-maintainer "dsir@camtel.invalid" --resource-dir apps/desktop-javafx/packaging/linux
+          else
+            WIN=(--win-menu --win-menu-group NexFleet --win-shortcut --win-dir-chooser --win-per-user-install
+                 --win-upgrade-uuid 6c1f6a7e-3f0b-4f7e-9d0c-2b1a9c4d5e61)
+            # MSI : installé directement par Windows Installer (pas d'extraction dans %TEMP%)
+            jpackage --type msi "${COMMON[@]}" --app-image appimg/NexFleet --dest dist "${WIN[@]}"
+            jpackage --type exe "${COMMON[@]}" --app-image appimg/NexFleet --dest dist "${WIN[@]}"
+            # version portable : aucun installateur, décompresser puis lancer NexFleet.exe
+            (cd appimg && 7z a -tzip -bd -mx=7 "../dist/NexFleet-$APP_VERSION-windows-portable.zip" NexFleet > /dev/null)
+          fi
           ls -la dist
-          echo "::notice title=Bureau ${{ matrix.type }} — paquet::$(cd dist && ls -s --block-size=K | tr '\n' ' ')"
+          echo "::notice title=Bureau ${{ matrix.type }} — paquets::$(cd dist && ls -s --block-size=K | tr '\n' ' ')"
+      - name: Essai d'installation du MSI et lancement (Windows)
+        if: matrix.type == 'exe'
+        run: |
+          MSI=$(cygpath -w "$(ls dist/*.msi)")
+          if ! msiexec //i "$MSI" //qn //l*v msi.log; then
+            echo "::error title=MSI — échec d'installation::$(iconv -f UTF-16LE -t UTF-8 msi.log 2>/dev/null | grep -iE 'error|erreur|return value 3' | tail -15 | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"} {print}')"; exit 1
+          fi
+          EXE=$(find "$LOCALAPPDATA" "$PROGRAMFILES" -maxdepth 3 -iname NexFleet.exe 2>/dev/null | head -1)
+          [ -n "$EXE" ] || { echo "::error title=MSI::NexFleet.exe introuvable après installation"; exit 1; }
+          echo "::notice title=MSI installé::$EXE"
+          timeout 300 "$EXE" --demo --screenshot="$(cygpath -w "$PWD/win-shots")" > run.log 2>&1 || true
+          N=$(ls win-shots/*.png 2>/dev/null | wc -l)
+          echo "::notice title=Windows — application lancée::${N} écrans capturés par l'application installée par le MSI"
+          [ "$N" -ge 20 ] || { echo "::error title=Windows — lancement::$(tail -30 run.log | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"} {print}')"; exit 1; }
+          msiexec //x "$MSI" //qn
+          echo "::notice title=MSI désinstallé::retiré proprement"
+          # la version portable démarre aussi, sans installation
+          7z x -bd -oportable dist/*portable.zip > /dev/null
+          timeout 300 portable/NexFleet/NexFleet.exe --demo --screenshot="$(cygpath -w "$PWD/portable-shots")" > run2.log 2>&1 || true
+          P=$(ls portable-shots/*.png 2>/dev/null | wc -l)
+          echo "::notice title=Windows — version portable::${P} écrans capturés sans installation"
+          [ "$P" -ge 20 ] || { echo "::error title=Windows — portable::$(tail -30 run2.log | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"} {print}')"; exit 1; }
       - name: Essai d'installation du DEB
         if: matrix.type == 'deb'
         run: |
@@ -313,6 +343,8 @@ jobs:
             out/*.apk
             out/*.deb
             out/*.exe
+            out/*.msi
+            out/*portable.zip
             out/nextfleet-api-*.jar
           body: |
             NexFleet CAMTEL ${{ env.APP_VERSION }} — paquets construits par la CI GitHub.
@@ -320,6 +352,8 @@ jobs:
             Voir docs/ETAT_AVANCEMENT.md et docs/INSTALLATION.md.
 
             - nexfleet_*_amd64.deb : Ubuntu 22.04 / 24.04, Debian 12+ (sudo apt install ./nexfleet_*.deb)
-            - NexFleet-*.exe : Windows 10/11, installation par utilisateur (non signé : SmartScreen demandera confirmation)
+            - NexFleet-*.msi : Windows 10/11, installateur recommandé (installation par utilisateur, sans droits administrateur)
+            - NexFleet-*-windows-portable.zip : Windows sans installation (décompresser, lancer NexFleet\NexFleet.exe)
+            - NexFleet-*.exe : ancien installateur (non signé : SmartScreen demandera confirmation)
             - nexfleet-*-debug.apk : Android 8+, pour essai (signé avec une clé de débogage)
             - nextfleet-api-*.jar : API Spring Boot (Java 21, PostgreSQL 16 + PostGIS)

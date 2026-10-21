@@ -82,7 +82,7 @@ public final class SettingsView extends ScrollPane {
 
         // À propos
         col.getChildren().add(Ui.insetGroup("À propos", List.of(
-                Ui.listRow(Ui.symbolTile(Icons.DOC, "tile-navy"), "Version", "0.5.0", null, null),
+                Ui.listRow(Ui.symbolTile(Icons.DOC, "tile-navy"), "Version", "0.5.1", null, null),
                 Ui.listRow(Ui.symbolTile(Icons.REPORT, "tile-mint"), "Référence", "Cahier des charges V4.0", null, null),
                 Ui.listRow(Ui.symbolTile(Icons.ID_CARD, "tile-gray"), "Police", "Inter · SIL OFL 1.1", null, null)),
                 "Design inspiré des Human Interface Guidelines d'Apple, sans reprise d'éléments propriétaires."));
