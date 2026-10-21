@@ -59,7 +59,7 @@ class ProductionBootstrapIntegrationTest {
         mvc.perform(get("/api/v1/admin/roles").header("Authorization", t))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("PASSWORD_CHANGE_REQUIRED"));
         mvc.perform(post("/api/v1/me/password").header("Authorization", t).contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(Map.of("currentPassword", "Amorcage-Prod-2026!", "newPassword", "Administration-Camtel-2026"))))
+                        .content(mapper.writeValueAsString(Map.of("currentPassword", "Amorcage-Prod-2026!", "newPassword", "Camtel-Flotte-Centre-2026!"))))
                 .andExpect(status().isNoContent());
         mvc.perform(get("/api/v1/admin/roles").header("Authorization", t)).andExpect(status().isOk())
                 .andExpect(header().exists("ETag"));
