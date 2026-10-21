@@ -281,6 +281,8 @@ jobs:
         if: matrix.type == 'exe'
         run: |
           set +e +o pipefail
+          exec > >(tee win.log) 2>&1
+          trap 'iconv -c -f UTF-16LE -t UTF-8 msi.log 2>/dev/null | grep -iE "return value 3|error|erreur|INSTALLDIR|APPDIR|ProductCode" | tail -25 >> win.log' EXIT
           MSI=$(cygpath -w "$(ls dist/*.msi)")
           echo "MSI: $MSI"
           timeout 600 msiexec //i "$MSI" //qn //norestart //l*v msi.log
@@ -325,7 +327,9 @@ jobs:
           echo "::notice title=DEB désinstallé::paquet retiré proprement, entrée de menu supprimée"
       - name: Annotations d'échec
         if: failure()
-        run: tools/ci-annotate.sh build.log "Bureau ${{ matrix.type }}"
+        run: |
+          tools/ci-annotate.sh build.log "Bureau ${{ matrix.type }}"
+          tools/ci-annotate.sh win.log "Windows — essai"
       - uses: actions/upload-artifact@v4
         with:
           name: nexfleet-bureau-${{ matrix.type }}
