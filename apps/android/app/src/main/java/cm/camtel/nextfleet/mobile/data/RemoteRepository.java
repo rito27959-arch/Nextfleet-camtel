@@ -640,7 +640,7 @@ public final class RemoteRepository implements Repository {
 
     private String call(String method, String path, String json, String bearer) {
         boolean read = "GET".equals(method) && bearer != null;
-        ResponseStore.Entry saved = read ? store().get(path) : null;
+        ResponseStore.Saved saved = read ? store().get(path) : null;
         if (read && Boolean.TRUE.equals(cacheOnly.get())) {
             if (saved == null) throw new RepositoryException(RepositoryException.Kind.NETWORK, "Pas encore de données locales.");
             return saved.body;

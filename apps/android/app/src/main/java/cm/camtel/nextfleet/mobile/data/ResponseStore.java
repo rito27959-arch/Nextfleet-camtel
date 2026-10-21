@@ -19,12 +19,12 @@ import java.util.Map;
  */
 final class ResponseStore {
 
-    static final class Entry {
+    static final class Saved {
         final String etag;
         final String body;
         final long savedAt;
 
-        Entry(String etag, String body, long savedAt) {
+        Saved(String etag, String body, long savedAt) {
             this.etag = etag;
             this.body = body;
             this.savedAt = savedAt;
@@ -33,9 +33,9 @@ final class ResponseStore {
 
     private static final int MAX_BODY = 300_000;
     private final File dir;
-    private final Map<String, Entry> memory = new LinkedHashMap<>(32, 0.75f, true) {
+    private final Map<String, Saved> memory = new LinkedHashMap<>(32, 0.75f, true) {
         @Override
-        protected boolean removeEldestEntry(Map.Entry<String, Entry> e) {
+        protected boolean removeEldestEntry(Map.Entry<String, Saved> e) {
             return size() > 64;
         }
     };
@@ -44,8 +44,8 @@ final class ResponseStore {
         dir = new File(c.getNoBackupFilesDir(), "nf-responses");
     }
 
-    synchronized Entry get(String path) {
-        Entry e = memory.get(path);
+    synchronized Saved get(String path) {
+        Saved e = memory.get(path);
         if (e != null) return e;
         File f = file(path);
         if (!f.isFile()) return null;
@@ -56,7 +56,7 @@ final class ResponseStore {
             String s = new String(all, 0, off, StandardCharsets.UTF_8);
             int a = s.indexOf('\n'), b = a < 0 ? -1 : s.indexOf('\n', a + 1);
             if (b < 0) return null;
-            e = new Entry(s.substring(0, a).isEmpty() ? null : s.substring(0, a), s.substring(b + 1), Long.parseLong(s.substring(a + 1, b)));
+            e = new Saved(s.substring(0, a).isEmpty() ? null : s.substring(0, a), s.substring(b + 1), Long.parseLong(s.substring(a + 1, b)));
             memory.put(path, e);
             return e;
         } catch (IOException | RuntimeException ex) {
@@ -66,7 +66,7 @@ final class ResponseStore {
 
     synchronized void put(String path, String etag, String body) {
         if (body.length() > MAX_BODY) return;
-        Entry e = new Entry(etag, body, System.currentTimeMillis());
+        Saved e = new Saved(etag, body, System.currentTimeMillis());
         memory.put(path, e);
         if (!dir.isDirectory() && !dir.mkdirs()) return;
         File tmp = new File(dir, file(path).getName() + ".tmp");

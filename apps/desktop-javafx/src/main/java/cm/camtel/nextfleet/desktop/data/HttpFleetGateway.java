@@ -1116,7 +1116,7 @@ public final class HttpFleetGateway implements FleetGateway {
         b.header("Accept-Encoding", "gzip");
         boolean get = "GET".equals(method);
         String cacheKey = get && auth ? path : null;
-        EtagCache.Entry cached = cacheKey == null ? null : etags.get(cacheKey);
+        EtagCache.Saved cached = cacheKey == null ? null : etags.get(cacheKey);
         if (cached != null) b.header("If-None-Match", cached.etag());
         HttpResponse<byte[]> res;
         try {
