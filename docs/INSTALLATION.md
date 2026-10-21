@@ -61,8 +61,9 @@ La CI installe réellement ce paquet, lance l'application installée sous Xvfb (
 
 **Windows** (10/11, sans droits administrateur) — trois formats, au choix :
 
-1. **`NexFleet-0.6.0.msi` (recommandé)** : double-cliquer, raccourci créé dans le menu Démarrer. La CI installe réellement
-   ce MSI, lance l'application installée (parcours de démonstration complet), puis la désinstalle, à chaque exécution.
+1. **`NexFleet-0.6.0.msi` (recommandé)** : double-cliquer, raccourci créé dans le menu Démarrer. La CI tente
+   à chaque exécution de l'installer et de le lancer ; cet essai n'est **pas encore concluant** en 0.6.0 (diagnostic en cours).
+   Si le MSI ne s'installe pas chez vous, utiliser la version portable.
 2. **`NexFleet-0.6.0-windows-portable.zip`** : sans installation. Décompresser (clic droit → Extraire tout), puis lancer
    `NexFleet\NexFleet.exe`. Également lancée par la CI.
 3. `NexFleet-0.6.0.exe` : ancien installateur. Il décompresse un MSI dans `%TEMP%` avant de l'exécuter ; si un antivirus

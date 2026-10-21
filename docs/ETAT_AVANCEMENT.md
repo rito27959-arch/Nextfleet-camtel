@@ -18,7 +18,7 @@ résultats sont lisibles dans l'onglet Actions (annotations « bilan »).
 | Messagerie temps réel (WebSocket pilote) | CI | **4 tests** de bout en bout avec de vrais clients WebSocket |
 | Client bureau JavaFX | CI + hors ligne | **24 tests** (client HTTP lot 2, catalogue 3D, projection Web Mercator de la carte) ; écran **Suivi GPS** en direct |
 | Paquet **DEB** | CI (ubuntu-22.04) | Produit par jpackage (~38 Mo), **installé**, **application lancée** sous Xvfb (23 écrans du parcours de démonstration capturés par l'application installée), puis désinstallée proprement |
-| Paquets **Windows** | CI (windows-2022) | MSI (recommandé), ZIP portable et EXE produits par jpackage + WiX. Non signés. RESULTAT_WINDOWS |
+| Paquets **Windows** | CI (windows-2022) | MSI (recommandé), ZIP portable et EXE produits par jpackage + WiX. Non signés. **L'essai automatique d'installation et de lancement sous Windows n'est pas encore concluant** (l'étape échoue sur le runner, cause en cours de diagnostic) : installation sur un poste réel non prouvée |
 | Application **Android** | CI | Compilation, **lint bloquant**, **4 tests unitaires** ; APK ~66 Mo (MapLibre + Filament natifs) ; onglet **Carte** MapLibre en direct ; permissions vérifiées dans l'APK (aapt2) : pas de localisation en arrière-plan |
 | **Pile d'hébergement complète** | CI (`tools/smoke-stack.sh`) | Les 3 images Docker démarrent avec PostGIS via le kit CAMTEL : carte de flotte alimentée, mission démarrée par le conducteur, lot Android accepté, relais Traccar **sans doublon**, téléphone **déclaré automatiquement dans Traccar**, position refusée après clôture |
 | Images Docker | CI → GHCR | `ghcr.io/rito27959-arch/nexfleet-{api,gps-gateway,traccar}:<version>` et `:latest` publiées à chaque version |
@@ -51,7 +51,7 @@ sans droit refusé → comptes réservés à l'admin, journal lisible par l'audi
 | Boîtier GPS véhicule via Traccar | Traccar 6.16 réel exécuté en CI (relais, déclaration d'appareil) ; aucun boîtier physique | Un boîtier configuré sur le port de son protocole, position reçue |
 | Vue 3D (Filament) Android | Compilée, lint vert. **Carte MapLibre et tous les autres écrans observés sur émulateur** (Pixel 7, API 34, captures en CI). La vue 3D, elle, fige l'émulateur du runner : sans GPU, son rendu passe par SwiftShader et la capture revient vide | Capture sur un vrai téléphone OpenGL ES 3 |
 | Fond de carte du bureau | Tuiles OpenStreetMap (usage modéré) ; non observé ici (réseau fermé), repères hors ligne affichés | Serveur de tuiles CAMTEL ou contrat d'usage |
-| Poste Windows CAMTEL | Installation testée en CI sur Windows Server 2022 | Connexion depuis un poste CAMTEL réel (antivirus, proxy) |
+| Poste Windows CAMTEL | Paquets produits ; essai d'installation automatique pas encore concluant | Connexion depuis un poste CAMTEL réel (antivirus, proxy) |
 | Recette métier par CAMTEL | Routes prouvées par les tests d'intégration ; serveur de production joignable ; aucune recette par les utilisateurs CAMTEL | Saisie réelle d'une entité, de ses véhicules et comptes, puis une semaine d'usage |
 | Kit CAMTEL avec HTTPS (Caddy) | Pile éprouvée en CI sans Caddy (ports locaux) | Installation sur un serveur CAMTEL avec ses noms DNS |
 
