@@ -62,7 +62,9 @@ jobs:
             -Dnf.db.password=ci_only 2>&1 | tee build.log
       - name: Annotations d'échec
         if: failure()
-        run: tools/ci-annotate.sh build.log Maven
+        run: |
+          python3 tools/ci-test-failures.py || true
+          tools/ci-annotate.sh build.log Maven
       - name: Bilan des tests (annotation)
         if: always()
         run: |

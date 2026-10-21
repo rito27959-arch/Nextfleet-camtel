@@ -4,7 +4,7 @@
 # Usage : tools/ci-annotate.sh journal.log "Titre"
 LOG=$1; TITLE=${2:-build}
 [[ -f "$LOG" ]] || exit 0
-enc() { sed -e 's/%/%25/g' -e 's/\r//g' | head -c 3500 | awk 'BEGIN{ORS="%0A"} {print}' ; }
+enc() { sed -e 's/%/%25/g' -e 's/\r//g' | head -c 3500 | iconv -c -f UTF-8 -t UTF-8 | awk 'BEGIN{ORS="%0A"} {print}' ; }
 # 1) échecs de tests JUnit (surefire) : en-tête de l'échec, message, premières lignes de pile du projet
 TF=$(grep -E -A14 "<<< (ERROR|FAILURE)!" "$LOG" | grep -E "<<<|Error|Exception|expected|but was|Assert|at cm\.camtel|Caused by|Status|Response|^\s*[A-Za-z].*:" \
      | grep -v "^\s*at org\.\|^\s*at java\.\|^\s*at jdk\." | head -60 | cut -c1-300 | enc)
