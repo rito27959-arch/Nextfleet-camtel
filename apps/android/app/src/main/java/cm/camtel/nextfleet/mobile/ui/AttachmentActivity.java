@@ -29,6 +29,7 @@ public final class AttachmentActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        Motion.detailScreen(this);
         if (NexFleetApp.get().session() == null) {
             finish();
             return;
@@ -115,5 +116,11 @@ public final class AttachmentActivity extends Activity {
     protected void onDestroy() {
         if (temp != null && !temp.delete()) temp.deleteOnExit();
         super.onDestroy();
+    }
+
+    @Override
+    public void finish() {
+        super.finish();
+        Motion.detailClosing(this);
     }
 }

@@ -30,6 +30,14 @@ login() { curl -fs -H 'Content-Type: application/json' -d "{\"login\":\"$1\",\"p
 MGR=$(login gestionnaire); DRV=$(login conducteur)
 [ -n "$MGR" ] && [ "$MGR" != null ] || fail "connexion gestionnaire"
 sleep 25
+# réponses JSON compressées (gzip) et revalidables par ETag (304 sans corps)
+HDR=$(curl -fs -o /dev/null -D - -H 'Accept-Encoding: gzip' -H "Authorization: Bearer $MGR" http://127.0.0.1:8080/api/v1/vehicles | tr -d '\r')
+echo "$HDR" | grep -qi '^content-encoding: gzip' || fail "réponse JSON non compressée"
+TAG=$(echo "$HDR" | grep -i '^etag:' | cut -d' ' -f2-)
+[ -n "$TAG" ] || fail "ETag absent"
+CODE=$(curl -s -o /dev/null -w '%{http_code}' -H "If-None-Match: $TAG" -H 'Accept-Encoding: gzip' -H "Authorization: Bearer $MGR" http://127.0.0.1:8080/api/v1/vehicles)
+[ "$CODE" = 304 ] || fail "revalidation ETag : $CODE au lieu de 304"
+echo "OK gzip + ETag/304"
 N=$(curl -fs -H "Authorization: Bearer $MGR" http://127.0.0.1:8080/api/v1/fleet/live | jq length)
 [ "$N" -ge 2 ] || fail "carte de flotte : $N véhicule(s)"
 echo "OK carte de flotte : $N véhicules en mission (simulateur de démonstration)"

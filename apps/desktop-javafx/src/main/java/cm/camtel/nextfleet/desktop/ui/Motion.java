@@ -50,8 +50,22 @@ public final class Motion {
     public static final Duration BASE = Duration.millis(240);
     public static final Duration SLOW = Duration.millis(280);
 
+    /** Vrai pendant une mise à jour silencieuse (données rafraîchies en arrière-plan) : rien ne doit bouger. */
+    private static boolean quiet;
+
     public static boolean isReduced() {
-        return reduced;
+        return reduced || quiet;
+    }
+
+    /** Exécute une mise à jour d'interface sans animation (fil JavaFX). */
+    public static void quietly(Runnable r) {
+        boolean before = quiet;
+        quiet = true;
+        try {
+            r.run();
+        } finally {
+            quiet = before;
+        }
     }
 
     public static void setReduced(boolean value) {
@@ -64,7 +78,7 @@ public final class Motion {
     }
 
     public static void enter(Node n, Duration delay, double rise) {
-        if (reduced) {
+        if (isReduced()) {
             n.setOpacity(1);
             n.setTranslateY(0);
             return;
@@ -95,7 +109,7 @@ public final class Motion {
     public static void countUp(Label label, double target, DoubleFunction<String> format) {
         String finalText = format.apply(target);
         label.setAccessibleText(finalText);
-        if (reduced || target == 0) {
+        if (isReduced() || target == 0) {
             label.setText(finalText);
             return;
         }
@@ -109,7 +123,7 @@ public final class Motion {
 
     /** Anime une propriété numérique (jauge, anneau, barre). */
     public static void animate(DoubleProperty p, double to, Duration d, Duration delay) {
-        if (reduced) {
+        if (isReduced()) {
             p.set(to);
             return;
         }
@@ -131,7 +145,7 @@ public final class Motion {
     }
 
     private static void lift(Node n, double y) {
-        if (reduced) return;
+        if (isReduced()) return;
         TranslateTransition t = new TranslateTransition(FAST, n);
         t.setToY(y);
         t.setInterpolator(EASE_OUT);
@@ -139,7 +153,7 @@ public final class Motion {
     }
 
     private static void scale(Node n, double s, Duration d, Interpolator i) {
-        if (reduced) return;
+        if (isReduced()) return;
         ScaleTransition t = new ScaleTransition(d, n);
         t.setToX(s);
         t.setToY(s);
@@ -149,7 +163,7 @@ public final class Motion {
 
     /** Panneau latéral qui glisse depuis la droite avec un ressort (feuille iOS). */
     public static void slideInFromRight(Node n, double distance) {
-        if (reduced) {
+        if (isReduced()) {
             n.setTranslateX(0);
             n.setOpacity(1);
             return;
@@ -165,7 +179,7 @@ public final class Motion {
     }
 
     public static void slideOutToRight(Node n, double distance, Runnable after) {
-        if (reduced) {
+        if (isReduced()) {
             after.run();
             return;
         }
@@ -186,16 +200,48 @@ public final class Motion {
                 new KeyFrame(period.divide(2), new KeyValue(n.opacityProperty(), min, EASE_IN_OUT)),
                 new KeyFrame(period, new KeyValue(n.opacityProperty(), 1.0, EASE_IN_OUT)));
         tl.setCycleCount(Animation.INDEFINITE);
-        if (!reduced) tl.play();
+        if (!isReduced()) tl.play();
         n.sceneProperty().addListener((o, a, s) -> {
             if (s == null) tl.stop();
         });
         return tl;
     }
 
+    /**
+     * Défilement fluide à la molette : chaque cran prolonge une glissade décélérée (260 ms) au lieu d'un saut sec.
+     * Laisse intacts les pavés tactiles (déjà fluides, avec inertie système) et les listes imbriquées
+     * (tableaux, zones de texte, autres panneaux défilants), qui gardent leur propre défilement.
+     */
+    public static void smoothScroll(javafx.scene.control.ScrollPane sp) {
+        if (sp.getProperties().containsKey("nf-smooth")) return;
+        sp.getProperties().put("nf-smooth", true);
+        double[] target = {-1};
+        Timeline tl = new Timeline();
+        tl.setOnFinished(e -> target[0] = -1);
+        sp.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, e -> {
+            if (isReduced() || e.getDeltaY() == 0 || e.isInertia() || e.getTouchCount() > 0 || e.isShortcutDown()) return;
+            for (Node n = e.getTarget() instanceof Node t ? t : null; n != null && n != sp; n = n.getParent()) {
+                if (n instanceof javafx.scene.control.ScrollPane || n instanceof javafx.scene.control.ListView
+                        || n instanceof javafx.scene.control.TableView || n instanceof javafx.scene.control.TextArea) return;
+            }
+            Node content = sp.getContent();
+            if (content == null) return;
+            double range = content.getLayoutBounds().getHeight() - sp.getViewportBounds().getHeight();
+            if (range <= 1) return;
+            double span = sp.getVmax() - sp.getVmin();
+            double from = target[0] >= 0 ? target[0] : sp.getVvalue();
+            double to = Math.max(sp.getVmin(), Math.min(sp.getVmax(), from - e.getDeltaY() * 2.2 / range * span));
+            target[0] = to;
+            tl.stop();
+            tl.getKeyFrames().setAll(new KeyFrame(Duration.millis(260), new KeyValue(sp.vvalueProperty(), to, EASE_OUT)));
+            tl.play();
+            e.consume();
+        });
+    }
+
     /** Glissement vertical vers une position (indicateur de navigation latérale). */
     public static void slideTo(Node n, double y) {
-        if (reduced || n.getOpacity() == 0) {
+        if (isReduced() || n.getOpacity() == 0) {
             n.setTranslateY(y);
             n.setOpacity(1);
             return;

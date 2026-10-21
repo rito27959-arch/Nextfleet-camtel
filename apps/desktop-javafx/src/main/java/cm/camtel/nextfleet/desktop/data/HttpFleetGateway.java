@@ -34,6 +34,8 @@ public final class HttpFleetGateway implements FleetGateway {
 
     private volatile URI base;
     private final HttpClient http;
+    /** Réponses GET déjà reçues, revalidées par ETag (304 : rien ne retransite). Vidé à chaque changement de session. */
+    private final EtagCache etags = new EtagCache(256);
     private final ObjectMapper json = new ObjectMapper();
     private volatile String token;
     private volatile boolean mustChangePassword;
@@ -88,6 +90,8 @@ public final class HttpFleetGateway implements FleetGateway {
         java.util.Arrays.fill(password, '\0');
         JsonNode r = send("POST", "/api/v1/auth/login", body, false);
         token = r.path("token").asText();
+        etags.clear();
+        ViewCache.reset(true);
         JsonNode u = r.path("user");
         mustChangePassword = u.path("mustChangePassword").asBoolean(false);
         List<String> roles = new ArrayList<>();
@@ -103,6 +107,8 @@ public final class HttpFleetGateway implements FleetGateway {
             } finally {
                 token = null;
                 mustChangePassword = false;
+                etags.clear();
+                ViewCache.reset(false);
             }
         }
     }
@@ -698,11 +704,11 @@ public final class HttpFleetGateway implements FleetGateway {
         if (t.workDone() != null && !t.workDone().isBlank()) b.put("workDone", t.workDone());
         if (t.proofFileId() != null) b.put("proofFileId", t.proofFileId().toString());
         if (t.reason() != null && !t.reason().isBlank()) b.put("reason", t.reason());
-        extraHeader = new String[]{"If-Match", "\"" + version + "\""};
+        extraHeader.set(new String[]{"If-Match", "\"" + version + "\""});
         try {
             return toWork(send("POST", "/api/v1/maintenance-orders/" + orderId + "/transition", b, true));
         } finally {
-            extraHeader = null;
+            extraHeader.remove();
         }
     }
 
@@ -827,11 +833,11 @@ public final class HttpFleetGateway implements FleetGateway {
         if (d.exceptionReason() != null && !d.exceptionReason().isBlank()) b.put("exceptionReason", d.exceptionReason());
         if (d.odometerKm() != null) b.put("odometerKm", d.odometerKm());
         if (d.receiptFileId() != null) b.put("receiptFileId", d.receiptFileId().toString());
-        extraHeader = new String[]{"Idempotency-Key", requestKey};
+        extraHeader.set(new String[]{"Idempotency-Key", requestKey});
         try {
             send("POST", "/api/v1/fuel-fills", b, true);
         } finally {
-            extraHeader = null;
+            extraHeader.remove();
         }
     }
 
@@ -1026,6 +1032,7 @@ public final class HttpFleetGateway implements FleetGateway {
                 .header("Accept", accept).header("X-Request-ID", UUID.randomUUID().toString()).header("Authorization", "Bearer " + token)
                 .method(method, body);
         if (contentType != null) b.header("Content-Type", contentType);
+        b.header("Accept-Encoding", "gzip");
         HttpResponse<byte[]> res;
         try {
             res = http.send(b.build(), HttpResponse.BodyHandlers.ofByteArray());
@@ -1036,10 +1043,14 @@ public final class HttpFleetGateway implements FleetGateway {
             throw new GatewayException(GatewayException.Kind.NETWORK, "Requête interrompue.");
         }
         int s = res.statusCode();
-        if (s >= 200 && s < 300) return res;
+        byte[] decoded = Compression.decode(res);
+        if (s >= 200 && s < 300) {
+            if (!"GET".equals(method)) ViewCache.invalidate();
+            return Compression.withBody(res, decoded);
+        }
         String detail;
         try {
-            detail = json.readTree(res.body()).path("detail").asText("Erreur " + s);
+            detail = json.readTree(decoded).path("detail").asText("Erreur " + s);
         } catch (IOException | RuntimeException e) {
             detail = "Erreur " + s;
         }
@@ -1061,15 +1072,16 @@ public final class HttpFleetGateway implements FleetGateway {
     }
 
     private JsonNode sendWithHeader(String method, String path, String header, String value) {
-        extraHeader = new String[]{header, value};
+        extraHeader.set(new String[]{header, value});
         try {
             return send(method, path, null, true);
         } finally {
-            extraHeader = null;
+            extraHeader.remove();
         }
     }
 
-    private volatile String[] extraHeader;
+    /** En-tête propre à l'appel en cours (If-Match, Idempotency-Key) : par fil, car les écrans lancent leurs appels en parallèle. */
+    private final ThreadLocal<String[]> extraHeader = new ThreadLocal<>();
 
     static Vehicle toVehicle(JsonNode n) {
         VehicleStatus status;
@@ -1099,11 +1111,16 @@ public final class HttpFleetGateway implements FleetGateway {
         b.method(method, body == null ? HttpRequest.BodyPublishers.noBody()
                 : HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8));
         if (body != null) b.header("Content-Type", "application/json");
-        String[] extra = extraHeader;
+        String[] extra = extraHeader.get();
         if (extra != null) b.header(extra[0], extra[1]);
-        HttpResponse<String> res;
+        b.header("Accept-Encoding", "gzip");
+        boolean get = "GET".equals(method);
+        String cacheKey = get && auth ? path : null;
+        EtagCache.Entry cached = cacheKey == null ? null : etags.get(cacheKey);
+        if (cached != null) b.header("If-None-Match", cached.etag());
+        HttpResponse<byte[]> res;
         try {
-            res = http.send(b.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            res = http.send(b.build(), HttpResponse.BodyHandlers.ofByteArray());
         } catch (IOException e) {
             throw new GatewayException(GatewayException.Kind.NETWORK,
                     "Serveur injoignable. Vérifiez la connexion réseau ; aucune donnée n'a été modifiée.");
@@ -1112,13 +1129,27 @@ public final class HttpFleetGateway implements FleetGateway {
             throw new GatewayException(GatewayException.Kind.NETWORK, "Requête interrompue.");
         }
         int s = res.statusCode();
+        byte[] bytes;
+        if (s == 304 && cached != null) {
+            // contenu inchangé : rien n'a transité sur le réseau hormis l'en-tête
+            bytes = cached.body();
+            s = 200;
+        } else {
+            bytes = Compression.decode(res);
+            if (cacheKey != null && s == 200) {
+                res.headers().firstValue("ETag").ifPresent(tag -> etags.put(cacheKey, tag, bytes));
+            }
+        }
         JsonNode payload;
         try {
-            payload = res.body() == null || res.body().isBlank() ? json.createObjectNode() : json.readTree(res.body());
+            payload = bytes.length == 0 ? json.createObjectNode() : json.readTree(bytes);
         } catch (IOException e) {
             throw new GatewayException(GatewayException.Kind.SERVER, "Réponse du serveur illisible (" + s + ").");
         }
-        if (s >= 200 && s < 300) return payload;
+        if (s >= 200 && s < 300) {
+            if (!get) ViewCache.invalidate();
+            return payload;
+        }
         String detail = payload.path("detail").asText("Erreur " + s);
         GatewayException.Kind kind = switch (s) {
             case 400, 422 -> GatewayException.Kind.VALIDATION;

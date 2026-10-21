@@ -85,13 +85,13 @@ final class MissionsView extends BorderPane {
     }
 
     private void load() {
-        list.getChildren().setAll(Ui.skeleton(-1, 76), Ui.skeleton(-1, 76), Ui.skeleton(-1, 76));
-        Ui.async(() -> shell.gateway().missions(), ms -> {
+        Ui.load("missions", () -> shell.gateway().missions(), ms -> {
             missions = ms;
             if (selected == null) ms.stream().filter(m -> m.status() == MissionStatus.ACTIVE).findFirst().ifPresent(m -> selected = m.id());
             renderList();
             if (selected != null) select(selected);
-        }, err -> list.getChildren().setAll(Ui.errorBanner(err, this::load)));
+        }, err -> list.getChildren().setAll(Ui.errorBanner(err, this::load)),
+                () -> list.getChildren().setAll(Ui.skeleton(-1, 76), Ui.skeleton(-1, 76), Ui.skeleton(-1, 76)));
     }
 
     private boolean inFilter(Mission m) {
@@ -131,6 +131,20 @@ final class MissionsView extends BorderPane {
         c.setAccessibleText("Mission " + m.reference() + ", " + m.status().label + ", " + m.purpose());
         Motion.pressable(c);
         return c;
+    }
+
+    /** Met une mission au premier plan (depuis la recherche globale). */
+    void focus(UUID id) {
+        selected = id;
+        missions.stream().filter(m -> m.id().equals(id)).findFirst().ifPresent(m -> {
+            filter = switch (m.status()) {
+                case ACTIVE -> 0;
+                case AUTHORIZED, DRAFT -> 1;
+                default -> 2;
+            };
+            if (seg != null) seg.select(filter);
+            select(id);
+        });
     }
 
     private void select(UUID id) {

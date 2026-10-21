@@ -23,6 +23,9 @@ final class MessagesPage implements Page {
     private static final ZoneId DLA = ZoneId.of("Africa/Douala");
     private final MainActivity a;
     private final ScrollView scroll;
+    private final PullToRefresh ptr;
+    private boolean rendered;
+    private boolean fresh;
     private final LinearLayout col;
     private AutoCloseable realtime;
 
@@ -33,6 +36,8 @@ final class MessagesPage implements Page {
         scroll = new ScrollView(a);
         scroll.addView(col);
         Ui.applyInsets(scroll, true, false);
+        ptr = new PullToRefresh(a, scroll);
+        ptr.setOnRefresh(this::reload);
     }
 
     @Override
@@ -47,7 +52,7 @@ final class MessagesPage implements Page {
 
     @Override
     public View view() {
-        return scroll;
+        return ptr;
     }
 
     @Override
@@ -69,10 +74,38 @@ final class MessagesPage implements Page {
     }
 
     private void reload() {
-        Ui.async(() -> NexFleetApp.get().repository().conversations(), this::render, e -> {
-            col.removeAllViews();
-            col.addView(Ui.largeTitle(a, "Messages"));
-            col.addView(Ui.text(a, e.getMessage(), 14, Ui.RED, NexFleetApp.get().regular()));
+        reload(null);
+    }
+
+    /** Dernières conversations connues tout de suite, puis celles du serveur ; squelettes au tout premier affichage. */
+    private void reload(Runnable done) {
+        cm.camtel.nextfleet.mobile.data.Repository repo = NexFleetApp.get().repository();
+        if (!rendered) {
+            if (col.getChildCount() == 0) {
+                col.addView(Ui.largeTitle(a, "Messages"));
+                for (int i = 0; i < 4; i++) {
+                    View sk = Ui.skeleton(a, 72, 18);
+                    ((LinearLayout.LayoutParams) sk.getLayoutParams()).topMargin = Ui.dp(a, i == 0 ? 12 : 8);
+                    col.addView(sk);
+                }
+            }
+            Ui.async(() -> repo.cached(repo::conversations), list -> {
+                if (list != null && !fresh) render(list);
+            }, e -> { });
+        }
+        Ui.async(repo::conversations, list -> {
+            fresh = true;
+            render(list);
+            if (done != null) done.run();
+        }, e -> {
+            if (!rendered) {
+                col.removeAllViews();
+                col.addView(Ui.largeTitle(a, "Messages"));
+                col.addView(Ui.text(a, e.getMessage(), 14, Ui.RED, NexFleetApp.get().regular()));
+            } else {
+                Motion.reject(col);
+            }
+            if (done != null) done.run();
         });
     }
 
@@ -88,9 +121,23 @@ final class MessagesPage implements Page {
             plus.setBackground(Ui.rounded(a, Ui.ACCENT, 999));
             plus.setContentDescription("Nouvelle conversation");
             plus.setOnClickListener(v -> compose());
+            Motion.pressable(plus);
             head.addView(plus, new LinearLayout.LayoutParams(Ui.dp(a, 40), Ui.dp(a, 40)));
         }
         col.addView(head);
+        Long offline = NexFleetApp.get().repository().offlineSince();
+        if (offline != null && fresh) {
+            TextView b = Ui.offlineBanner(a, offline);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.bottomMargin = Ui.dp(a, 12);
+            col.addView(b, lp);
+        }
+        if (list.isEmpty()) {
+            col.addView(Ui.emptyState(a, cm.camtel.nextfleet.mobile.R.drawable.ic_tab_messages, "Aucune conversation",
+                    "Les échanges de vos missions et avec votre gestionnaire apparaîtront ici."));
+            finishRender();
+            return;
+        }
         LinearLayout group = Ui.group(a);
         for (int i = 0; i < list.size(); i++) {
             Conversation c = list.get(i);
@@ -103,8 +150,13 @@ final class MessagesPage implements Page {
             }
             group.addView(row(c));
         }
-        if (list.isEmpty()) group.addView(Ui.muted(a, "Aucune conversation.", 14));
         col.addView(group);
+        finishRender();
+    }
+
+    private void finishRender() {
+        if (!rendered) Motion.stagger(col);
+        rendered = true;
     }
 
     private View row(Conversation c) {

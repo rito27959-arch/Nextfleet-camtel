@@ -49,9 +49,8 @@ final class FuelView extends ScrollPane {
     }
 
     private void load() {
-        col.getChildren().setAll(header(), Ui.skeleton(-1, 96), Ui.skeleton(-1, 280));
-        Ui.async(() -> new Object[]{shell.gateway().fuelOrders(), shell.gateway().fuelFills(),
-                shell.gateway().vehicles(null, null, 0, 200).items(), shell.gateway().suppliers()}, r -> {
+        Ui.load("fuel", Ui.all(() -> shell.gateway().fuelOrders(), () -> shell.gateway().fuelFills(),
+                () -> shell.gateway().vehicles(null, null, 0, 200).items(), () -> shell.gateway().suppliers()), r -> {
             @SuppressWarnings("unchecked") List<FuelOrder> o = (List<FuelOrder>) r[0];
             @SuppressWarnings("unchecked") List<FuelFill> f = (List<FuelFill>) r[1];
             @SuppressWarnings("unchecked") List<Vehicle> v = (List<Vehicle>) r[2];
@@ -61,7 +60,8 @@ final class FuelView extends ScrollPane {
             vehicles = v;
             suppliers = s;
             render();
-        }, err -> col.getChildren().set(1, Ui.errorBanner(err, this::load)));
+        }, err -> col.getChildren().setAll(header(), Ui.errorBanner(err, this::load)),
+                () -> col.getChildren().setAll(header(), Ui.skeleton(-1, 96), Ui.skeleton(-1, 280)));
     }
 
     private Node header() {

@@ -182,6 +182,12 @@ public final class ScreenshotTour {
         add(() -> shot("32-rapports"));
         add(() -> shell().show(AppShell.Section.MAINTENANCE));
         add(() -> shot("33-entretiens-gestionnaire"));
+        add(() -> shell().openSearch(""));
+        add(() -> shot("34-recherche-universelle"));
+        add(() -> shell().openSearch("lt"));
+        add(() -> { });
+        add(() -> shot("34b-recherche-universelle-saisie"));
+        add(() -> shell().closeSearch());
         add(() -> app.showLogin(null));
         add(() -> login("auditeur"));
         add(() -> shell().show(AppShell.Section.VEHICLES));

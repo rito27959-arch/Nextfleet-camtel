@@ -71,6 +71,16 @@ public class Bootstrap {
                 seedDemo();
             }
             if (jdbc.queryForObject("SELECT count(*) FROM app_user", Integer.class) == 0) createAdmin();
+            boolean production = "PRODUCTION".equals(jdbc.queryForObject("SELECT kind FROM app_environment", String.class));
+            if (production && !adminLogin.isBlank()) {
+                // en production, le mot de passe d'amorçage (connu de l'hébergement) doit être remplacé à la première
+                // connexion, y compris pour un compte créé par une version antérieure qui ne l'imposait pas
+                int n = jdbc.update("""
+                        UPDATE app_user SET must_change_password = true
+                         WHERE login_normalized = lower(?) AND password_changed_at IS NULL AND NOT must_change_password""",
+                        adminLogin.strip());
+                if (n > 0) LOG.info("Amorçage : changement du mot de passe d'amorçage imposé à « {} »", adminLogin.strip());
+            }
         });
     }
 

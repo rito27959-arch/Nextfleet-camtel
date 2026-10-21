@@ -74,6 +74,16 @@ public interface Repository {
         return new RepositoryException(RepositoryException.Kind.SERVER, what + " : disponible avec le serveur NexFleet uniquement.");
     }
 
+    /** Même lecture, servie par le stockage local seulement ; null s'il n'y a encore rien. */
+    default <T> T cached(java.util.function.Supplier<T> read) {
+        return null;
+    }
+
+    /** Si la dernière lecture a dû se contenter des données locales (réseau absent) : date de ces données. */
+    default Long offlineSince() {
+        return null;
+    }
+
     default void changePassword(char[] current, char[] next) {
         throw demoOnly("Le changement de mot de passe");
     }

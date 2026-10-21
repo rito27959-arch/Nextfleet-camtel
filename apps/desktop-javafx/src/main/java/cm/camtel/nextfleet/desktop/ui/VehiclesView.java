@@ -129,14 +129,15 @@ public final class VehiclesView extends BorderPane {
     }
 
     private void load() {
-        VBox sk = new VBox(8);
-        for (int i = 0; i < 6; i++) sk.getChildren().add(Ui.skeleton(-1, 40));
-        sk.getStyleClass().add("card");
-        body.getChildren().setAll(sk);
         String q = search.getText();
         VehicleStatus st = status;
         int p = page;
-        Ui.async(() -> gateway.vehicles(q, st, p, PAGE_SIZE), this::render, this::fail);
+        Ui.load("vehicles:" + q + ":" + st + ":" + p, () -> gateway.vehicles(q, st, p, PAGE_SIZE), this::render, this::fail, () -> {
+            VBox sk = new VBox(8);
+            for (int i = 0; i < 6; i++) sk.getChildren().add(Ui.skeleton(-1, 40));
+            sk.getStyleClass().add("card");
+            body.getChildren().setAll(sk);
+        });
     }
 
     private void render(Page<Vehicle> r) {
@@ -165,6 +166,11 @@ public final class VehiclesView extends BorderPane {
 
     private void fail(GatewayException e) {
         body.getChildren().setAll(Ui.errorBanner(e, this::load));
+    }
+
+    /** Ouvre directement la fiche d'un véhicule (depuis la recherche globale). */
+    void openVehicle(Vehicle v) {
+        openSheet(v);
     }
 
     private void openSheet(Vehicle v) {

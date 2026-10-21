@@ -41,6 +41,9 @@ final class MissionsPage implements Page, TrackingBus.Listener {
 
     private final MainActivity a;
     private final ScrollView scroll;
+    private final PullToRefresh ptr;
+    private boolean rendered;
+    private boolean fresh;
     private final LinearLayout col;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private TextView liveLine;
@@ -53,6 +56,8 @@ final class MissionsPage implements Page, TrackingBus.Listener {
         scroll = new ScrollView(a);
         scroll.addView(col);
         Ui.applyInsets(scroll, true, false);
+        ptr = new PullToRefresh(a, scroll);
+        ptr.setOnRefresh(this::load);
     }
 
     @Override
@@ -67,7 +72,7 @@ final class MissionsPage implements Page, TrackingBus.Listener {
 
     @Override
     public View view() {
-        return scroll;
+        return ptr;
     }
 
     @Override
@@ -94,14 +99,40 @@ final class MissionsPage implements Page, TrackingBus.Listener {
     }
 
     private void load() {
-        if (col.getChildCount() == 0) {
-            col.addView(Ui.largeTitle(a, "Missions"));
-            col.addView(Ui.muted(a, "Chargement…", 15));
+        load(null);
+    }
+
+    /**
+     * Affichage immédiat des dernières missions connues (stockage local), puis version du serveur.
+     * Premier affichage sans données locales : squelettes à la forme des cartes, jamais un texte d'attente.
+     */
+    private void load(Runnable done) {
+        cm.camtel.nextfleet.mobile.data.Repository repo = NexFleetApp.get().repository();
+        if (!rendered) {
+            if (col.getChildCount() == 0) {
+                col.addView(Ui.largeTitle(a, "Missions"));
+                col.addView(Ui.skeleton(a, 196, 26));
+                col.addView(Ui.skeleton(a, 64, 18));
+                col.addView(Ui.skeleton(a, 88, 18));
+            }
+            Ui.async(() -> repo.cached(repo::missions), list -> {
+                if (list != null && !fresh) render(list);
+            }, e -> { });
         }
-        Ui.async(() -> NexFleetApp.get().repository().missions(), this::render, e -> {
-            col.removeAllViews();
-            col.addView(Ui.largeTitle(a, "Missions"));
-            col.addView(errorCard(e.getMessage()));
+        Ui.async(repo::missions, list -> {
+            fresh = true;
+            render(list);
+            if (done != null) done.run();
+        }, e -> {
+            if (!rendered) {
+                col.removeAllViews();
+                col.addView(Ui.largeTitle(a, "Missions"));
+                col.addView(errorCard(e.getMessage()));
+            } else {
+                Motion.reject(col);
+                android.widget.Toast.makeText(a, e.getMessage(), android.widget.Toast.LENGTH_SHORT).show();
+            }
+            if (done != null) done.run();
         });
     }
 
@@ -112,6 +143,8 @@ final class MissionsPage implements Page, TrackingBus.Listener {
         TextView title = Ui.largeTitle(a, s.can(Permission.MISSION_DRIVE) && !s.can(Permission.MISSION_MANAGE) ? "Mes missions" : "Missions");
         title.setPadding(Ui.dp(a, 4), 0, 0, 0);
         col.addView(title);
+        Long offline = NexFleetApp.get().repository().offlineSince();
+        if (offline != null && fresh) col.addView(Ui.offlineBanner(a, offline));
         Mission active = null, next = null;
         List<Mission> others = new ArrayList<>();
         for (Mission m : missions) {
@@ -143,6 +176,8 @@ final class MissionsPage implements Page, TrackingBus.Listener {
                 if (visible) load();
             }, 15_000);
         }
+        if (!rendered) Motion.stagger(col);
+        rendered = true;
     }
 
     private View hero(Mission m, boolean active) {

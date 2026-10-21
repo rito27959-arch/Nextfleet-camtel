@@ -34,8 +34,8 @@ final class ReportsView extends ScrollPane {
     }
 
     private void load() {
-        col.getChildren().setAll(header(), Ui.skeleton(-1, 300));
-        Ui.async(() -> shell.gateway().reports(), this::render, err -> col.getChildren().set(1, Ui.errorBanner(err, this::load)));
+        Ui.load("reports", () -> shell.gateway().reports(), this::render, err -> col.getChildren().setAll(header(), Ui.errorBanner(err, this::load)),
+                () -> col.getChildren().setAll(header(), Ui.skeleton(-1, 300)));
     }
 
     private Node header() {

@@ -58,6 +58,9 @@ public final class RemoteRepository implements Repository {
             JSONArray ra = u.optJSONArray("roles");
             if (ra != null) for (int i = 0; i < ra.length(); i++) roles.add(ra.getJSONObject(i).getString("role"));
             session = new Session(r.getString("token"), u.optString("login", login), u.optString("displayName", login), roles, false);
+            // nouvelle connexion : aucune donnée d'une session précédente (autre agent sur le même téléphone)
+            store().clear();
+            offlineSince = null;
             session.mustChangePassword = u.optBoolean("mustChangePassword", false);
             return session;
         } catch (JSONException e) {
@@ -69,6 +72,8 @@ public final class RemoteRepository implements Repository {
     public void logout() {
         Session s = session;
         session = null;
+        offlineSince = null;
+        store().clear();
         if (s != null) call("POST", "/api/v1/auth/logout", null, s.token);
     }
 
@@ -478,11 +483,11 @@ public final class RemoteRepository implements Repository {
             if (exceptionReason != null && !exceptionReason.trim().isEmpty()) b.put("exceptionReason", exceptionReason.trim());
             if (odometerKm != null) b.put("odometerKm", odometerKm);
             if (receiptFileId != null) b.put("receiptFileId", receiptFileId);
-            extraHeader = new String[]{"Idempotency-Key", requestKey};
+            extraHeader.set(new String[]{"Idempotency-Key", requestKey});
             try {
                 call("POST", "/api/v1/fuel-fills", b.toString(), token());
             } finally {
-                extraHeader = null;
+                extraHeader.remove();
             }
         } catch (JSONException e) {
             throw unreadable();
@@ -544,7 +549,12 @@ public final class RemoteRepository implements Repository {
         }
     }
 
-    private volatile String[] extraHeader;
+    /** En-tête propre à l'appel en cours : par fil, les écrans lancent plusieurs appels en même temps. */
+    private final ThreadLocal<String[]> extraHeader = new ThreadLocal<>();
+    /** Lecture depuis le stockage local seulement (affichage instantané avant la réponse du serveur). */
+    private final ThreadLocal<Boolean> cacheOnly = new ThreadLocal<>();
+    private volatile ResponseStore store;
+    private volatile Long offlineSince;
 
     /** Transport binaire (fichiers) avec le même traitement d'erreurs que {@link #call}. */
     private byte[] raw(String method, String path, byte[] body, String contentType) {
@@ -600,7 +610,41 @@ public final class RemoteRepository implements Repository {
 
     // ------------------------------------------------------------------ transport HTTP
 
+    private ResponseStore store() {
+        ResponseStore s = store;
+        if (s == null) {
+            synchronized (this) {
+                if (store == null) store = new ResponseStore(cm.camtel.nextfleet.mobile.NexFleetApp.get());
+                s = store;
+            }
+        }
+        return s;
+    }
+
+    @Override
+    public <T> T cached(java.util.function.Supplier<T> read) {
+        cacheOnly.set(true);
+        try {
+            return read.get();
+        } catch (RuntimeException e) {
+            return null;
+        } finally {
+            cacheOnly.remove();
+        }
+    }
+
+    @Override
+    public Long offlineSince() {
+        return offlineSince;
+    }
+
     private String call(String method, String path, String json, String bearer) {
+        boolean read = "GET".equals(method) && bearer != null;
+        ResponseStore.Entry saved = read ? store().get(path) : null;
+        if (read && Boolean.TRUE.equals(cacheOnly.get())) {
+            if (saved == null) throw new RepositoryException(RepositoryException.Kind.NETWORK, "Pas encore de données locales.");
+            return saved.body;
+        }
         HttpURLConnection c = null;
         try {
             c = (HttpURLConnection) new URL(apiUrl + path).openConnection();
@@ -610,7 +654,8 @@ public final class RemoteRepository implements Repository {
             c.setRequestProperty("Accept", "application/json");
             c.setRequestProperty("X-Request-ID", UUID.randomUUID().toString());
             if (bearer != null) c.setRequestProperty("Authorization", "Bearer " + bearer);
-            String[] extra = extraHeader;
+            if (saved != null && saved.etag != null) c.setRequestProperty("If-None-Match", saved.etag);
+            String[] extra = extraHeader.get();
             if (extra != null) c.setRequestProperty(extra[0], extra[1]);
             if (json != null) {
                 c.setDoOutput(true);
@@ -623,10 +668,26 @@ public final class RemoteRepository implements Repository {
                 c.setFixedLengthStreamingMode(0);
             }
             int code = c.getResponseCode();
+            if (code == 304 && saved != null) {
+                offlineSince = null;
+                return saved.body;   // inchangé : seuls les en-têtes ont transité
+            }
             String text = read(code >= 400 ? c.getErrorStream() : c.getInputStream());
-            if (code >= 200 && code < 300) return text.isEmpty() ? "{}" : text;
+            if (code >= 200 && code < 300) {
+                if (read) {
+                    offlineSince = null;
+                    if (code == 200 && !text.isEmpty()) store().put(path, c.getHeaderField("ETag"), text);
+                }
+                return text.isEmpty() ? "{}" : text;
+            }
             throw error(code, text);
         } catch (IOException e) {
+            if (saved != null) {
+                // hors connexion : dernière version connue, signalée comme telle par l'écran (offlineSince)
+                Long since = offlineSince;
+                offlineSince = since == null ? saved.savedAt : Math.min(since, saved.savedAt);
+                return saved.body;
+            }
             throw new RepositoryException(RepositoryException.Kind.NETWORK,
                     "Serveur injoignable. Vérifiez la connexion ; aucune donnée n'a été modifiée.");
         } finally {

@@ -47,9 +47,8 @@ final class WorkOrdersView extends ScrollPane {
     }
 
     private void load() {
-        col.getChildren().setAll(header(), Ui.skeleton(-1, 96), Ui.skeleton(-1, 280));
-        Ui.async(() -> new Object[]{shell.gateway().workOrders(false), workshop() ? shell.gateway().oilChanges() : List.of(),
-                shell.gateway().vehicles(null, null, 0, 200).items(), shell.gateway().maintenanceCategories()}, r -> {
+        Ui.load("work:" + section, Ui.all(() -> shell.gateway().workOrders(false), () -> workshop() ? shell.gateway().oilChanges() : List.of(),
+                () -> shell.gateway().vehicles(null, null, 0, 200).items(), () -> shell.gateway().maintenanceCategories()), r -> {
             @SuppressWarnings("unchecked") List<WorkOrder> o = (List<WorkOrder>) r[0];
             @SuppressWarnings("unchecked") List<Prod.OilChange> oc = (List<Prod.OilChange>) r[1];
             @SuppressWarnings("unchecked") List<Vehicle> v = (List<Vehicle>) r[2];
@@ -59,7 +58,8 @@ final class WorkOrdersView extends ScrollPane {
             vehicles = v;
             categories = c;
             render();
-        }, err -> col.getChildren().set(1, Ui.errorBanner(err, this::load)));
+        }, err -> col.getChildren().setAll(header(), Ui.errorBanner(err, this::load)),
+                () -> col.getChildren().setAll(header(), Ui.skeleton(-1, 96), Ui.skeleton(-1, 280)));
     }
 
     private Node header() {

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- feuille modale qui monte depuis le bas -->
+<translate xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="420" android:fromYDelta="100%" android:toYDelta="0%"
+    android:interpolator="@anim/nf_ease_out" />

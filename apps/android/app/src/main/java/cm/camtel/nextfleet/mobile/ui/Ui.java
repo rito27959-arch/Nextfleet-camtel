@@ -61,7 +61,7 @@ public final class Ui {
         opaque = c.getSharedPreferences("nexfleet.ui", Context.MODE_PRIVATE).getBoolean("opaque", false);
     }
 
-    private static final ExecutorService IO = Executors.newFixedThreadPool(2);
+    private static final ExecutorService IO = Executors.newFixedThreadPool(4);
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     private Ui() { }
@@ -209,6 +209,56 @@ public final class Ui {
         return r;
     }
 
+    /** Bloc gris arrondi qui « respire » pendant un chargement (forme du contenu attendu, jamais un texte d'attente). */
+    public static View skeleton(Context c, int heightDp, float radiusDp) {
+        View v = new View(c);
+        v.setBackground(rounded(c, 0x14102434, radiusDp));
+        v.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(c, heightDp)));
+        v.setContentDescription("Chargement");
+        if (android.animation.ValueAnimator.areAnimatorsEnabled()) {
+            android.animation.ObjectAnimator a = android.animation.ObjectAnimator.ofFloat(v, View.ALPHA, 1f, 0.45f);
+            a.setDuration(800);
+            a.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+            a.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+            v.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                @Override public void onViewAttachedToWindow(View x) { a.start(); }
+                @Override public void onViewDetachedFromWindow(View x) { a.cancel(); }
+            });
+        }
+        return v;
+    }
+
+    /** État vide illustré (HIG « Empty states ») : symbole, titre court, phrase qui dit quoi faire ou attendre. */
+    public static LinearLayout emptyState(Context c, int iconRes, String title, String message) {
+        LinearLayout box = column(c, 8);
+        box.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        box.setPadding(dp(c, 24), dp(c, 48), dp(c, 24), dp(c, 32));
+        android.widget.ImageView ic = new android.widget.ImageView(c);
+        ic.setImageResource(iconRes);
+        ic.setImageTintList(ColorStateList.valueOf(TERTIARY));
+        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(c, 52), dp(c, 52));
+        ip.bottomMargin = dp(c, 6);
+        box.addView(ic, ip);
+        TextView t = text(c, title, 20, TEXT, NexFleetApp.get().semibold());
+        t.setGravity(android.view.Gravity.CENTER);
+        box.addView(t);
+        TextView m = text(c, message, 15, MUTED, NexFleetApp.get().regular());
+        m.setGravity(android.view.Gravity.CENTER);
+        box.addView(m);
+        return box;
+    }
+
+    /** Bandeau « hors connexion » : les données affichées sont les dernières reçues, avec leur heure. */
+    public static TextView offlineBanner(Context c, long since) {
+        String when = java.time.format.DateTimeFormatter.ofPattern("d MMM 'à' HH:mm", java.util.Locale.FRANCE)
+                .format(java.time.Instant.ofEpochMilli(since).atZone(java.time.ZoneId.of("Africa/Douala")));
+        TextView t = text(c, "Hors connexion · données du " + when + ". Elles se mettront à jour dès le retour du réseau.",
+                13, 0xFF8A3B00, NexFleetApp.get().semibold());
+        t.setPadding(dp(c, 14), dp(c, 10), dp(c, 14), dp(c, 10));
+        t.setBackground(rounded(c, 0x26FF9500, 14));
+        return t;
+    }
+
     public static View separator(Context c, float insetDp) {
         View v = new View(c);
         v.setBackgroundColor(SEPARATOR);
@@ -275,6 +325,7 @@ public final class Ui {
         b.setBackground(new RippleDrawable(ColorStateList.valueOf(0x22000000), rounded(c, bg, 999), rounded(c, Color.BLACK, 999)));
         if (style == Style.FILLED) b.setElevation(dp(c, 2));
         b.setOnClickListener(onClick);
+        Motion.pressable(b);
         return b;
     }
 

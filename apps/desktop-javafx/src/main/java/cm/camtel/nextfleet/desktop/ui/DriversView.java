@@ -69,16 +69,22 @@ public final class DriversView extends ScrollPane {
         load();
     }
 
+    /** Pré-remplit la recherche (depuis la recherche globale). */
+    void query(String q) {
+        search.setText(q);
+    }
+
     private void load() {
-        FlowPane sk = new FlowPane(16, 16);
-        for (int i = 0; i < 6; i++) {
-            VBox c = new VBox(10, Ui.skeleton(46, 46), Ui.skeleton(180, 14), Ui.skeleton(120, 12));
-            c.getStyleClass().addAll("card", "driver-card");
-            sk.getChildren().add(c);
-        }
-        body.getChildren().setAll(sk);
         String q = search.getText();
-        Ui.async(() -> gateway.drivers(q), this::render, this::fail);
+        Ui.load("drivers:" + q, () -> gateway.drivers(q), this::render, this::fail, () -> {
+            FlowPane sk = new FlowPane(16, 16);
+            for (int i = 0; i < 6; i++) {
+                VBox c = new VBox(10, Ui.skeleton(46, 46), Ui.skeleton(180, 14), Ui.skeleton(120, 12));
+                c.getStyleClass().addAll("card", "driver-card");
+                sk.getChildren().add(c);
+            }
+            body.getChildren().setAll(sk);
+        });
     }
 
     private void fail(GatewayException e) {

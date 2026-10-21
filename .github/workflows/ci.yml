@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 env:
-  APP_VERSION: 0.6.0
+  APP_VERSION: 0.7.0
 
 jobs:
   base-de-donnees:
@@ -257,7 +257,7 @@ jobs:
             --input jp/app --main-jar "$(cd jp/app && ls nextfleet-desktop-*.jar)" \
             --main-class cm.camtel.nextfleet.desktop.NextfleetDesktopApp \
             --module-path jp/fx \
-            --add-modules javafx.controls,javafx.swing,java.net.http,java.sql,java.naming,java.logging,java.desktop,jdk.crypto.ec,jdk.localedata,jdk.unsupported,jdk.charsets \
+            --add-modules javafx.controls,javafx.swing,java.net.http,java.sql,java.naming,java.logging,java.desktop,java.prefs,jdk.crypto.ec,jdk.localedata,jdk.unsupported,jdk.charsets \
             --icon apps/desktop-javafx/packaging/${{ matrix.icon }} \
             --dest appimg
           mkdir -p dist
@@ -280,8 +280,6 @@ jobs:
       - name: Essai d'installation du MSI et lancement (Windows)
         id: essai-windows
         if: matrix.type == 'exe'
-        # signalé sans bloquer la publication tant que l'essai n'est pas concluant (diagnostic en cours)
-        continue-on-error: true
         run: |
           set +e +o pipefail
           exec > >(tee win.log) 2>&1

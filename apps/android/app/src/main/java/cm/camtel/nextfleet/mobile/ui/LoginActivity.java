@@ -239,6 +239,10 @@ public final class LoginActivity extends Activity {
     private void showError(String m) {
         error.setText(m);
         error.setVisibility(View.VISIBLE);
+        // refus : secousse du formulaire et vibration de refus, comme un mot de passe erroné sur iOS
+        View target = password != null && password.getParent() instanceof View ? (View) password.getParent() : error;
+        Motion.reject(target);
+        Motion.shake(target);
     }
 
     private boolean isDebuggable() {

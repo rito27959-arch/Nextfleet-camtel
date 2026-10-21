@@ -50,6 +50,10 @@ public final class DueDatesView extends ScrollPane {
     }
 
     private void load() {
+        Ui.load("due:" + THRESHOLD_DAYS, () -> gateway.dueDates(THRESHOLD_DAYS), this::render, this::fail, this::skeleton);
+    }
+
+    private void skeleton() {
         HBox sk = new HBox(16);
         for (int i = 0; i < 3; i++) {
             VBox t = new VBox(10, Ui.skeleton(80, 14), Ui.skeleton(60, 34));
@@ -59,7 +63,6 @@ public final class DueDatesView extends ScrollPane {
             sk.getChildren().add(t);
         }
         root.getChildren().setAll(header(), sk);
-        Ui.async(() -> gateway.dueDates(THRESHOLD_DAYS), this::render, this::fail);
     }
 
     private void fail(GatewayException e) {

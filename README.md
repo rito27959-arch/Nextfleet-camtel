@@ -3,12 +3,13 @@
 Plateforme de gestion du parc automobile CAMTEL : API Java 21 / Spring Boot, PostgreSQL + PostGIS, client bureau JavaFX
 (Windows, Linux) et application Android Java avec collecte GPS de mission et vues 3D Filament. Référence : cahier des charges V4.0 et document d'architecture V5.0.
 
-> **Statut : version 0.6.0 — mode production.** Serveur en service (`https://api-production-a1d8.up.railway.app`, base vide,
-> comptes créés par l'administrateur avec mot de passe provisoire). Tous les écrans du bureau et d'Android sont branchés sur
-> l'API : véhicules, conducteurs, échéances et documents, missions, entretiens, carburant, coûts et budget, rapports CSV,
-> messagerie avec pièces jointes en temps réel, comptes et droits, suivi GPS. Démonstration seulement sur demande (`--demo`).
-> Voir [`docs/ETAT_AVANCEMENT.md`](docs/ETAT_AVANCEMENT.md) pour ce qui est réellement prouvé et ce qui reste à essayer sur
-> le terrain (collecte GPS sur un vrai téléphone, boîtier véhicule). Aucune homologation ni avis DSIR/DS n'est revendiqué.
+> **Statut : version 0.7.0 — production, performance et finitions.** Serveur en service
+> (`https://api-production-a1d8.up.railway.app`, base vide, comptes créés par l'administrateur avec mot de passe provisoire).
+> Tous les écrans du bureau et d'Android sont branchés sur l'API. 0.7.0 : réponses compressées et revalidées (ETag),
+> affichage instantané des données déjà vues, recherche universelle Ctrl+K sur le bureau, transitions et retours haptiques
+> façon iOS sur Android, tirer pour actualiser, consultation hors connexion des dernières données.
+> Voir [`docs/ETAT_AVANCEMENT.md`](docs/ETAT_AVANCEMENT.md) pour ce qui est prouvé et ce qui reste à essayer sur le terrain.
+> Aucune homologation ni avis DSIR/DS n'est revendiqué.
 
 ## Arborescence
 

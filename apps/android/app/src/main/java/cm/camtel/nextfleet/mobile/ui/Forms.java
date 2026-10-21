@@ -43,6 +43,8 @@ final class Forms {
         action = Ui.text(a, actionLabel, 17, Ui.ACCENT_TEXT, NexFleetApp.get().semibold());
         action.setPadding(Ui.dp(a, 6), Ui.dp(a, 10), Ui.dp(a, 6), Ui.dp(a, 10));
         action.setOnClickListener(v -> onAction.run());
+        Motion.pressable(action);
+        Motion.pressable(cancel);
         action.setContentDescription(actionLabel);
         bar.addView(cancel);
         bar.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
@@ -153,6 +155,8 @@ final class Forms {
     void fail(String m) {
         error.setText(m);
         error.setVisibility(View.VISIBLE);
+        Motion.reject(error);
+        Motion.shake(error);
         action.setEnabled(true);
         action.setAlpha(1f);
     }

@@ -35,13 +35,17 @@ public class NextfleetDesktopApp extends Application {
     private Scene scene;
     private FleetGateway gateway;
     private boolean dark;
+    private java.util.prefs.Preferences prefs;
 
     @Override
     public void start(Stage stage) {
         this.stage = stage;
         Map<String, String> args = getParameters().getNamed();
         boolean demo = getParameters().getUnnamed().contains("--demo");
-        dark = getParameters().getUnnamed().contains("--dark");
+        // préférences du poste (thème, fenêtre) ; ignorées pendant un parcours de captures pour rester reproductible
+        boolean remember = args.get("screenshot") == null;
+        prefs = remember ? java.util.prefs.Preferences.userNodeForPackage(NextfleetDesktopApp.class) : null;
+        dark = getParameters().getUnnamed().contains("--dark") || (prefs != null && prefs.getBoolean("dark", false));
         cm.camtel.nextfleet.desktop.ui.Motion.setReduced(getParameters().getUnnamed().contains("--reduce-motion"));
         cm.camtel.nextfleet.desktop.ui.Appearance.setOpaque(getParameters().getUnnamed().contains("--opaque"));
         cm.camtel.nextfleet.desktop.ui.FleetTrackingView.configureTiles(args.get("tiles"));
@@ -57,6 +61,7 @@ public class NextfleetDesktopApp extends Application {
         stage.setMinWidth(1100);
         stage.setMinHeight(700);
         stage.setScene(scene);
+        restoreWindow(stage);
         showLogin(null);
         stage.show();
 
@@ -106,6 +111,7 @@ public class NextfleetDesktopApp extends Application {
             before.setMouseTransparent(true);
             dark = !dark;
             applyTheme();
+            rememberTheme();
             pane.getChildren().add(before);
             javafx.animation.FadeTransition f = new javafx.animation.FadeTransition(javafx.util.Duration.millis(240), before);
             f.setToValue(0);
@@ -116,6 +122,34 @@ public class NextfleetDesktopApp extends Application {
         }
         dark = !dark;
         applyTheme();
+        rememberTheme();
+    }
+
+    private void rememberTheme() {
+        if (prefs != null) prefs.putBoolean("dark", dark);
+    }
+
+    /** Rouvre la fenêtre à sa dernière place et taille si l'écran correspondant est toujours branché. */
+    private void restoreWindow(Stage stage) {
+        if (prefs == null) return;
+        double w = prefs.getDouble("w", -1), h = prefs.getDouble("h", -1), x = prefs.getDouble("x", Double.NaN), y = prefs.getDouble("y", Double.NaN);
+        if (w >= 1100 && h >= 700 && !Double.isNaN(x)
+                && !javafx.stage.Screen.getScreensForRectangle(x + 40, y + 40, 100, 100).isEmpty()) {
+            stage.setX(x);
+            stage.setY(y);
+            stage.setWidth(w);
+            stage.setHeight(h);
+        }
+        stage.setMaximized(prefs.getBoolean("max", false));
+        stage.setOnCloseRequest(e -> {
+            prefs.putBoolean("max", stage.isMaximized());
+            if (!stage.isMaximized() && !stage.isIconified()) {
+                prefs.putDouble("x", stage.getX());
+                prefs.putDouble("y", stage.getY());
+                prefs.putDouble("w", stage.getWidth());
+                prefs.putDouble("h", stage.getHeight());
+            }
+        });
     }
 
     public void setRoot(Parent root) {

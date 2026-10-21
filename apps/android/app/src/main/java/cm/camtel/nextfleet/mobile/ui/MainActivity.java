@@ -33,6 +33,7 @@ public final class MainActivity extends Activity {
     private final List<LinearLayout> tabs = new ArrayList<>();
     private FrameLayout content;
     private int current = -1;
+    private View indicator;
     private Consumer<Boolean> permissionCallback;
 
     @Override
@@ -63,10 +64,17 @@ public final class MainActivity extends Activity {
         FrameLayout root = new FrameLayout(this);
         root.setBackground(Ui.backdrop());
         root.addView(content, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        LinearLayout bar = new LinearLayout(this);
+        // barre : capsule de sélection (qui glisse en ressort) sous la rangée d'onglets
+        FrameLayout bar = new FrameLayout(this);
         bar.setBackground(Ui.glass(this, 32));
         bar.setElevation(Ui.dp(this, 10));
         bar.setPadding(Ui.dp(this, 6), Ui.dp(this, 6), Ui.dp(this, 6), Ui.dp(this, 6));
+        indicator = new View(this);
+        indicator.setBackground(Ui.rounded(this, Ui.SELECT, 26));
+        indicator.setVisibility(View.INVISIBLE);
+        bar.addView(indicator, new FrameLayout.LayoutParams(0, Ui.dp(this, 52)));
+        LinearLayout tabRow = new LinearLayout(this);
+        bar.addView(tabRow, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 52)));
         for (int i = 0; i < pages.size(); i++) {
             final int idx = i;
             LinearLayout t = new LinearLayout(this);
@@ -79,12 +87,17 @@ public final class MainActivity extends Activity {
             label.setGravity(Gravity.CENTER);
             label.setPadding(0, Ui.dp(this, 2), 0, 0);
             t.addView(label);
-            t.setOnClickListener(v -> show(idx));
+            t.setOnClickListener(v -> {
+                if (current != idx) Motion.tick(v);
+                show(idx);
+            });
             t.setContentDescription(pages.get(i).title());
             t.setMinimumHeight(Ui.dp(this, 52));
             tabs.add(t);
-            bar.addView(t, new LinearLayout.LayoutParams(0, Ui.dp(this, 52), 1f));
+            tabRow.addView(t, new LinearLayout.LayoutParams(0, Ui.dp(this, 52), 1f));
         }
+        // première mise en place de la capsule une fois les onglets mesurés
+        tabRow.addOnLayoutChangeListener((v, l, tp, r, b, ol, ot, or, ob) -> placeIndicator(false));
         FrameLayout barHost = new FrameLayout(this);
         FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM);
@@ -135,24 +148,58 @@ public final class MainActivity extends Activity {
 
     void show(int i) {
         if (current == i) return;
+        boolean first = current < 0;
         if (current >= 0) pages.get(current).onHide();
+        View old = current >= 0 ? pages.get(current).view() : null;
         current = i;
-        content.removeAllViews();
         View v = pages.get(i).view();
+        if (v.getParent() != null) ((android.view.ViewGroup) v.getParent()).removeView(v);
         content.addView(v, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        v.setAlpha(0f);
-        v.setTranslationY(Ui.dp(this, 8));
-        v.animate().alpha(1f).translationY(0).setDuration(220).start();
+        if (old != null && Motion.enabled()) {
+            // fondu enchaîné : l'ancien onglet s'efface pendant que le nouveau apparaît en montant légèrement
+            old.animate().cancel();
+            old.animate().alpha(0f).setDuration(140).withEndAction(() -> {
+                if (old != pages.get(current).view()) content.removeView(old);
+                old.setAlpha(1f);
+            }).start();
+        } else if (old != null) {
+            content.removeView(old);
+        }
+        if (Motion.enabled()) {
+            v.setAlpha(0f);
+            v.setTranslationY(Ui.dp(this, 10));
+            v.animate().alpha(1f).translationY(0).setStartDelay(first ? 0 : 40).setDuration(320).setInterpolator(Motion.EASE_OUT).start();
+        }
         for (int k = 0; k < tabs.size(); k++) {
             int color = k == i ? Ui.GLASS_ACCENT : Ui.TEXT;
             LinearLayout t = tabs.get(k);
             ((ImageView) t.getChildAt(0)).setImageTintList(ColorStateList.valueOf(color));
             ((TextView) t.getChildAt(1)).setTextColor(color);
-            // onglet actif : capsule teintée concentrique à la barre (32 − 6 = 26)
-            t.setBackground(k == i ? Ui.rounded(this, Ui.SELECT, 26) : null);
             t.setSelected(k == i);
         }
+        if (!first) Motion.pop(tabs.get(i).getChildAt(0));
+        placeIndicator(!first);
         pages.get(i).onShow();
+    }
+
+    /** Capsule teintée concentrique à la barre (32 − 6 = 26) qui rejoint l'onglet actif en ressort. */
+    private void placeIndicator(boolean animate) {
+        if (indicator == null || current < 0 || current >= tabs.size()) return;
+        View t = tabs.get(current);
+        if (t.getWidth() == 0) return;
+        android.view.ViewGroup.LayoutParams lp = indicator.getLayoutParams();
+        if (lp.width != t.getWidth()) {
+            lp.width = t.getWidth();
+            indicator.setLayoutParams(lp);
+        }
+        indicator.setVisibility(View.VISIBLE);
+        float x = t.getLeft();
+        if (animate && Motion.enabled()) {
+            indicator.animate().translationX(x).setDuration(460).setInterpolator(Motion.SPRING).start();
+        } else {
+            indicator.animate().cancel();
+            indicator.setTranslationX(x);
+        }
     }
 
     void showPage(Class<? extends Page> type) {

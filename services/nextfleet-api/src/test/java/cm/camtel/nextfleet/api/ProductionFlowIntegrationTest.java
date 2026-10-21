@@ -32,6 +32,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -111,6 +112,26 @@ class ProductionFlowIntegrationTest {
                 .andExpect(status().isNoContent());
         call(get("/api/v1/me"), t, null).andExpect(jsonPath("$.mustChangePassword").value(false));
         return t;
+    }
+
+    @Test
+    @DisplayName("Lecture revalidée par ETag : 304 sans corps si rien n'a changé, droits revérifiés, jamais sur les écritures")
+    void etagRevalidation() throws Exception {
+        String admin = login("admin", "Admin-Initial-2026!");
+        var first = call(get("/api/v1/admin/roles"), admin, null).andExpect(status().isOk()).andReturn().getResponse();
+        String etag = first.getHeader("ETag");
+        assertNotNull(etag, "ETag attendu sur une lecture JSON");
+        assertTrue(first.getHeader("Cache-Control").contains("no-store"), "aucun cache intermédiaire");
+        var again = call(get("/api/v1/admin/roles").header("If-None-Match", etag), admin, null)
+                .andExpect(status().isNotModified()).andReturn().getResponse();
+        assertEquals(0, again.getContentAsByteArray().length);
+        call(get("/api/v1/admin/roles").header("If-None-Match", "\"autre\""), admin, null).andExpect(status().isOk());
+        // l'ETag ne contourne pas les droits : sans jeton, refus avant toute comparaison
+        mvc.perform(get("/api/v1/admin/roles").header("If-None-Match", etag)).andExpect(status().isUnauthorized());
+        // pas d'ETag sur une écriture
+        var w = call(post("/api/v1/admin/org-units"), admin, """
+                {"code":"DR-ETAG","name":"Entité de test ETag"}""").andExpect(status().isCreated()).andReturn().getResponse();
+        assertNull(w.getHeader("ETag"));
     }
 
     @Test

@@ -42,9 +42,10 @@ final class CostsView extends ScrollPane {
     }
 
     private void load() {
-        col.getChildren().setAll(header(), Ui.skeleton(-1, 96), Ui.skeleton(-1, 300));
         int y = year;
-        Ui.async(() -> shell.gateway().costs(y), this::render, err -> col.getChildren().set(1, Ui.errorBanner(err, this::load)));
+        Ui.load("costs:" + y, () -> shell.gateway().costs(y), this::render,
+                err -> col.getChildren().setAll(header(), Ui.errorBanner(err, this::load)),
+                () -> col.getChildren().setAll(header(), Ui.skeleton(-1, 96), Ui.skeleton(-1, 300)));
     }
 
     private Node header() {

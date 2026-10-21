@@ -50,8 +50,8 @@ public final class DashboardView extends ScrollPane {
     }
 
     private void load() {
-        root.getChildren().setAll(header(null), skeletonGrid());
-        Ui.async(gateway::dashboard, this::render, this::fail);
+        Ui.load("dashboard", gateway::dashboard, this::render, this::fail,
+                () -> root.getChildren().setAll(header(null), skeletonGrid()));
     }
 
     private void fail(GatewayException e) {

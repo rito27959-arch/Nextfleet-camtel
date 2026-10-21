@@ -1,4 +1,4 @@
-# État réel d'avancement — version 0.6.0 (mode production)
+# État réel d'avancement — version 0.7.0 (production, performance et finitions)
 
 **21 octobre 2026.** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
 Aucune autorisation CAMTEL, aucun avis DSIR ou DS et aucune mise en production ne sont revendiqués.
@@ -18,13 +18,24 @@ résultats sont lisibles dans l'onglet Actions (annotations « bilan »).
 | Messagerie temps réel (WebSocket pilote) | CI | **4 tests** de bout en bout avec de vrais clients WebSocket |
 | Client bureau JavaFX | CI + hors ligne | **24 tests** (client HTTP lot 2, catalogue 3D, projection Web Mercator de la carte) ; écran **Suivi GPS** en direct |
 | Paquet **DEB** | CI (ubuntu-22.04) | Produit par jpackage (~38 Mo), **installé**, **application lancée** sous Xvfb (23 écrans du parcours de démonstration capturés par l'application installée), puis désinstallée proprement |
-| Paquets **Windows** | CI (windows-2022) | MSI (recommandé), ZIP portable et EXE produits par jpackage + WiX. Non signés. **L'essai automatique d'installation et de lancement sous Windows n'est pas encore concluant** (l'étape échoue sur le runner, cause en cours de diagnostic) : installation sur un poste réel non prouvée |
+| Paquets **Windows** | CI (windows-2022) | MSI (recommandé), ZIP portable et EXE produits par jpackage + WiX. Non signés. **MSI installé, application installée lancée (26 écrans capturés) puis désinstallée ; version portable lancée sans installation**, à chaque exécution |
 | Application **Android** | CI | Compilation, **lint bloquant**, **4 tests unitaires** ; APK ~66 Mo (MapLibre + Filament natifs) ; onglet **Carte** MapLibre en direct ; permissions vérifiées dans l'APK (aapt2) : pas de localisation en arrière-plan |
 | **Pile d'hébergement complète** | CI (`tools/smoke-stack.sh`) | Les 3 images Docker démarrent avec PostGIS via le kit CAMTEL : carte de flotte alimentée, mission démarrée par le conducteur, lot Android accepté, relais Traccar **sans doublon**, téléphone **déclaré automatiquement dans Traccar**, position refusée après clôture |
 | Images Docker | CI → GHCR | `ghcr.io/rito27959-arch/nexfleet-{api,gps-gateway,traccar}:<version>` et `:latest` publiées à chaque version |
 | Contrats OpenAPI | CI | `openapi.yaml` et `openapi-lot2.yaml` (0.3.0, alignés sur l'implémentation) valides |
 | **Refonte « Liquid Glass teinté » (iOS 26)** | CI + `docs/RECHERCHE_DESIGN_IOS26.md` | Bureau et Android redessinés écran par écran (verre teinté sur la navigation seulement, capsules, rayons concentriques, typographie iOS, alertes iOS 26, réglage « Réduire la transparence »). Contrastes du verre au pire cas vérifiés par `tools/check_contrast.py` ; captures bureau dans `docs/design-reference/captures-v2-ios26/` ; captures Android prises sur émulateur (Pixel 7, API 34) par la CI, branche `captures-android` |
 | Captures | `tools/screenshots.sh` | Lot 2 : 22 captures + 2 GIF, dont `23-catalogue-3d.png` (rendu 3D JavaFX réel) |
+
+### Performance et finitions (0.7.0)
+
+| Élément | Preuve |
+|---|---|
+| Réponses JSON compressées (gzip) et revalidées par ETag (304 sans corps) | `tools/smoke-stack.sh` contre les vraies images Docker (en-tête `Content-Encoding: gzip`, 304 sur `If-None-Match`) ; test d'intégration : 304 sans corps, droits revérifiés (401 sans jeton malgré l'ETag), aucun ETag sur une écriture, `Cache-Control: no-store` conservé |
+| Administrateur d'amorçage obligé de changer son mot de passe en PRODUCTION | `ProductionBootstrapIntegrationTest` (PostGIS réel) ; s'applique aussi au compte `admin` déjà créé sur Railway tant qu'il n'a pas choisi son mot de passe |
+| Bureau : appels réseau en parallèle sur fils virtuels, réaffichage instantané des écrans déjà vus puis actualisation silencieuse, cache vidé à chaque modification et à la déconnexion | Compilation + parcours de captures |
+| Bureau : recherche universelle Ctrl+K (écrans, véhicules, conducteurs, missions ; clavier ↑ ↓ ↵ Échap ; correspondance surlignée ; récents), fondu enchaîné entre écrans, défilement fluide à la molette, raccourcis Ctrl+1…9 / Ctrl+R / Ctrl+,, fenêtre et thème mémorisés | Captures `34-recherche-universelle*.png` |
+| Android : transitions iOS (pages qui glissent, formulaires qui montent), capsule d'onglet qui glisse en ressort, appui qui enfonce, retours haptiques (onglet, succès, refus), secousse sur erreur, tirer pour actualiser, squelettes de chargement, états vides illustrés, bulles de message qui apparaissent comme iMessage | Compilation, lint et recette émulateur en CI ; **sensations haptiques non vérifiables sur émulateur** (vrai téléphone requis) |
+| Android : dernières données affichées instantanément et consultables hors connexion (bandeau « Hors connexion · données du … ») ; stockage privé de l'application, effacé à la connexion et à la déconnexion | Compilation en CI ; **comportement hors connexion à essayer sur un vrai téléphone** |
 
 ### Mode production (0.6.0)
 
@@ -51,7 +62,7 @@ sans droit refusé → comptes réservés à l'admin, journal lisible par l'audi
 | Boîtier GPS véhicule via Traccar | Traccar 6.16 réel exécuté en CI (relais, déclaration d'appareil) ; aucun boîtier physique | Un boîtier configuré sur le port de son protocole, position reçue |
 | Vue 3D (Filament) Android | Compilée, lint vert. **Carte MapLibre et tous les autres écrans observés sur émulateur** (Pixel 7, API 34, captures en CI). La vue 3D, elle, fige l'émulateur du runner : sans GPU, son rendu passe par SwiftShader et la capture revient vide | Capture sur un vrai téléphone OpenGL ES 3 |
 | Fond de carte du bureau | Tuiles OpenStreetMap (usage modéré) ; non observé ici (réseau fermé), repères hors ligne affichés | Serveur de tuiles CAMTEL ou contrat d'usage |
-| Poste Windows CAMTEL | Paquets produits ; essai d'installation automatique pas encore concluant | Connexion depuis un poste CAMTEL réel (antivirus, proxy) |
+| Poste Windows CAMTEL | Installation et lancement prouvés en CI (Windows Server 2022) | Connexion depuis un poste CAMTEL réel (antivirus, proxy) |
 | Recette métier par CAMTEL | Routes prouvées par les tests d'intégration ; serveur de production joignable ; aucune recette par les utilisateurs CAMTEL | Saisie réelle d'une entité, de ses véhicules et comptes, puis une semaine d'usage |
 | Kit CAMTEL avec HTTPS (Caddy) | Pile éprouvée en CI sans Caddy (ports locaux) | Installation sur un serveur CAMTEL avec ses noms DNS |
 

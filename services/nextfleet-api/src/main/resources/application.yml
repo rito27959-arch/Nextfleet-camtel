@@ -25,6 +25,10 @@ server:
   port: ${PORT:${NF_PORT:8080}}
   forward-headers-strategy: native
   shutdown: graceful
+  compression:                # listes JSON ~85 % plus légères sur les liaisons mobiles et satellitaires
+    enabled: true
+    mime-types: application/json,application/problem+json,text/csv,text/plain
+    min-response-size: 1024
   error:
     include-stacktrace: never
     include-message: never

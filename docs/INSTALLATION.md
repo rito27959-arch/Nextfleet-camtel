@@ -1,4 +1,4 @@
-# Installation — NexFleet CAMTEL 0.6.0
+# Installation — NexFleet CAMTEL 0.7.0
 
 Ce guide couvre les trois livrables produits par la CI GitHub Actions (gratuite pour ce dépôt public) et le serveur.
 Aucune autorisation CAMTEL n'est revendiquée : c'est une version pilote à installer sur des postes et des serveurs de test.
@@ -9,12 +9,12 @@ Chaque exécution réussie de la CI (onglet **Actions** du dépôt) publie ces a
 
 | Artefact | Contenu |
 |---|---|
-| `nexfleet-bureau-deb` | `nexfleet_0.6.0_amd64.deb` (construit sur Ubuntu 22.04 : Ubuntu 22.04 / 24.04, Debian 12+ ; JRE et JavaFX embarqués) |
-| `nexfleet-bureau-exe` | `NexFleet-0.6.0.msi` (recommandé), `NexFleet-0.6.0-windows-portable.zip` (sans installation) et `NexFleet-0.6.0.exe` (Windows 10/11, par utilisateur, sans droits administrateur) |
-| `nexfleet-android-apk` | `nexfleet-0.6.0-debug.apk` et `nexfleet-0.6.0-release-unsigned.apk` (ou `-release.apk` si signé) |
+| `nexfleet-bureau-deb` | `nexfleet_0.7.0_amd64.deb` (construit sur Ubuntu 22.04 : Ubuntu 22.04 / 24.04, Debian 12+ ; JRE et JavaFX embarqués) |
+| `nexfleet-bureau-exe` | `NexFleet-0.7.0.msi` (recommandé), `NexFleet-0.7.0-windows-portable.zip` (sans installation) et `NexFleet-0.7.0.exe` (Windows 10/11, par utilisateur, sans droits administrateur) |
+| `nexfleet-android-apk` | `nexfleet-0.7.0-debug.apk` et `nexfleet-0.7.0-release-unsigned.apk` (ou `-release.apk` si signé) |
 | `nexfleet-api-jar` | Jar exécutable de l'API Spring Boot |
 
-**Version publiée** : la release [v0.6.0](https://github.com/rito27959-arch/Nextfleet-camtel/releases/tag/v0.6.0) contient
+**Version publiée** : la release [v0.7.0](https://github.com/rito27959-arch/Nextfleet-camtel/releases/tag/v0.7.0) contient
 l'APK, le DEB, le MSI, la version portable Windows, l'EXE et le jar de l'API. Pour publier une version suivante : changer `APP_VERSION` dans
 `.github/workflows/ci.yml`, puis pousser une étiquette `vX.Y.Z` ou lancer le workflow « ci » à la main avec « publier » coché.
 
@@ -56,17 +56,16 @@ Sans `NF_MISSION_TOKEN_KEY`, l'API refuse tout démarrage de mission (409) : auc
 
 ## 3. Poste bureau
 
-**Linux** : `sudo apt install ./nexfleet_0.6.0_amd64.deb`, puis menu Bureautique → NexFleet, ou `/opt/nexfleet/bin/NexFleet`.
+**Linux** : `sudo apt install ./nexfleet_0.7.0_amd64.deb`, puis menu Bureautique → NexFleet, ou `/opt/nexfleet/bin/NexFleet`.
 La CI installe réellement ce paquet, lance l'application installée sous Xvfb (parcours de démonstration complet), puis la désinstalle, à chaque exécution.
 
 **Windows** (10/11, sans droits administrateur) — trois formats, au choix :
 
-1. **`NexFleet-0.6.0.msi` (recommandé)** : double-cliquer, raccourci créé dans le menu Démarrer. La CI tente
-   à chaque exécution de l'installer et de le lancer ; cet essai n'est **pas encore concluant** en 0.6.0 (diagnostic en cours).
-   Si le MSI ne s'installe pas chez vous, utiliser la version portable.
-2. **`NexFleet-0.6.0-windows-portable.zip`** : sans installation. Décompresser (clic droit → Extraire tout), puis lancer
+1. **`NexFleet-0.7.0.msi` (recommandé)** : double-cliquer, raccourci créé dans le menu Démarrer. La CI installe réellement
+   ce MSI, lance l'application installée (parcours complet), puis la désinstalle, à chaque exécution.
+2. **`NexFleet-0.7.0-windows-portable.zip`** : sans installation. Décompresser (clic droit → Extraire tout), puis lancer
    `NexFleet\NexFleet.exe`. Également lancée par la CI.
-3. `NexFleet-0.6.0.exe` : ancien installateur. Il décompresse un MSI dans `%TEMP%` avant de l'exécuter ; si un antivirus
+3. `NexFleet-0.7.0.exe` : ancien installateur. Il décompresse un MSI dans `%TEMP%` avant de l'exécuter ; si un antivirus
    ou une politique de poste bloque ce dossier, il échoue avec « CreateProcess … msiexec.exe … main.msi failed, system error 2 ».
    Utiliser alors le MSI ou la version portable.
 

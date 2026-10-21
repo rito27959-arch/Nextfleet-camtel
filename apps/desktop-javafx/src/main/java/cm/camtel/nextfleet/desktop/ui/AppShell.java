@@ -68,6 +68,7 @@ public final class AppShell extends StackPane {
     private final Region indicator = new Region();
     private final Pane indicatorLayer = new Pane(indicator);
     private final Toasts toasts = new Toasts();
+    private final CommandPalette palette = new CommandPalette(this);
     private final Label dueBadge = Ui.label("", "nav-count", "nav-count-alert");
     private final Label messagesBadge = Ui.label("", "nav-count");
     private Node current;
@@ -97,9 +98,14 @@ public final class AppShell extends StackPane {
         getChildren().addAll(frame, toasts.host());
         sceneProperty().addListener((o, a, scene) -> {
             if (scene != null) {
-                scene.getAccelerators().put(new KeyCodeCombination(KeyCode.K, KeyCombination.SHORTCUT_DOWN), search::requestFocus);
+                // raccourcis clavier façon macOS : Ctrl+K recherche, Ctrl+1…9 écrans, Ctrl+R actualiser, Ctrl+, réglages
+                scene.getAccelerators().put(new KeyCodeCombination(KeyCode.K, KeyCombination.SHORTCUT_DOWN), palette::open);
+                scene.getAccelerators().put(new KeyCodeCombination(KeyCode.F, KeyCombination.SHORTCUT_DOWN), palette::open);
+                scene.getAccelerators().put(new KeyCodeCombination(KeyCode.R, KeyCombination.SHORTCUT_DOWN), this::refresh);
+                scene.getAccelerators().put(new KeyCodeCombination(KeyCode.COMMA, KeyCombination.SHORTCUT_DOWN), () -> show(Section.SETTINGS));
                 List<Section> order = sections(false);
-                KeyCode[] keys = {KeyCode.DIGIT1, KeyCode.DIGIT2, KeyCode.DIGIT3, KeyCode.DIGIT4, KeyCode.DIGIT5};
+                KeyCode[] keys = {KeyCode.DIGIT1, KeyCode.DIGIT2, KeyCode.DIGIT3, KeyCode.DIGIT4, KeyCode.DIGIT5,
+                        KeyCode.DIGIT6, KeyCode.DIGIT7, KeyCode.DIGIT8, KeyCode.DIGIT9};
                 for (int i = 0; i < Math.min(order.size(), keys.length); i++) {
                     Section s = order.get(i);
                     scene.getAccelerators().put(new KeyCodeCombination(keys[i], KeyCombination.SHORTCUT_DOWN), () -> show(s));
@@ -385,8 +391,12 @@ public final class AppShell extends StackPane {
     // ------------------------------------------------------------------ barre supérieure
 
     private HBox topbar() {
-        search.setPromptText("Rechercher un véhicule, un conducteur…");
-        search.setTooltip(new Tooltip("Recherche globale (Ctrl+K)"));
+        search.setPromptText("Rechercher…");
+        search.setTooltip(new Tooltip("Recherche universelle (Ctrl+K)"));
+        // la capsule ouvre la recherche universelle ; la saisie se fait dans le panneau central
+        search.setEditable(false);
+        search.setFocusTraversable(false);
+        search.setOnMouseClicked(e -> palette.open());
         search.getStyleClass().add("search-field");
         search.setAccessibleText("Recherche globale");
         StackPane searchBox = new StackPane(search, Icons.stroke(Icons.SEARCH, 16, "-nf-muted"));
@@ -394,7 +404,11 @@ public final class AppShell extends StackPane {
         StackPane.setAlignment(searchBox.getChildren().get(1), Pos.CENTER_LEFT);
         searchBox.getChildren().get(1).setTranslateX(12);
         searchBox.getChildren().get(1).setMouseTransparent(true);
-        search.setOnAction(e -> openVehicles(search.getText()));
+        Label kbd = Ui.label("Ctrl K", "palette-kbd");
+        kbd.setMouseTransparent(true);
+        searchBox.getChildren().add(kbd);
+        StackPane.setAlignment(kbd, Pos.CENTER_RIGHT);
+        StackPane.setMargin(kbd, new Insets(0, 10, 0, 0));
 
         HBox bar = session.can(VEHICLE_READ) ? new HBox(searchBox, Ui.spacer()) : new HBox(Ui.spacer());
         bar.getStyleClass().add("topbar");
@@ -493,6 +507,37 @@ public final class AppShell extends StackPane {
         setContent(new VehiclesView(gateway, session, query, this));
     }
 
+    /** Fiche d'un véhicule, ouverte par-dessus la liste filtrée sur son immatriculation. */
+    public void openVehicle(cm.camtel.nextfleet.desktop.data.Models.Vehicle v) {
+        if (!visible(Section.VEHICLES)) return;
+        closeSidePanelNow();
+        nav.get(Section.VEHICLES).setSelected(true);
+        currentSection = Section.VEHICLES;
+        VehiclesView vv = new VehiclesView(gateway, session, v.registration(), this);
+        setContent(vv);
+        vv.openVehicle(v);
+    }
+
+    public void openDriver(String query) {
+        if (!visible(Section.DRIVERS)) return;
+        closeSidePanelNow();
+        nav.get(Section.DRIVERS).setSelected(true);
+        currentSection = Section.DRIVERS;
+        DriversView dv = new DriversView(gateway, this);
+        dv.query(query);
+        setContent(dv);
+    }
+
+    public void openMission(java.util.UUID id) {
+        if (!visible(Section.MISSIONS)) return;
+        closeSidePanelNow();
+        nav.get(Section.MISSIONS).setSelected(true);
+        currentSection = Section.MISSIONS;
+        MissionsView mv = new MissionsView(this);
+        setContent(mv);
+        mv.focus(id);
+    }
+
     public Node currentView() {
         return current;
     }
@@ -501,10 +546,44 @@ public final class AppShell extends StackPane {
         return currentSection;
     }
 
+    /** Recherche universelle, éventuellement pré-remplie. */
+    public void openSearch(String query) {
+        if (query == null || query.isEmpty()) palette.open();
+        else palette.open(query);
+    }
+
+    public void closeSearch() {
+        palette.close();
+    }
+
+    /** Actualise l'écran courant (Ctrl+R) : données gardées affichées, remplacées dès que le serveur répond. */
+    public void refresh() {
+        if (palette.isOpen()) return;
+        if (currentSection != null) show(currentSection);
+    }
+
+    /**
+     * Fondu enchaîné entre écrans : l'ancien s'efface en 140 ms pendant que le nouveau monte de 8 px.
+     * L'ancien ne capte plus les clics dès le changement.
+     */
     private void setContent(Node view) {
+        if (view instanceof javafx.scene.control.ScrollPane sp) Motion.smoothScroll(sp);
+        Node old = current;
         current = view;
-        content.getChildren().setAll(view);
-        Motion.enter(view, javafx.util.Duration.ZERO, 8);
+        if (old == null || Motion.isReduced()) {
+            content.getChildren().setAll(view);
+            Motion.enter(view, javafx.util.Duration.ZERO, 8);
+            return;
+        }
+        content.getChildren().removeIf(n -> n != old);
+        old.setMouseTransparent(true);
+        content.getChildren().add(view);
+        javafx.animation.FadeTransition out = new javafx.animation.FadeTransition(javafx.util.Duration.millis(140), old);
+        out.setToValue(0);
+        out.setInterpolator(Motion.EASE_OUT);
+        out.setOnFinished(e -> content.getChildren().remove(old));
+        out.play();
+        Motion.enter(view, javafx.util.Duration.millis(40), 8);
     }
 
     /** Module non livré dans ce lot : affiché comme tel, jamais simulé (règle du prompt maître). */

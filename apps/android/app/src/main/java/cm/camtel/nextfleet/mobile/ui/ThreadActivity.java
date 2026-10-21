@@ -47,6 +47,8 @@ public final class ThreadActivity extends Activity {
     private ScrollView scroll;
     private EditText input;
     private ImageButton send;
+    /** Nombre de bulles au dernier affichage : seules les nouvelles s'animent. */
+    private int renderedCount = -1;
     private String conversationId;
     private List<ChatLine> lines = List.of();
     private static final int PICK_FILE = 52;
@@ -58,6 +60,7 @@ public final class ThreadActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        Motion.detailScreen(this);
         if (NexFleetApp.get().session() == null) {
             finish();
             return;
@@ -130,7 +133,11 @@ public final class ThreadActivity extends Activity {
         send.setImageTintList(ColorStateList.valueOf(0xFFFFFFFF));
         send.setBackground(Ui.rounded(this, Ui.ACCENT, 999));
         send.setContentDescription("Envoyer");
-        send.setOnClickListener(v -> submit());
+        send.setOnClickListener(v -> {
+            Motion.tick(v);
+            submit();
+        });
+        Motion.pressable(send);
         composer.addView(send, new LinearLayout.LayoutParams(Ui.dp(this, 44), Ui.dp(this, 44)));
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) { }
@@ -233,6 +240,7 @@ public final class ThreadActivity extends Activity {
 
     private void render(String error) {
         list.removeAllViews();
+        lastBubble = null;
         if (error != null) {
             TextView t = Ui.text(this, error, 13, Ui.RED, NexFleetApp.get().regular());
             t.setPadding(Ui.dp(this, 12), Ui.dp(this, 8), Ui.dp(this, 12), Ui.dp(this, 8));
@@ -257,7 +265,10 @@ public final class ThreadActivity extends Activity {
                 who.setPadding(Ui.dp(this, 12), Ui.dp(this, 6), 0, 0);
                 list.addView(who);
             }
-            list.addView(bubble(l.body, l.mine, false, false));
+            View bl = bubble(l.body, l.mine, false, false);
+            list.addView(bl);
+            lastBubble = bl;
+            lastMineBubble = l.mine;
             for (Models.Attachment f : l.attachments) {
                 TextView chip = Ui.text(this, "📎 " + f.name + " · " + Math.max(1, f.sizeBytes / 1024) + " Ko", 13,
                         l.mine ? Ui.ACCENT_TEXT : Ui.TEXT, NexFleetApp.get().semibold());
@@ -277,11 +288,36 @@ public final class ThreadActivity extends Activity {
         }
         for (Map.Entry<String, String[]> p : pending.entrySet()) {
             boolean failed = "1".equals(p.getValue()[1]);
-            list.addView(bubble(p.getValue()[0], true, !failed, failed));
+            View bl = bubble(p.getValue()[0], true, !failed, failed);
+            list.addView(bl);
+            lastBubble = bl;
+            lastMineBubble = true;
             list.addView(failed ? meta(Chat.DeliveryState.ECHEC.label + " · Toucher pour réessayer", true, () -> deliver(p.getKey()))
                     : meta(Chat.DeliveryState.EN_ATTENTE.label, false, null));
         }
+        int count = lines.size() + pending.size();
+        if (renderedCount >= 0 && count > renderedCount && lastBubble != null) arrive(lastBubble, lastMineBubble);
+        renderedCount = count;
         scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
+    }
+
+    private View lastBubble;
+    private boolean lastMineBubble;
+
+    /** Nouvelle bulle : grandit depuis son coin (à droite pour soi, à gauche pour l'autre) avec un ressort, comme iMessage. */
+    private void arrive(View row, boolean mine) {
+        if (!Motion.enabled()) return;
+        View b = row instanceof LinearLayout && ((LinearLayout) row).getChildCount() > 0 ? ((LinearLayout) row).getChildAt(0) : row;
+        float target = b.getAlpha();   // une bulle en attente d'envoi reste estompée
+        b.post(() -> {
+            b.setPivotX(mine ? b.getWidth() : 0);
+            b.setPivotY(b.getHeight());
+            b.setScaleX(0.6f);
+            b.setScaleY(0.6f);
+            b.setAlpha(0f);
+            b.setTranslationY(Ui.dp(this, 16));
+            b.animate().scaleX(1f).scaleY(1f).alpha(target).translationY(0).setDuration(460).setInterpolator(Motion.SPRING).start();
+        });
     }
 
     private View bubble(String text, boolean mine, boolean pendingState, boolean failed) {
@@ -348,5 +384,11 @@ public final class ThreadActivity extends Activity {
             }
             render(null);
         });
+    }
+
+    @Override
+    public void finish() {
+        super.finish();
+        Motion.detailClosing(this);
     }
 }

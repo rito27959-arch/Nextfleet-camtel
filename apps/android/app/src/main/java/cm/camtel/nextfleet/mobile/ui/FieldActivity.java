@@ -53,6 +53,7 @@ public final class FieldActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        Motion.sheetScreen(this);
         if (NexFleetApp.get().session() == null) {
             finish();
             return;
@@ -337,8 +338,15 @@ public final class FieldActivity extends Activity {
     }
 
     private void done(String message) {
+        Motion.success(getWindow().getDecorView());
         android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_LONG).show();
         setResult(RESULT_OK);
         finish();
+    }
+
+    @Override
+    public void finish() {
+        super.finish();
+        Motion.sheetClosing(this);
     }
 }

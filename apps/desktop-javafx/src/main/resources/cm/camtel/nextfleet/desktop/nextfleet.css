@@ -876,3 +876,37 @@
 .attachment-chip { -fx-background-color: -nf-fill; -fx-background-radius: 999; -fx-padding: 4 10; -fx-font-size: 12px; -fx-cursor: hand; }
 .bubble-mine .attachment-chip { -fx-background-color: rgba(255,255,255,0.22); -fx-text-fill: white; }
 .ok-text { -fx-text-fill: -nf-green-text; }
+
+/* ---------- recherche universelle (Ctrl+K), façon Spotlight */
+.palette-scrim { -fx-background-color: rgba(10, 24, 32, 0.22); }
+.root.dark .palette-scrim { -fx-background-color: rgba(0, 0, 0, 0.50); }
+.palette-card {
+    -fx-background-color: -nf-glass-stroke, -nf-surface;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 22;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.30), 60, 0, 0, 24);
+}
+.palette-top { -fx-padding: 14 18; -fx-border-color: transparent transparent -nf-separator transparent; }
+.palette-field, .palette-field:focused {
+    -fx-background-color: transparent; -fx-border-color: transparent; -fx-padding: 4 0;
+    -fx-font-size: 19px; -fx-text-fill: -nf-text; -fx-prompt-text-fill: -nf-tertiary;
+}
+.palette-kbd {
+    -fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: -nf-muted;
+    -fx-background-color: -nf-fill; -fx-background-radius: 6; -fx-padding: 2 7;
+}
+.palette-scroll, .palette-scroll > .viewport { -fx-background-color: transparent; -fx-background: transparent; }
+.palette-results { -fx-padding: 6 8 8 8; }
+.palette-group { -fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: -nf-muted; -fx-padding: 10 10 4 10; }
+.palette-row { -fx-padding: 7 10; -fx-background-radius: 12; -fx-cursor: hand; -fx-min-height: 50; }
+.palette-row-selected { -fx-background-color: -nf-select; }
+.palette-title { -fx-font-size: 14px; -fx-fill: -nf-text; }
+.palette-match { -fx-font-weight: 700; -fx-fill: -nf-accent-text; }
+.palette-enter { -fx-font-size: 13px; -fx-text-fill: transparent; -fx-padding: 0 4; }
+.palette-row-selected .palette-enter { -fx-text-fill: -nf-muted; }
+.palette-empty { -fx-font-size: 14px; -fx-text-fill: -nf-muted; -fx-padding: 22 12; }
+.palette-foot { -fx-padding: 9 18; -fx-border-color: -nf-separator transparent transparent transparent; }
+.palette-hint { -fx-font-size: 11px; -fx-text-fill: -nf-tertiary; }
+.search-capsule .search-field { -fx-cursor: hand; }
+/* lignes de liste : respiration verticale iOS (deux lignes de texte jamais collées au bord) */
+.list-row { -fx-padding: 9 14; -fx-min-height: 50; }

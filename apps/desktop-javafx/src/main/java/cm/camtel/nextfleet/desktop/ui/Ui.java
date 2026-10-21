@@ -35,11 +35,11 @@ public final class Ui {
 
     private Ui() { }
 
-    private static final ExecutorService IO = Executors.newFixedThreadPool(2, r -> {
-        Thread t = new Thread(r, "nextfleet-io");
-        t.setDaemon(true);
-        return t;
-    });
+    /**
+     * Appels réseau sur fils virtuels (Java 21) : chaque appel a son fil, sans file d'attente. Avant, deux fils
+     * partagés faisaient attendre l'écran derrière les pastilles et les notifications.
+     */
+    private static final ExecutorService IO = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("nextfleet-io-", 0).factory());
 
     private static final Locale FR = Locale.FRANCE;
 
@@ -59,6 +59,59 @@ public final class Ui {
                     "Erreur inattendue : " + (t == null ? "inconnue" : t.getClass().getSimpleName())));
         });
         IO.submit(task);
+    }
+
+    /**
+     * Lance plusieurs appels en même temps et rend leurs résultats dans l'ordre : un écran à quatre appels attend
+     * le plus lent au lieu de leur somme (de l'ordre d'un tiers de seconde gagné par appel depuis Douala).
+     */
+    public static Supplier<Object[]> all(Supplier<?>... works) {
+        return () -> {
+            java.util.List<java.util.concurrent.Future<?>> fs = new java.util.ArrayList<>();
+            for (Supplier<?> w : works) fs.add(IO.submit(w::get));
+            Object[] out = new Object[works.length];
+            for (int i = 0; i < fs.size(); i++) {
+                try {
+                    out[i] = fs.get(i).get();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new GatewayException(GatewayException.Kind.NETWORK, "Requête interrompue.");
+                } catch (java.util.concurrent.ExecutionException e) {
+                    fs.forEach(f -> f.cancel(true));
+                    if (e.getCause() instanceof GatewayException g) throw g;
+                    if (e.getCause() instanceof RuntimeException r) throw r;
+                    throw new IllegalStateException(e.getCause());
+                }
+            }
+            return out;
+        };
+    }
+
+    /**
+     * Chargement d'écran « affichage immédiat puis actualisation » : si l'écran a déjà été vu dans la session, ses
+     * données s'affichent sans attendre ni squelette, puis la version serveur les remplace discrètement (sans
+     * rejouer les animations) si elle diffère. Sinon : squelette, puis données animées.
+     */
+    public static <T> void load(String key, Supplier<T> work, Consumer<T> onData, Consumer<GatewayException> onError, Runnable showSkeleton) {
+        T cached = cm.camtel.nextfleet.desktop.data.ViewCache.get(key);
+        if (cached != null) {
+            onData.accept(cached);
+        } else if (showSkeleton != null) {
+            showSkeleton.run();
+        }
+        long gen = cm.camtel.nextfleet.desktop.data.ViewCache.generation();
+        async(work, fresh -> {
+            cm.camtel.nextfleet.desktop.data.ViewCache.put(key, fresh, gen);
+            if (cached == null) onData.accept(fresh);
+            else if (!deepEquals(cached, fresh)) Motion.quietly(() -> onData.accept(fresh));
+        }, e -> {
+            if (cached == null) onError.accept(e);
+        });
+    }
+
+    private static boolean deepEquals(Object a, Object b) {
+        if (a instanceof Object[] x && b instanceof Object[] y) return java.util.Arrays.deepEquals(x, y);
+        return java.util.Objects.equals(a, b);
     }
 
     public static void later(Runnable r) {

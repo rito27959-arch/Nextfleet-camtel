@@ -48,6 +48,7 @@ public final class ModelViewerActivity extends Activity implements Choreographer
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        Motion.detailScreen(this);
         String id = getIntent().getStringExtra("id");
         Catalogue.Entry entry = null;
         for (Catalogue.Entry e : NexFleetApp.get().catalogue().entries) if (e.id.equals(id)) entry = e;
@@ -152,5 +153,11 @@ public final class ModelViewerActivity extends Activity implements Choreographer
         if (viewer != null) viewer.destroy();
         if (engine != null) engine.destroy();
         super.onDestroy();
+    }
+
+    @Override
+    public void finish() {
+        super.finish();
+        Motion.detailClosing(this);
     }
 }

@@ -20,6 +20,7 @@ public final class ChangePasswordActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        Motion.sheetScreen(this);
         if (NexFleetApp.get().session() == null) {
             finish();
             return;
@@ -66,6 +67,7 @@ public final class ChangePasswordActivity extends Activity {
             NexFleetApp.get().repository().changePassword(cur.toCharArray(), next.toCharArray());
             return true;
         }, ok -> {
+            Motion.success(getWindow().getDecorView());
             android.widget.Toast.makeText(this, "Mot de passe enregistré.", android.widget.Toast.LENGTH_SHORT).show();
             if (forced) startActivity(new Intent(this, MainActivity.class));
             finish();
@@ -83,5 +85,6 @@ public final class ChangePasswordActivity extends Activity {
             startActivity(new Intent(this, LoginActivity.class));
         }
         super.finish();
+        Motion.sheetClosing(this);
     }
 }
