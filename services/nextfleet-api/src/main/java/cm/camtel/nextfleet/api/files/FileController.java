@@ -31,10 +31,11 @@ public class FileController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<FileService.FileView> upload(@RequestParam String purpose,
                                                        @RequestParam(required = false) UUID orgUnitId,
+                                                       @RequestParam(required = false) UUID vehicleId,
                                                        @RequestParam("file") MultipartFile file) throws IOException {
         if (file.getSize() > FileService.MAX_BYTES) throw new IllegalArgumentException("Fichier trop volumineux (10 Mo maximum).");
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(service.upload(purpose, orgUnitId, file.getOriginalFilename(), file.getBytes()));
+                .body(service.upload(purpose, orgUnitId, vehicleId, file.getOriginalFilename(), file.getBytes()));
     }
 
     @GetMapping("/{id}")

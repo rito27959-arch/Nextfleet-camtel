@@ -60,6 +60,17 @@ public class FileService {
 
     @Transactional(noRollbackFor = AccessDeniedException.class)
     public FileView upload(String purpose, UUID orgUnitId, String originalName, byte[] content) {
+        return upload(purpose, orgUnitId, null, originalName, content);
+    }
+
+    /** {@code vehicleId} : l'entité du dépôt est celle du véhicule concerné (justificatif d'atelier, reçu, document). */
+    @Transactional(noRollbackFor = AccessDeniedException.class)
+    public FileView upload(String purpose, UUID orgUnitId, UUID vehicleId, String originalName, byte[] content) {
+        if (orgUnitId == null && vehicleId != null) {
+            List<UUID> o = jdbc.queryForList("SELECT org_unit_id FROM vehicle WHERE id = :v", new MapSqlParameterSource("v", vehicleId), UUID.class);
+            if (o.isEmpty()) throw new NotFoundException("Véhicule introuvable.");
+            orgUnitId = o.get(0);
+        }
         AuthenticatedUser u = access.currentUser();
         if (content == null || content.length == 0) throw new IllegalArgumentException("Fichier vide.");
         if (content.length > MAX_BYTES) throw new IllegalArgumentException("Fichier trop volumineux (10 Mo maximum).");

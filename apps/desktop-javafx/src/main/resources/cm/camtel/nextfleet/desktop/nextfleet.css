@@ -851,3 +851,28 @@
 .glass .muted, .sidebar .muted, .sidebar .section-title, .map-glass-panel .muted, .map-chip .label { -fx-text-fill: -nf-glass-muted; }
 .nav-item:selected, .nav-item:selected .label { -fx-text-fill: -nf-glass-accent; }
 .nav-item:selected .icon { -fx-stroke: -nf-glass-accent; }
+
+/* ===================================================================== PRODUCTION : atelier, carburant, coûts, rapports */
+.progress-bar { -fx-pref-height: 8; }
+.progress-bar > .track { -fx-background-color: -nf-fill; -fx-background-radius: 999; -fx-background-insets: 0; }
+.progress-bar > .bar { -fx-background-radius: 999; -fx-background-insets: 0; -fx-padding: 4; }
+.progress-ok > .bar { -fx-background-color: -nf-green; }
+.progress-warning > .bar { -fx-background-color: -nf-orange; }
+.progress-danger > .bar { -fx-background-color: -nf-red; }
+/* barres empilées : couleurs de série doublées de la légende (jamais la couleur seule) */
+.default-color0.chart-bar { -fx-bar-fill: -nf-brand; -fx-background-radius: 4 4 0 0; }
+.default-color1.chart-bar { -fx-bar-fill: -nf-orange; }
+.default-color2.chart-bar { -fx-bar-fill: -nf-indigo; }
+.chart-legend { -fx-background-color: transparent; -fx-padding: 6 0 0 0; }
+.chart-legend-item { -fx-text-fill: -nf-muted; -fx-font-size: 12px; }
+.default-color0.chart-legend-item-symbol { -fx-background-color: -nf-brand; -fx-background-radius: 3; }
+.default-color1.chart-legend-item-symbol { -fx-background-color: -nf-orange; -fx-background-radius: 3; }
+.default-color2.chart-legend-item-symbol { -fx-background-color: -nf-indigo; -fx-background-radius: 3; }
+.axis { -fx-tick-label-fill: -nf-muted; -fx-font-size: 11px; }
+.axis:bottom, .axis:left { -fx-border-color: transparent; }
+.date-picker { -fx-background-radius: 10; }
+.temp-password { -fx-font-family: "monospaced"; -fx-font-size: 20px; -fx-font-weight: bold; -fx-padding: 12 16;
+                 -fx-background-color: -nf-fill; -fx-background-radius: 14; -fx-text-fill: -nf-text; }
+.attachment-chip { -fx-background-color: -nf-fill; -fx-background-radius: 999; -fx-padding: 4 10; -fx-font-size: 12px; -fx-cursor: hand; }
+.bubble-mine .attachment-chip { -fx-background-color: rgba(255,255,255,0.22); -fx-text-fill: white; }
+.ok-text { -fx-text-fill: -nf-green-text; }

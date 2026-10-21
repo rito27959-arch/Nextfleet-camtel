@@ -144,8 +144,9 @@ public final class AppShell extends StackPane {
         };
     }
 
+    /** Tous les modules sont livrés : plus de section « À venir ». */
     private static boolean upcoming(Section s) {
-        return s == Section.MAINTENANCE || s == Section.FUEL || s == Section.COSTS || s == Section.REPORTS;
+        return false;
     }
 
     /** Sections livrées (ou à venir) visibles pour ce profil, dans l'ordre de la barre latérale. */
@@ -203,10 +204,32 @@ public final class AppShell extends StackPane {
         NotificationCenter nc = new NotificationCenter(gateway, this::closeSidePanel, n -> {
             closeSidePanel();
             if (n.targetSection() == null) return;
-            if ("VEHICLES".equals(n.targetSection())) openVehicles(n.targetQuery());
-            else show(Section.valueOf(n.targetSection()));
+            String target = n.targetSection().toUpperCase(java.util.Locale.ROOT);
+            switch (target) {
+                case "VEHICLES" -> openVehicles(n.targetQuery());
+                case "FUEL" -> show(Section.FUEL);
+                case "WORKSHOP" -> show(visible(Section.WORKSHOP) ? Section.WORKSHOP : Section.MAINTENANCE);
+                case "ANOMALIES" -> show(Section.OVERVIEW);
+                case "MISSIONS" -> show(visible(Section.MISSIONS) ? Section.MISSIONS : Section.MY_MISSIONS);
+                default -> {
+                    try {
+                        show(Section.valueOf(target));
+                    } catch (IllegalArgumentException e) {
+                        show(home());
+                    }
+                }
+            }
         }, this::refreshBellBadge);
         showSidePanel(nc, 400);
+    }
+
+    /** Feuille latérale (formulaire, détail) décollée des bords ; Échap ou clic sur le voile la ferme. */
+    public void openSheet(javafx.scene.layout.Region panel, double width) {
+        showSidePanel(panel, width);
+    }
+
+    public void closeSheet() {
+        closeSidePanel();
     }
 
     private void showSidePanel(javafx.scene.layout.Region panel, double width) {
@@ -432,7 +455,10 @@ public final class AppShell extends StackPane {
         currentSection = s;
         Node view = switch (s) {
             case MY_MISSIONS -> new DriverHomeView(this);
-            case WORKSHOP -> new WorkshopView(this);
+            case WORKSHOP, MAINTENANCE -> new WorkOrdersView(this, s);
+            case FUEL -> new FuelView(this);
+            case COSTS -> new CostsView(this);
+            case REPORTS -> new ReportsView(this);
             case USERS -> new UsersView(this);
             case MISSIONS -> new MissionsView(this);
             case TRACKING -> new FleetTrackingView(this);

@@ -87,8 +87,8 @@ public final class LoginView extends StackPane {
         Button forgot = new Button("Mot de passe oublié ?");
         forgot.getStyleClass().add("btn-plain");
         forgot.setOnAction(e -> AlertDialog.show(this, Ui.symbolTile(Icons.LOCK, "tile-gray"), "Mot de passe oublié",
-                "Contactez l'administrateur NexFleet de votre direction. La réinitialisation en libre-service "
-                        + "arrivera avec l'annuaire CAMTEL (NF-50).",
+                "Contactez l'administrateur NexFleet de votre direction : il vous remet un mot de passe provisoire, "
+                        + "que vous remplacez à la première connexion.",
                 List.of(AlertDialog.Action.preferred("OK", () -> { }))));
 
         form = new VBox(12, appIcon, gap(4), title, hint, gap(10), fields, error, gap(4), submit, forgot);
@@ -102,8 +102,11 @@ public final class LoginView extends StackPane {
         }
         if (gateway.isDemo()) {
             form.getChildren().add(demoAccounts());
+        } else if (gateway instanceof cm.camtel.nextfleet.desktop.data.HttpFleetGateway http) {
+            form.getChildren().add(5, serverRow(http));
         }
-        Label sso = Ui.label("Connexion fédérée CAMTEL (OIDC) disponible après accord DSIR.", "footnote", "muted");
+        Label sso = Ui.label(gateway.isDemo() ? "Mode démonstration : données fictives, rien n'est enregistré sur un serveur."
+                : "Compte remis par l'administrateur NexFleet de votre direction.", "footnote", "muted");
         sso.setWrapText(true);
         form.getChildren().add(sso);
         form.getStyleClass().add("login-card");
@@ -169,8 +172,77 @@ public final class LoginView extends StackPane {
         return new VBox(head, list);
     }
 
+    /** Serveur utilisé, modifiable avant connexion ; l'adresse est vérifiée (réponse « UP ») avant d'être enregistrée. */
+    private Node serverRow(cm.camtel.nextfleet.desktop.data.HttpFleetGateway http) {
+        boolean unset = cm.camtel.nextfleet.desktop.data.ServerConfig.isUnset(http.base());
+        Label where = Ui.label(unset ? "Aucun serveur configuré" : "Serveur : " + http.base().getHost(), "footnote", unset ? "error-text" : "muted");
+        Button edit = new Button(unset ? "Configurer" : "Modifier");
+        edit.getStyleClass().add("btn-plain");
+        HBox line = new HBox(6, Icons.stroke(Icons.LOCK, 12, "-nf-muted"), where, Ui.spacer(), edit);
+        line.setAlignment(Pos.CENTER_LEFT);
+        TextField url = new TextField(unset ? "" : http.base().toString());
+        url.setPromptText("https://nexfleet.camtel.cm");
+        url.setAccessibleText("Adresse du serveur NexFleet");
+        Button check = new Button("Vérifier et enregistrer");
+        check.getStyleClass().add("btn-tinted");
+        Label status = Ui.label("", "footnote", "muted");
+        status.setWrapText(true);
+        VBox editor = new VBox(8, url, new HBox(10, check, status));
+        editor.setManaged(unset);
+        editor.setVisible(unset);
+        edit.setOnAction(e -> {
+            editor.setManaged(!editor.isVisible());
+            editor.setVisible(!editor.isVisible());
+            if (editor.isVisible()) url.requestFocus();
+        });
+        check.setOnAction(e -> {
+            java.net.URI uri;
+            try {
+                String raw = url.getText().strip();
+                if (!raw.contains("://")) raw = "https://" + raw;
+                uri = cm.camtel.nextfleet.desktop.data.HttpFleetGateway.validate(java.net.URI.create(raw));
+            } catch (IllegalArgumentException ex) {
+                status.setText(ex.getMessage().startsWith("HTTPS") ? "HTTPS obligatoire pour un serveur distant." : "Adresse invalide.");
+                return;
+            }
+            java.net.URI previous = http.base();
+            java.net.URI target = uri;
+            check.setDisable(true);
+            status.setText("Vérification…");
+            Ui.async(() -> {
+                http.setBase(target);
+                if (!http.ping()) {
+                    http.setBase(previous);
+                    throw new cm.camtel.nextfleet.desktop.data.FleetGateway.GatewayException(
+                            cm.camtel.nextfleet.desktop.data.FleetGateway.GatewayException.Kind.NETWORK, "Aucun serveur NexFleet ne répond à cette adresse.");
+                }
+                cm.camtel.nextfleet.desktop.data.ServerConfig.save(target.toString());
+                return target;
+            }, ok -> {
+                check.setDisable(false);
+                status.setText("");
+                where.setText("Serveur : " + ok.getHost());
+                where.getStyleClass().setAll("label", "footnote", "muted");
+                edit.setText("Modifier");
+                editor.setManaged(false);
+                editor.setVisible(false);
+                login.requestFocus();
+            }, err -> {
+                check.setDisable(false);
+                status.setText(err.getMessage());
+            });
+        });
+        return new VBox(6, line, editor);
+    }
+
     private void attempt(FleetGateway gateway, Consumer<Session> onLogin) {
         clearError();
+        if (gateway instanceof cm.camtel.nextfleet.desktop.data.HttpFleetGateway http
+                && cm.camtel.nextfleet.desktop.data.ServerConfig.isUnset(http.base())) {
+            showError("Indiquez d'abord l'adresse du serveur NexFleet (fournie par la DSIR).");
+            shake(form);
+            return;
+        }
         if (login.getText().isBlank() || password.getText().isEmpty()) {
             showError("Renseignez l'identifiant et le mot de passe.");
             shake(form);

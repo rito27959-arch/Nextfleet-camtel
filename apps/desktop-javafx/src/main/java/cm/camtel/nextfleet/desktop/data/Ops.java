@@ -39,7 +39,12 @@ public final class Ops {
                                Instant lastAt, long unread, List<String> participants) { }
 
     public record ChatLine(long seq, String senderId, String senderName, String body, Instant at, boolean mine,
-                           Chat.DeliveryState state, String clientMessageId) { }
+                           Chat.DeliveryState state, String clientMessageId, List<Prod.Attachment> attachments) {
+        public ChatLine(long seq, String senderId, String senderName, String body, Instant at, boolean mine,
+                        Chat.DeliveryState state, String clientMessageId) {
+            this(seq, senderId, senderName, body, at, mine, state, clientMessageId, List.of());
+        }
+    }
 
     public record Grant(Role role, String scope, LocalDate until, boolean delegation) { }
 

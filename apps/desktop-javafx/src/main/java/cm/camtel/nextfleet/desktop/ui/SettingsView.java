@@ -36,7 +36,12 @@ public final class SettingsView extends ScrollPane {
         profile.setStyle("-fx-min-height: 72;");
         Node signOut = Ui.listRow(null, "Se déconnecter", null, new javafx.scene.layout.Region(), shell::confirmLogout);
         ((Label) ((HBox) signOut).getChildren().get(0)).getStyleClass().add("destructive");
-        col.getChildren().add(Ui.insetGroup(null, List.of(profile, signOut), null));
+        List<Node> account = new java.util.ArrayList<>(List.of(profile));
+        if (!gateway.isDemo()) {
+            account.add(Ui.listRow(Ui.symbolTile(Icons.KEY, "tile-gray"), "Changer mon mot de passe", null, null, () -> passwordSheet(shell)));
+        }
+        account.add(signOut);
+        col.getChildren().add(Ui.insetGroup(null, account, null));
 
         // Profil et droits (matrice des habilitations)
         if (primary != null) {
@@ -77,7 +82,8 @@ public final class SettingsView extends ScrollPane {
         col.getChildren().add(Ui.insetGroup("Données", List.of(
                 Ui.listRow(Ui.symbolTile(Icons.SHIELD, gateway.isDemo() ? "tile-orange" : "tile-green"), "Environnement",
                         gateway.isDemo() ? "Démonstration" : "Serveur NexFleet", null, null),
-                Ui.listRow(Ui.symbolTile(Icons.GEAR, "tile-gray"), "Paramètres métier", "Lot 3", null, null)),
+                Ui.listRow(Ui.symbolTile(Icons.LOCK, "tile-navy"), "Serveur",
+                        gateway instanceof cm.camtel.nextfleet.desktop.data.HttpFleetGateway h ? h.base().getHost() : "Aucun (données locales)", null, null)),
                 gateway.isDemo() ? "Données fictives, refusées en production (NF-04)." : null));
 
         // À propos
@@ -94,6 +100,26 @@ public final class SettingsView extends ScrollPane {
         content.setMaxWidth(704);
         setContent(center);
         Motion.stagger(col.getChildren());
+    }
+
+    /** Changement de mot de passe en libre-service ; les autres sessions de l'utilisateur sont fermées par le serveur. */
+    private static void passwordSheet(AppShell shell) {
+        javafx.scene.control.PasswordField current = new javafx.scene.control.PasswordField();
+        javafx.scene.control.PasswordField next = new javafx.scene.control.PasswordField();
+        javafx.scene.control.PasswordField confirm = new javafx.scene.control.PasswordField();
+        FormSheet f = new FormSheet("Mot de passe", "Enregistrer", shell::closeSheet)
+                .intro("12 caractères au moins, lettres et chiffres ou symboles. Vos autres sessions ouvertes seront fermées.")
+                .field("Mot de passe actuel *", current).field("Nouveau mot de passe *", next).field("Confirmation *", confirm);
+        f.onSubmit(() -> {
+            if (!next.getText().equals(confirm.getText())) throw new IllegalArgumentException("Les deux saisies du nouveau mot de passe diffèrent.");
+            if (next.getText().length() < 12) throw new IllegalArgumentException("Le nouveau mot de passe doit contenir au moins 12 caractères.");
+            shell.gateway().changePassword(current.getText().toCharArray(), next.getText().toCharArray());
+            return true;
+        }, ok -> {
+            shell.closeSheet();
+            shell.toasts().success("Mot de passe modifié", "Utilisez-le dès votre prochaine connexion.");
+        });
+        shell.openSheet(f, 420);
     }
 
     private static Node notifRow(NotificationKind k, String title, String icon, String tile) {

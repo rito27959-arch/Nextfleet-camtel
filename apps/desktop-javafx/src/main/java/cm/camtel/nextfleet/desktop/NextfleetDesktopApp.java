@@ -4,6 +4,7 @@ import cm.camtel.nextfleet.desktop.data.DemoFleetGateway;
 import cm.camtel.nextfleet.desktop.data.FleetGateway;
 import cm.camtel.nextfleet.desktop.data.HttpFleetGateway;
 import cm.camtel.nextfleet.desktop.ui.AppShell;
+import cm.camtel.nextfleet.desktop.ui.ChangePasswordView;
 import cm.camtel.nextfleet.desktop.ui.LoginView;
 import cm.camtel.nextfleet.desktop.ui.ScreenshotTour;
 import javafx.application.Application;
@@ -21,8 +22,9 @@ import java.util.Map;
 /**
  * Client NexFleet Windows / Linux (JavaFX).
  * <pre>
- *   --api=https://serveur/            API NexFleet (HTTPS obligatoire hors localhost)
- *   --demo                            mode démonstration, données fictives (badge DÉMO)
+ *   (sans option)                     serveur NexFleet : adresse choisie à la connexion ou livrée avec l'application
+ *   --api=https://serveur/            impose l'adresse du serveur (HTTPS obligatoire hors localhost)
+ *   --demo                            mode démonstration (formation), données fictives, badge DÉMO
  *   --dark                            thème sombre au démarrage
  *   --screenshot=DOSSIER              parcours automatique et captures PNG (recette visuelle)
  * </pre>
@@ -38,7 +40,7 @@ public class NextfleetDesktopApp extends Application {
     public void start(Stage stage) {
         this.stage = stage;
         Map<String, String> args = getParameters().getNamed();
-        boolean demo = getParameters().getUnnamed().contains("--demo") || !args.containsKey("api");
+        boolean demo = getParameters().getUnnamed().contains("--demo");
         dark = getParameters().getUnnamed().contains("--dark");
         cm.camtel.nextfleet.desktop.ui.Motion.setReduced(getParameters().getUnnamed().contains("--reduce-motion"));
         cm.camtel.nextfleet.desktop.ui.Appearance.setOpaque(getParameters().getUnnamed().contains("--opaque"));
@@ -46,7 +48,7 @@ public class NextfleetDesktopApp extends Application {
         String shots = args.get("screenshot");
         gateway = demo
                 ? new DemoFleetGateway(Clock.systemUTC(), shots != null ? Duration.ZERO : Duration.ofMillis(350))
-                : new HttpFleetGateway(URI.create(args.get("api")));
+                : new HttpFleetGateway(serverUri(args.get("api")));
 
         loadFonts();
         scene = new Scene(new javafx.scene.layout.Pane(), 1440, 900);
@@ -65,8 +67,29 @@ public class NextfleetDesktopApp extends Application {
         }
     }
 
+    /** Adresse : --api, sinon choix enregistré, sinon adresse livrée ; à défaut l'écran de connexion la demande. */
+    private static URI serverUri(String arg) {
+        String url = arg != null && !arg.isBlank() ? arg : cm.camtel.nextfleet.desktop.data.ServerConfig.load();
+        if (url == null || url.isBlank()) return URI.create(cm.camtel.nextfleet.desktop.data.ServerConfig.UNSET);
+        try {
+            return HttpFleetGateway.validate(URI.create(url.strip()));
+        } catch (IllegalArgumentException e) {
+            return URI.create(cm.camtel.nextfleet.desktop.data.ServerConfig.UNSET);
+        }
+    }
+
     public void showLogin(String notice) {
-        setRoot(new LoginView(gateway, notice, session -> setRoot(new AppShell(gateway, session, this::logout, this::toggleTheme, () -> dark))));
+        setRoot(new LoginView(gateway, notice, session -> {
+            if (gateway.mustChangePassword()) {
+                setRoot(new ChangePasswordView(gateway, true, () -> openShell(session), this::logout));
+            } else {
+                openShell(session);
+            }
+        }));
+    }
+
+    private void openShell(cm.camtel.nextfleet.desktop.data.Models.Session session) {
+        setRoot(new AppShell(gateway, session, this::logout, this::toggleTheme, () -> dark));
     }
 
     private void logout() {

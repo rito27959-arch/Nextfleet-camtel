@@ -173,8 +173,202 @@ public interface FleetGateway {
         return AuditChain.firstBroken(shown);
     }
 
+    /** Nouveaux messages en temps réel ; par défaut aucun signal (l'écran relit périodiquement). */
+    default AutoCloseable subscribeMessages(java.util.function.Consumer<String> onConversation) {
+        return () -> { };
+    }
+
+    // ------------------------------------------------------------------ production : compte et entités
+
+    /** Vrai après une connexion avec un mot de passe provisoire : seul le changement de mot de passe est permis. */
+    default boolean mustChangePassword() {
+        return false;
+    }
+
+    default void changePassword(char[] current, char[] next) {
+        throw notYet("Le changement de mot de passe");
+    }
+
+    /** Entités où l'utilisateur détient la permission (code serveur, ex. « vehicle:write »). */
+    default java.util.List<Prod.OrgUnit> orgUnits(String permission) {
+        throw notYet("La liste des entités");
+    }
+
+    // ------------------------------------------------------------------ production : missions
+
+    default Ops.Mission createMission(Prod.MissionDraft draft) {
+        throw notYet("La création de mission");
+    }
+
+    default Ops.Mission authorizeMission(UUID missionId) {
+        throw notYet("L'autorisation de mission");
+    }
+
+    default Ops.Mission cancelMission(UUID missionId, String reason) {
+        throw notYet("L'annulation de mission");
+    }
+
+    // ------------------------------------------------------------------ production : parc, conducteurs, documents
+
+    default void assignDriver(UUID vehicleId, UUID driverId, String reason) {
+        throw notYet("L'affectation d'un conducteur");
+    }
+
+    default java.util.List<Prod.DriverRef> driverRefs() {
+        return drivers("").stream().map(d -> new Prod.DriverRef(d.id(), d.fullName(), d.staffNumber())).toList();
+    }
+
+    default Models.Driver createDriver(Prod.DriverDraft draft) {
+        throw notYet("La création de conducteur");
+    }
+
+    default java.util.List<Prod.VehicleDocument> vehicleDocuments(UUID vehicleId) {
+        throw notYet("Les documents du véhicule");
+    }
+
+    default Prod.VehicleDocument addVehicleDocument(UUID vehicleId, String docType, String reference, java.time.LocalDate validFrom,
+                                                    java.time.LocalDate validUntil, UUID fileId) {
+        throw notYet("L'ajout de document");
+    }
+
+    // ------------------------------------------------------------------ production : pièces justificatives
+
+    /** Dépôt d'un PDF, JPEG, PNG ou WebP (10 Mo max) ; le serveur vérifie le contenu réel du fichier. */
+    /** {@code vehicleId} (facultatif) : le serveur rattache le fichier à l'entité du véhicule. */
+    default Prod.StoredFile upload(String purpose, UUID vehicleId, java.nio.file.Path file) {
+        throw notYet("Le dépôt de pièces justificatives");
+    }
+
+    default byte[] download(UUID fileId) {
+        throw notYet("Le téléchargement de pièces justificatives");
+    }
+
+    // ------------------------------------------------------------------ production : atelier
+
+    default java.util.List<Prod.Category> maintenanceCategories() {
+        throw notYet("L'atelier");
+    }
+
+    default java.util.List<Prod.WorkOrder> workOrders(boolean openOnly) {
+        throw notYet("L'atelier");
+    }
+
+    default Prod.WorkOrder requestWork(UUID vehicleId, String categoryCode, String title) {
+        throw notYet("Les demandes d'intervention");
+    }
+
+    default Prod.WorkOrder transitionWork(UUID orderId, long version, Prod.WorkTransition t) {
+        throw notYet("Le suivi des interventions");
+    }
+
+    default java.util.List<Prod.OilChange> oilChanges() {
+        throw notYet("Les vidanges");
+    }
+
+    default Prod.OilChange addOilChange(Prod.OilChangeDraft draft) {
+        throw notYet("La saisie de vidange");
+    }
+
+    // ------------------------------------------------------------------ production : carburant
+
+    default java.util.List<Prod.Supplier> suppliers() {
+        throw notYet("Les fournisseurs");
+    }
+
+    default Prod.Supplier createSupplier(String code, String name, String kind) {
+        throw notYet("La création de fournisseur");
+    }
+
+    default java.util.List<Prod.FuelOrder> fuelOrders() {
+        throw notYet("Les bons de carburant");
+    }
+
+    default Prod.FuelOrder createFuelOrder(Prod.FuelOrderDraft draft, boolean submit) {
+        throw notYet("La demande de bon");
+    }
+
+    default void approveFuelOrder(UUID orderId, String comment) {
+        throw notYet("La validation de bon");
+    }
+
+    default void cancelFuelOrder(UUID orderId, String reason) {
+        throw notYet("L'annulation de bon");
+    }
+
+    default java.util.List<Prod.FuelFill> fuelFills() {
+        throw notYet("Les pleins");
+    }
+
+    /** Idempotent : la même {@code requestKey} ne crée jamais deux pleins (renvoi après coupure réseau). */
+    default void recordFill(String requestKey, Prod.FillDraft draft) {
+        throw notYet("La saisie de plein");
+    }
+
+    // ------------------------------------------------------------------ production : coûts et rapports
+
+    default Prod.CostSummary costs(int year) {
+        throw notYet("Le suivi des coûts");
+    }
+
+    default Prod.ImportResult importBudget(int year, UUID orgUnitId, String sourceFile, String csv) {
+        throw notYet("L'import du budget");
+    }
+
+    default java.util.List<Prod.ReportInfo> reports() {
+        throw notYet("Les rapports");
+    }
+
+    default byte[] exportReport(String code, java.time.LocalDate from, java.time.LocalDate to) {
+        throw notYet("L'export de rapports");
+    }
+
+    // ------------------------------------------------------------------ production : comptes
+
+    default java.util.List<Prod.RoleInfo> roles() {
+        throw notYet("La liste des rôles");
+    }
+
+    default Prod.CreatedAccount createAccount(Prod.AccountDraft draft) {
+        throw notYet("La création de compte");
+    }
+
+    default java.util.List<Prod.RoleGrant> grants(String userId) {
+        throw notYet("Les rôles du compte");
+    }
+
+    default void grantRole(String userId, String role, UUID scopeOrgId, java.time.Instant validUntil) {
+        throw notYet("L'attribution de rôle");
+    }
+
+    default void revokeGrant(String userId, UUID grantId, String reason) {
+        throw notYet("Le retrait de rôle");
+    }
+
+    /** Renvoie le nouveau mot de passe provisoire (affiché une seule fois). */
+    default String resetPassword(String userId, String reason) {
+        throw notYet("La réinitialisation de mot de passe");
+    }
+
+    default void setAccountStatus(String userId, boolean active, String reason) {
+        throw notYet("La suspension de compte");
+    }
+
+    // ------------------------------------------------------------------ production : messagerie
+
+    default java.util.List<Prod.Contact> contacts() {
+        throw notYet("Les contacts");
+    }
+
+    default Ops.Conversation openConversation(java.util.List<String> userIds, String title) {
+        throw notYet("La création de conversation");
+    }
+
+    default Ops.ChatLine sendMessage(String conversationId, String clientMessageId, String body, java.util.List<UUID> attachmentIds) {
+        if (attachmentIds == null || attachmentIds.isEmpty()) return sendMessage(conversationId, clientMessageId, body);
+        throw notYet("L'envoi de pièces jointes");
+    }
+
     static GatewayException notYet(String what) {
-        return new GatewayException(GatewayException.Kind.SERVER, what + " n'est pas disponible avec ce serveur. "
-                + "Cette fonction reste consultable en mode démonstration.");
+        return new GatewayException(GatewayException.Kind.SERVER, what + " n'est pas disponible dans ce mode.");
     }
 }
