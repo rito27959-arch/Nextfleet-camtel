@@ -102,7 +102,7 @@ public class SessionService {
                   FROM app_user u
                  WHERE s.token_sha256 = :h AND s.revoked_at IS NULL AND s.expires_at > now()
                    AND u.id = s.user_id AND u.status = 'ACTIVE'
-                RETURNING s.id AS session_id, u.id AS user_id, u.login, u.display_name, u.org_unit_id""",
+                RETURNING s.id AS session_id, u.id AS user_id, u.login, u.display_name, u.org_unit_id, u.must_change_password""",
                 Map.of("h", sha256(token)));
         if (rows.isEmpty()) return Optional.empty();
         Map<String, Object> r = rows.get(0);
@@ -115,7 +115,7 @@ public class SessionService {
                         rs.getTimestamp("valid_until") == null ? null : rs.getTimestamp("valid_until").toInstant(),
                         rs.getTimestamp("revoked_at") == null ? null : rs.getTimestamp("revoked_at").toInstant()));
         return Optional.of(new AuthenticatedUser(userId, (UUID) r.get("session_id"), (String) r.get("login"),
-                (String) r.get("display_name"), (UUID) r.get("org_unit_id"), grants));
+                (String) r.get("display_name"), (UUID) r.get("org_unit_id"), grants, Boolean.TRUE.equals(r.get("must_change_password"))));
     }
 
     @Transactional

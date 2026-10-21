@@ -27,22 +27,38 @@ public class AuthController {
 
     public record GrantView(String role, String scopeOrgId, Instant validUntil) { }
 
-    public record MeView(UUID id, String login, String displayName, UUID orgUnitId, List<GrantView> roles) {
+    public record MeView(UUID id, String login, String displayName, UUID orgUnitId, List<GrantView> roles,
+                         boolean mustChangePassword) {
         static MeView of(AuthenticatedUser u) {
+            Instant now = Instant.now();
             return new MeView(u.userId(), u.login(), u.displayName(), u.orgUnitId(),
-                    u.grants().stream().filter(g -> g.revokedAt() == null)
-                            .map(g -> new GrantView(g.roleCode(), g.scopeOrgId(), g.validUntil())).toList());
+                    u.grants().stream().filter(g -> g.revokedAt() == null && !g.validFrom().isAfter(now)
+                                    && (g.validUntil() == null || g.validUntil().isAfter(now)))
+                            .map(g -> new GrantView(g.roleCode(), g.scopeOrgId(), g.validUntil())).toList(),
+                    u.mustChangePassword());
         }
     }
+
+    public record PasswordChange(@NotBlank @Size(max = 256) String currentPassword,
+                                 @NotBlank @Size(min = 12, max = 128) String newPassword) { }
 
     public record LoginResponse(String token, Instant expiresAt, MeView user) { }
 
     private final SessionService sessions;
     private final AccessService access;
+    private final cm.camtel.nextfleet.api.admin.AccountService accounts;
 
-    public AuthController(SessionService sessions, AccessService access) {
+    public AuthController(SessionService sessions, AccessService access, cm.camtel.nextfleet.api.admin.AccountService accounts) {
         this.sessions = sessions;
         this.access = access;
+        this.accounts = accounts;
+    }
+
+    /** Changement de mot de passe en libre-service ; seule route ouverte tant qu'un changement est imposé (avec /me et /auth/logout). */
+    @PostMapping("/me/password")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changePassword(@Valid @RequestBody PasswordChange r) {
+        accounts.changeOwnPassword(r.currentPassword(), r.newPassword());
     }
 
     /** NF-01 : message générique en cas d'échec (ni « compte inconnu » ni « mot de passe faux »). */

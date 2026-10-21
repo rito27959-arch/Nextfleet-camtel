@@ -42,7 +42,8 @@ public class FuelController {
                                  @NotNull @DecimalMin("0.01") @Digits(integer = 7, fraction = 2) BigDecimal liters,
                                  @NotNull @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal unitPriceXaf,
                                  @NotNull Boolean fullTank,
-                                 @NotBlank @Size(max = 60) String receiptReference) { }
+                                 @NotBlank @Size(max = 60) String receiptReference,
+                                 UUID receiptFileId) { }
 
     public record ApprovalRequest(@Size(max = 500) String comment) { }
 

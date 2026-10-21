@@ -74,4 +74,12 @@ public class LiveScope {
         if (e.hasNonNull("bearingDeg")) o.put("bearingDeg", e.get("bearingDeg").asDouble());
         return o;
     }
+
+    /** Participants actifs d'une conversation qui détiennent la permission chat:use. */
+    public Set<UUID> chatParticipants(UUID conversationId) {
+        return new java.util.HashSet<>(jdbc.queryForList("""
+                SELECT user_id FROM conversation_participant
+                 WHERE conversation_id = :c AND left_at IS NULL AND nf_has_permission(user_id, 'chat:use')""",
+                new org.springframework.jdbc.core.namedparam.MapSqlParameterSource("c", conversationId), UUID.class));
+    }
 }

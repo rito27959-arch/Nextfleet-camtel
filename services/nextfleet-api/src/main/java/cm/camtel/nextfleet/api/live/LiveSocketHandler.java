@@ -77,6 +77,10 @@ public class LiveSocketHandler extends TextWebSocketHandler {
     }
 
     void broadcast(JsonNode e) {
+        if ("nf_message".equals(e.path("_channel").asText())) {
+            broadcastMessage(e);
+            return;
+        }
         UUID org = uuid(e, "orgUnitId");
         UUID driver = uuid(e, "driverUserId");
         if (clients.isEmpty()) return;
@@ -87,6 +91,29 @@ public class LiveSocketHandler extends TextWebSocketHandler {
             if (!allowed) continue;
             try {
                 c.ws().sendMessage(new TextMessage(text));
+            } catch (IOException | IllegalStateException ex) {
+                clients.remove(c.ws().getId());
+            }
+        }
+    }
+
+    /**
+     * Nouveau message : seuls les participants actifs de la conversation, détenteurs de chat:use, reçoivent un signal
+     * (identifiant de conversation et numéro de séquence, jamais le contenu) ; le client relit ensuite par l'API REST,
+     * qui réapplique tous les contrôles d'accès.
+     */
+    void broadcastMessage(JsonNode e) {
+        UUID conv = uuid(e, "conversationId");
+        if (conv == null || clients.isEmpty()) return;
+        Set<UUID> participants = scopes.chatParticipants(conv);
+        ObjectNode out = mapper.createObjectNode().put("type", "message").put("conversationId", conv.toString())
+                .put("serverSeq", e.path("serverSeq").asLong());
+        UUID sender = uuid(e, "senderId");
+        for (Client c : clients.values()) {
+            if (!participants.contains(c.user().userId())) continue;
+            out.put("mine", c.user().userId().equals(sender));
+            try {
+                c.ws().sendMessage(new TextMessage(out.toString()));
             } catch (IOException | IllegalStateException ex) {
                 clients.remove(c.ws().getId());
             }

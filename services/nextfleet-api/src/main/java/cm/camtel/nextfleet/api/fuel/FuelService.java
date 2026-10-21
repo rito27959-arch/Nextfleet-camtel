@@ -126,18 +126,24 @@ public class FuelService {
 
         UUID org = vehicleOrg(c.vehicleId());
         access.require("fuel_fill:create", org, "fuel_fill", "new");
+        if (c.receiptFileId() != null) {
+            List<Map<String, Object>> f = jdbc.queryForList("SELECT purpose, org_unit_id FROM stored_file WHERE id = :f", Map.of("f", c.receiptFileId()));
+            if (f.isEmpty() || !"FUEL_RECEIPT".equals(f.get(0).get("purpose")) || !org.equals(f.get(0).get("org_unit_id"))) {
+                throw new IllegalArgumentException("Reçu inconnu ou déposé pour une autre entité.");
+            }
+        }
         BigDecimal amount = c.liters().multiply(c.unitPriceXaf()).setScale(2, RoundingMode.HALF_UP);
         UUID id = jdbc.queryForObject("""
                 INSERT INTO fuel_fill(fuel_order_id, exception_reason, vehicle_id, driver_id, supplier_id, filled_at,
                                       odometer_km, liters, unit_price, amount, full_tank, receipt_reference,
-                                      entered_by, client_request_id)
-                VALUES (:o, :ex, :v, :d, :s, :t, :km, :l, :p, :a, :full, :ref, :u, :k) RETURNING id""",
+                                      entered_by, client_request_id, receipt_file_id)
+                VALUES (:o, :ex, :v, :d, :s, :t, :km, :l, :p, :a, :full, :ref, :u, :k, :rf) RETURNING id""",
                 new MapSqlParameterSource().addValue("o", c.fuelOrderId()).addValue("ex", c.exceptionReason())
                         .addValue("v", c.vehicleId()).addValue("d", c.driverId()).addValue("s", c.supplierId())
                         .addValue("t", Timestamp.from(c.filledAt())).addValue("km", c.odometerKm())
                         .addValue("l", c.liters()).addValue("p", c.unitPriceXaf()).addValue("a", amount)
                         .addValue("full", c.fullTank()).addValue("ref", c.receiptReference().strip())
-                        .addValue("u", u.userId()).addValue("k", idempotencyKey), UUID.class);
+                        .addValue("u", u.userId()).addValue("k", idempotencyKey).addValue("rf", c.receiptFileId()), UUID.class);
         FuelFillView v = jdbc.queryForObject("SELECT * FROM fuel_fill WHERE id = :id", Map.of("id", id), FILL);
         audit.record(u.userId(), "CREATE", "fuel_fill", id.toString(), c.exceptionReason(), null, v);
         return new IdempotentResult(v, false);

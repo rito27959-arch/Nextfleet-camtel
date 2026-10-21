@@ -7,4 +7,4 @@ import java.util.UUID;
 
 /** Principal porté par la requête après validation du jeton de session. */
 public record AuthenticatedUser(UUID userId, UUID sessionId, String login, String displayName,
-                                UUID orgUnitId, List<Grant> grants) { }
+                                UUID orgUnitId, List<Grant> grants, boolean mustChangePassword) { }

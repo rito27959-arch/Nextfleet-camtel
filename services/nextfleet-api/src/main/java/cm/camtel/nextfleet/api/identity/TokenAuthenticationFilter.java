@@ -14,6 +14,9 @@ import java.util.List;
 /** Lit « Authorization: Bearer &lt;jeton&gt; » et place l'utilisateur authentifié dans le contexte. */
 public class TokenAuthenticationFilter extends OncePerRequestFilter {
 
+    private static final java.util.Set<String> OPEN_WHEN_PASSWORD_CHANGE =
+            java.util.Set.of("/api/v1/me", "/api/v1/me/password", "/api/v1/auth/logout");
+
     private final SessionService sessions;
 
     public TokenAuthenticationFilter(SessionService sessions) {
@@ -25,9 +28,20 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String header = req.getHeader("Authorization");
         if (header != null && header.startsWith("Bearer ")) {
-            sessions.resolve(header.substring(7).trim()).ifPresent(user ->
-                    SecurityContextHolder.getContext().setAuthentication(
-                            new UsernamePasswordAuthenticationToken(user, null, List.of())));
+            AuthenticatedUser user = sessions.resolve(header.substring(7).trim()).orElse(null);
+            if (user != null) {
+                if (user.mustChangePassword() && !OPEN_WHEN_PASSWORD_CHANGE.contains(req.getRequestURI())) {
+                    // Mot de passe provisoire : aucune donnée métier tant qu'il n'a pas été remplacé.
+                    res.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    res.setContentType("application/problem+json");
+                    res.setCharacterEncoding("UTF-8");
+                    res.getWriter().write("{\"type\":\"about:blank\",\"title\":\"Changement de mot de passe requis\","
+                            + "\"status\":403,\"code\":\"PASSWORD_CHANGE_REQUIRED\","
+                            + "\"detail\":\"Choisissez un nouveau mot de passe pour continuer.\"}");
+                    return;
+                }
+                SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(user, null, List.of()));
+            }
         }
         try {
             chain.doFilter(req, res);

@@ -23,7 +23,11 @@ import java.util.UUID;
 public class ConversationController {
 
     public record PostRequest(@NotBlank @Pattern(regexp = "^[A-Za-z0-9._:-]{1,80}$") String clientMessageId,
-                              @NotBlank @Size(max = 8000) String body) { }
+                              @NotBlank @Size(max = 8000) String body,
+                              @Size(max = 5) List<UUID> attachmentIds) { }
+
+    public record OpenRequest(@jakarta.validation.constraints.NotNull @Size(min = 1, max = 50) List<UUID> participantIds,
+                              @Size(max = 120) String title) { }
 
     public record ReadRequest(Long upTo) { }
 
@@ -38,6 +42,16 @@ public class ConversationController {
         return service.list();
     }
 
+    @GetMapping("/contacts")
+    public List<ConversationService.Contact> contacts(@RequestParam(required = false) String q) {
+        return service.contacts(q);
+    }
+
+    @PostMapping
+    public ResponseEntity<ConversationService.ConversationView> open(@Valid @RequestBody OpenRequest r) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.open(r.participantIds(), r.title()));
+    }
+
     @GetMapping("/{id}/messages")
     public List<ConversationService.Line> messages(@PathVariable UUID id, @RequestParam(defaultValue = "0") long after,
                                                    @RequestParam(defaultValue = "200") int limit) {
@@ -47,7 +61,7 @@ public class ConversationController {
     /** 201 à la création, 200 pour une réémission reconnue (même message renvoyé). */
     @PostMapping("/{id}/messages")
     public ResponseEntity<ConversationService.Ack> post(@PathVariable UUID id, @Valid @RequestBody PostRequest r) {
-        ConversationService.Ack a = service.post(id, r.clientMessageId(), r.body());
+        ConversationService.Ack a = service.post(id, r.clientMessageId(), r.body(), r.attachmentIds());
         return ResponseEntity.status(a.duplicate() ? HttpStatus.OK : HttpStatus.CREATED).body(a);
     }
 

@@ -25,11 +25,19 @@ public class VehicleService {
     public record VehicleView(UUID id, String registration, String registrationNormalized, String vin,
                               String make, String model, Integer modelYear, String vehicleType, String energy,
                               BigDecimal tankCapacityLiters, boolean tankCapacityVerified, String status,
-                              UUID orgUnitId, String modelAssetStatus, Instant archivedAt, long version) { }
+                              UUID orgUnitId, String modelAssetStatus, Instant archivedAt, long version,
+                              String category, String orgUnitName, String driverName, BigDecimal odometerKm,
+                              java.time.LocalDate nextDueOn, String siteLabel) { }
 
     private static final String COLUMNS = """
             id, registration, registration_normalized, vin, make, model, model_year, vehicle_type, energy,
-            tank_capacity_l, tank_capacity_verified, status, org_unit_id, model_asset_status, archived_at, version""";
+            tank_capacity_l, tank_capacity_verified, status, org_unit_id, model_asset_status, archived_at, version,
+            category, site_label,
+            (SELECT o.name FROM organisation_unit o WHERE o.id = vehicle.org_unit_id) AS org_unit_name,
+            (SELECT d.full_name FROM vehicle_assignment a JOIN driver d ON d.id = a.driver_id
+              WHERE a.vehicle_id = vehicle.id AND a.period @> now() LIMIT 1) AS driver_name,
+            (SELECT od.value_km FROM vehicle_odometer od WHERE od.vehicle_id = vehicle.id ORDER BY od.read_at DESC LIMIT 1) AS odometer_km,
+            (SELECT min(dd.due_on) FROM v_due_date dd WHERE dd.subject_kind = 'VEHICULE' AND dd.subject_id = vehicle.id) AS next_due_on""";
 
     private static final RowMapper<VehicleView> MAPPER = (rs, i) -> new VehicleView(
             rs.getObject("id", UUID.class), rs.getString("registration"), rs.getString("registration_normalized"),
@@ -38,7 +46,8 @@ public class VehicleService {
             rs.getBigDecimal("tank_capacity_l"), rs.getBoolean("tank_capacity_verified"), rs.getString("status"),
             rs.getObject("org_unit_id", UUID.class), rs.getString("model_asset_status"),
             rs.getTimestamp("archived_at") == null ? null : rs.getTimestamp("archived_at").toInstant(),
-            rs.getLong("version"));
+            rs.getLong("version"), rs.getString("category"), rs.getString("org_unit_name"), rs.getString("driver_name"),
+            rs.getBigDecimal("odometer_km"), rs.getObject("next_due_on", java.time.LocalDate.class), rs.getString("site_label"));
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AccessService access;
@@ -87,13 +96,20 @@ public class VehicleService {
         RegistrationNumber reg = RegistrationNumber.of(c.registration());   // validation et normalisation
         UUID id = jdbc.queryForObject("""
                 INSERT INTO vehicle(registration, vin, make, model, model_year, vehicle_type, energy,
-                                    tank_capacity_l, tank_capacity_verified, org_unit_id)
-                VALUES (:reg, :vin, :make, :model, :year, :type, :energy, :tank, :tankv, :org) RETURNING id""",
+                                    tank_capacity_l, tank_capacity_verified, org_unit_id, category, site_label)
+                VALUES (:reg, :vin, :make, :model, :year, :type, :energy, :tank, :tankv, :org, :cat, :site) RETURNING id""",
                 new MapSqlParameterSource().addValue("reg", reg.raw()).addValue("vin", blankToNull(c.vin()))
                         .addValue("make", c.make().strip()).addValue("model", c.model().strip())
                         .addValue("year", c.modelYear()).addValue("type", c.vehicleType()).addValue("energy", c.energy())
                         .addValue("tank", c.tankCapacityLiters()).addValue("tankv", c.tankCapacityVerified())
-                        .addValue("org", c.orgUnitId()), UUID.class);
+                        .addValue("org", c.orgUnitId()).addValue("cat", blankToNull(c.category()))
+                        .addValue("site", blankToNull(c.siteLabel())), UUID.class);
+        if (c.odometerKm() != null) {
+            jdbc.update("""
+                    INSERT INTO vehicle_odometer(vehicle_id, read_at, value_km, source, author_id, justification)
+                    VALUES (:v, now(), :km, 'SAISIE', :u, 'Relevé à la création du véhicule')""",
+                    new MapSqlParameterSource("v", id).addValue("km", c.odometerKm()).addValue("u", access.currentUser().userId()));
+        }
         VehicleView created = find(id);
         audit.record(access.currentUser().userId(), "CREATE", "vehicle", id.toString(), null, null, created);
         return created;
@@ -109,11 +125,15 @@ public class VehicleService {
                        model_year = COALESCE(:year, model_year), status = COALESCE(:status, status),
                        tank_capacity_l = COALESCE(:tank, tank_capacity_l),
                        tank_capacity_verified = COALESCE(:tankv, tank_capacity_verified),
+                       category = COALESCE(:cat, category), site_label = COALESCE(:site, site_label),
+                       energy = COALESCE(:energy, energy), vin = COALESCE(:vin, vin),
                        version = version + 1, updated_at = now()
                  WHERE id = :id AND version = :v""",
                 new MapSqlParameterSource().addValue("make", p.make()).addValue("model", p.model())
                         .addValue("year", p.modelYear()).addValue("status", p.status())
                         .addValue("tank", p.tankCapacityLiters()).addValue("tankv", p.tankCapacityVerified())
+                        .addValue("cat", blankToNull(p.category())).addValue("site", blankToNull(p.siteLabel()))
+                        .addValue("energy", blankToNull(p.energy())).addValue("vin", blankToNull(p.vin()))
                         .addValue("id", id).addValue("v", expectedVersion));
         if (n == 0) throw new StaleVersionException("version " + expectedVersion);
         VehicleView after = find(id);

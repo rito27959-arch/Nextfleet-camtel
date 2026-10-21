@@ -20,7 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 /**
- * Écoute PostgreSQL {@code LISTEN nf_position} sur une connexion DÉDIÉE (hors pool) et redistribue chaque position
+ * Écoute PostgreSQL {@code LISTEN nf_position} et {@code nf_message} sur une connexion DÉDIÉE (hors pool) et redistribue chaque position
  * acceptée aux abonnés (WebSocket). Reconnexion automatique avec attente progressive : une coupure de la base ne fait
  * pas tomber l'API, le flux reprend seul.
  */
@@ -60,11 +60,12 @@ public class LiveFeedListener {
             try (Connection c = DriverManager.getConnection(ds.determineUrl(), ds.determineUsername(), ds.determinePassword())) {
                 try (Statement st = c.createStatement()) {
                     st.execute("LISTEN nf_position");
+                    st.execute("LISTEN nf_message");
                 }
                 PGConnection pg = c.unwrap(PGConnection.class);
                 connected = true;
                 backoff = 1000;
-                LOG.info("Flux temps réel : écoute de nf_position active");
+                LOG.info("Flux temps réel : écoute de nf_position et nf_message active");
                 while (running) {
                     PGNotification[] ns = pg.getNotifications(10_000);
                     if (ns == null) {
@@ -73,7 +74,7 @@ public class LiveFeedListener {
                         }
                         continue;
                     }
-                    for (PGNotification n : ns) dispatch(n.getParameter());
+                    for (PGNotification n : ns) dispatch(n.getName(), n.getParameter());
                 }
             } catch (Exception e) {
                 connected = false;
@@ -90,10 +91,11 @@ public class LiveFeedListener {
         }
     }
 
-    void dispatch(String payload) {
+    void dispatch(String channel, String payload) {
         JsonNode event;
         try {
             event = mapper.readTree(payload);
+            if (event instanceof com.fasterxml.jackson.databind.node.ObjectNode o) o.put("_channel", channel);
         } catch (Exception e) {
             LOG.warn("Notification illisible ignorée");
             return;

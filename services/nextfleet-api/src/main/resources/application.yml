@@ -16,6 +16,10 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  servlet:
+    multipart:
+      max-file-size: 10MB         # pièces justificatives : 10 Mo maximum (contrôlé aussi par la base)
+      max-request-size: 11MB
 
 server:
   port: ${PORT:${NF_PORT:8080}}

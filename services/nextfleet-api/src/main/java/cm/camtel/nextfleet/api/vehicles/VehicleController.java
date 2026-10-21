@@ -39,13 +39,20 @@ public class VehicleController {
                                 @Pattern(regexp = "DIESEL|ESSENCE|HYBRIDE|ELECTRIQUE|GPL|AUTRE") String energy,
                                 @DecimalMin("1") BigDecimal tankCapacityLiters,
                                 boolean tankCapacityVerified,
-                                @NotNull UUID orgUnitId) { }
+                                @NotNull UUID orgUnitId,
+                                @Pattern(regexp = "Pick-up|SUV|4x4|Berline|Minibus|Fourgon|Camion|Moto|Autre") String category,
+                                @Size(max = 120) String siteLabel,
+                                @DecimalMin("0") BigDecimal odometerKm) { }
 
     /** Correction partielle ; {@code reason} obligatoire pour l'historique (RG-01). */
     public record VehiclePatch(@Size(max = 60) String make, @Size(max = 60) String model,
                                @Min(1950) @Max(2100) Integer modelYear,
                                @Pattern(regexp = "AVAILABLE|IN_SERVICE|ON_MISSION|MAINTENANCE|OUT_OF_SERVICE") String status,
                                @DecimalMin("1") BigDecimal tankCapacityLiters, Boolean tankCapacityVerified,
+                               @Pattern(regexp = "Pick-up|SUV|4x4|Berline|Minibus|Fourgon|Camion|Moto|Autre") String category,
+                               @Size(max = 120) String siteLabel,
+                               @Pattern(regexp = "DIESEL|ESSENCE|HYBRIDE|ELECTRIQUE|GPL|AUTRE") String energy,
+                               @Size(max = 32) String vin,
                                @NotBlank @Size(min = 5, max = 500) String reason) { }
 
     public record Page<T>(List<T> items, int page, int size, long total) { }

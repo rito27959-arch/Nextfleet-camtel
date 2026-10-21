@@ -58,6 +58,13 @@ public class MissionController {
         return service.start(id, r.noticeVersion(), r.deviceId());
     }
 
+    public record CancelRequest(@NotBlank @Size(min = 5, max = 500) String reason) { }
+
+    @PostMapping("/{id}/cancel")
+    public MissionService.MissionView cancel(@PathVariable UUID id, @Valid @RequestBody CancelRequest r) {
+        return service.cancel(id, r.reason());
+    }
+
     @PostMapping("/{id}/finish")
     public MissionService.MissionView finish(@PathVariable UUID id) {
         return service.finish(id);

@@ -149,6 +149,21 @@ public class MissionService {
         return row(id).view();
     }
 
+    /** Annulation d'une mission non démarrée (brouillon ou autorisée) ; motif obligatoire, aucune collecte possible ensuite. */
+    @Transactional
+    public MissionView cancel(UUID id, String reason) {
+        Row r = row(id);
+        access.require("mission:manage", r.orgUnitId(), "mission", id.toString());
+        if (reason == null || reason.strip().length() < 5) throw new IllegalArgumentException("Motif d'annulation obligatoire (5 caractères au moins).");
+        AuthenticatedUser u = access.currentUser();
+        int n = jdbc.update("""
+                UPDATE mission SET status = 'CANCELLED', version = version + 1
+                 WHERE id = :id AND status IN ('DRAFT','AUTHORIZED')""", new MapSqlParameterSource("id", id));
+        if (n == 0) throw new IllegalStateException("Seule une mission non démarrée peut être annulée ; une mission en cours se clôture.");
+        audit.record(u.userId(), "CANCEL", "mission", id.toString(), reason.strip(), r.view().status(), "CANCELLED");
+        return row(id).view();
+    }
+
     @Transactional
     public StartResult start(UUID id, String noticeVersion, String deviceId) {
         AuthenticatedUser u = access.currentUser();
