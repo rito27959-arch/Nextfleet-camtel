@@ -40,7 +40,7 @@ sans droit refusé → comptes réservés à l'admin, journal lisible par l'audi
 |---|---|---|
 | Collecte GPS sur un vrai téléphone | Code compilé et testé unitairement ; jamais exécuté sur un appareil | Essai terrain : téléphone + passerelle + API, positions reçues pendant la mission et refusées après |
 | Boîtier GPS véhicule via Traccar | Traccar 6.16 réel exécuté en CI (relais, déclaration d'appareil) ; aucun boîtier physique | Un boîtier configuré sur le port de son protocole, position reçue |
-| Vue 3D (Filament) et carte (MapLibre) Android | Compilées, lint vert ; rendu jamais observé sur écran | Capture sur un appareil OpenGL ES 3 |
+| Vue 3D (Filament) Android | Compilée, lint vert. **Carte MapLibre et tous les autres écrans observés sur émulateur** (Pixel 7, API 34, captures en CI). La vue 3D, elle, fige l'émulateur du runner : sans GPU, son rendu passe par SwiftShader et la capture revient vide | Capture sur un vrai téléphone OpenGL ES 3 |
 | Fond de carte du bureau | Tuiles OpenStreetMap (usage modéré) ; non observé ici (réseau fermé), repères hors ligne affichés | Serveur de tuiles CAMTEL ou contrat d'usage |
 | Hébergement Railway | Prêt (images publiques) ; **création du projet refusée par Railway** : panne de leurs constructions le 20/10/2026 (« Deploys have been paused temporarily ») | Relancer quand Railway rétablit le service |
 | Lancement de l'EXE | Installateur produit ; application non lancée sous Windows | Installation et connexion sur un poste Windows CAMTEL |
