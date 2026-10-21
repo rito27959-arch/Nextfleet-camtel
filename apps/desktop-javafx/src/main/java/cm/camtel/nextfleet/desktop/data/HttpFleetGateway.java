@@ -881,6 +881,14 @@ public final class HttpFleetGateway implements FleetGateway {
     // ------------------------------------------------------------------ production : comptes
 
     @Override
+    public Prod.OrgUnit createOrgUnit(String code, String name, UUID parentId) {
+        ObjectNode b = json.createObjectNode().put("code", code).put("name", name);
+        if (parentId != null) b.put("parentId", parentId.toString());
+        JsonNode n = send("POST", "/api/v1/admin/org-units", b, true);
+        return new Prod.OrgUnit(uuid(n, "id"), n.path("code").asText(), n.path("name").asText(), uuid(n, "parentId"), n.path("parentName").asText(null));
+    }
+
+    @Override
     public List<Prod.RoleInfo> roles() {
         List<Prod.RoleInfo> out = new ArrayList<>();
         send("GET", "/api/v1/admin/roles", null, true).forEach(n -> {
@@ -896,7 +904,7 @@ public final class HttpFleetGateway implements FleetGateway {
         ObjectNode b = json.createObjectNode().put("login", d.login()).put("displayName", d.displayName()).put("orgUnitId", d.orgUnitId().toString());
         if (d.email() != null && !d.email().isBlank()) b.put("email", d.email());
         if (d.phone() != null && !d.phone().isBlank()) b.put("phone", d.phone());
-        if (d.driverId() != null) b.put("driverId", d.driverId().toString());
+        if (d.driverStaffNumber() != null && !d.driverStaffNumber().isBlank()) b.put("driverStaffNumber", d.driverStaffNumber());
         if (d.role() != null) b.putArray("roles").addObject().put("role", d.role()).put("scopeOrgId", d.orgUnitId().toString());
         JsonNode n = send("POST", "/api/v1/admin/users", b, true);
         return new Prod.CreatedAccount(n.path("user").path("id").asText(), n.path("user").path("login").asText(), n.path("temporaryPassword").asText());

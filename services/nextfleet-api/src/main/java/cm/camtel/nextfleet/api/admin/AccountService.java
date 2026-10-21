@@ -199,6 +199,18 @@ public class AccountService {
         }
     }
 
+    /** Fiche conducteur désignée par son matricule, dans l'entité du compte ou ses sous-entités administrées. */
+    @Transactional(readOnly = true)
+    public UUID driverByStaffNumber(String staffNumber, UUID orgUnitId) {
+        if (staffNumber == null || staffNumber.isBlank()) return null;
+        List<UUID> scope = access.scopeFor("admin:users");
+        List<UUID> found = jdbc.queryForList("""
+                SELECT id FROM driver WHERE upper(staff_number) = upper(btrim(:s)) AND archived_at IS NULL AND org_unit_id IN (:scope)""",
+                new MapSqlParameterSource("s", staffNumber).addValue("scope", scope.isEmpty() ? List.of(orgUnitId) : scope), UUID.class);
+        if (found.isEmpty()) throw new IllegalArgumentException("Aucun conducteur actif avec le matricule « " + staffNumber.strip() + " » dans votre périmètre.");
+        return found.get(0);
+    }
+
     private void linkDriver(UUID userId, UUID driverId) {
         List<Map<String, Object>> d = jdbc.queryForList("SELECT org_unit_id, user_id FROM driver WHERE id = :d", new MapSqlParameterSource("d", driverId));
         if (d.isEmpty()) throw new IllegalArgumentException("Fiche conducteur introuvable.");

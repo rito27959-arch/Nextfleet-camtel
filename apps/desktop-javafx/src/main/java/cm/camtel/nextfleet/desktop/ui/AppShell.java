@@ -468,7 +468,7 @@ public final class AppShell extends StackPane {
             case OVERVIEW -> new DashboardView(gateway, session, this);
             case VEHICLES -> new VehiclesView(gateway, session, null, this);
             case DUE -> new DueDatesView(gateway, this);
-            case DRIVERS -> new DriversView(gateway);
+            case DRIVERS -> new DriversView(gateway, this);
             case CATALOGUE -> new CatalogueView(this);
             case SETTINGS -> new SettingsView(gateway, session, this);
             default -> unavailable(s);

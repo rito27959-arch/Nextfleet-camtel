@@ -38,7 +38,11 @@ final class VehicleFormView extends ScrollPane {
     private final ComboBox<String> energy = new ComboBox<>(FXCollections.observableArrayList(
             "DIESEL", "ESSENCE", "HYBRIDE", "ELECTRIQUE", "GPL", "AUTRE"));
     private final TextField tank = field("Litres (facultatif)");
-    private final TextField category = field("Ex. Pick-up");
+    private final ComboBox<String> categoryBox = new ComboBox<>(FXCollections.observableArrayList(
+            "", "Pick-up", "SUV", "4x4", "Berline", "Minibus", "Fourgon", "Camion", "Moto", "Autre"));
+    private final TextField category = field("Ex. Pick-up");   // valeur transmise (liste fermée côté serveur)
+    private final TextField odometer = field("Ex. 12500 (facultatif)");
+    private final ComboBox<cm.camtel.nextfleet.desktop.data.Prod.OrgUnit> org = new ComboBox<>();
     private final Map<String, Label> errorLabels = new LinkedHashMap<>();
     private final Map<String, Control> controls = new LinkedHashMap<>();
     private final Label globalError = Ui.label("", "error-text");
@@ -84,8 +88,10 @@ final class VehicleFormView extends ScrollPane {
                 group("registration", "Immatriculation *", registration),
                 row(group("make", "Marque *", make), group("model", "Modèle *", model)),
                 row(group("year", "Année", year), group("energy", "Énergie", energy)),
-                row(group("tank", "Capacité du réservoir", tank), group("category", "Catégorie", category)),
+                row(group("tank", "Capacité du réservoir", tank), group("category", "Catégorie", categoryBox)),
                 group("vin", "Numéro de châssis (VIN)", vin),
+                group("odometer", "Kilométrage actuel", odometer),
+                group("org", "Entité d'affectation", org),
                 globalError);
 
         save.getStyleClass().addAll("btn-primary", "btn-large");
@@ -97,6 +103,26 @@ final class VehicleFormView extends ScrollPane {
         globalError.setWrapText(true);
 
         save.setOnAction(e -> submit(gateway, onCreated));
+        categoryBox.setMaxWidth(Double.MAX_VALUE);
+        categoryBox.valueProperty().addListener((o, a, b) -> category.setText(b == null ? "" : b));
+        org.setMaxWidth(Double.MAX_VALUE);
+        org.setAccessibleText("Entité d'affectation");
+        Node orgGroup = org.getParent();
+        if (gateway.isDemo()) {
+            if (orgGroup != null) {
+                orgGroup.setVisible(false);
+                orgGroup.setManaged(false);
+            }
+        } else {
+            Ui.async(() -> gateway.orgUnits("vehicle:write"), units -> {
+                org.getItems().setAll(units);
+                if (!units.isEmpty()) org.getSelectionModel().select(0);
+                if (units.size() <= 1 && orgGroup != null) {
+                    orgGroup.setVisible(false);
+                    orgGroup.setManaged(false);
+                }
+            }, err -> { });
+        }
     }
 
     private void submit(FleetGateway gateway, Consumer<Vehicle> onCreated) {
@@ -111,7 +137,18 @@ final class VehicleFormView extends ScrollPane {
         }
         save.setDisable(true);
         save.setText("Ajout…");
-        Ui.async(() -> gateway.createVehicle(r.draft()), v -> {
+        java.math.BigDecimal km;
+        try {
+            String raw = odometer.getText() == null ? "" : odometer.getText().strip().replace(" ", "").replace(',', '.');
+            km = raw.isEmpty() ? null : new java.math.BigDecimal(raw);
+            if (km != null && km.signum() < 0) throw new NumberFormatException();
+        } catch (NumberFormatException ex) {
+            showFieldError("odometer", "Kilométrage : nombre positif attendu.");
+            return;
+        }
+        java.util.UUID orgId = org.getValue() == null ? null : org.getValue().id();
+        Ui.async(() -> gateway instanceof cm.camtel.nextfleet.desktop.data.HttpFleetGateway http
+                ? http.createVehicle(r.draft(), orgId, km) : gateway.createVehicle(r.draft()), v -> {
             save.setDisable(false);
             save.setText("Ajouter le véhicule");
             onCreated.accept(v);
@@ -144,7 +181,7 @@ final class VehicleFormView extends ScrollPane {
         model.setText("Hilux");
         year.setText("2026");
         tank.setText("80");
-        category.setText("Pick-up");
+        categoryBox.setValue("Pick-up");
         save.fire();
     }
 

@@ -25,7 +25,8 @@ public class AdminController {
     public record UserCreate(@NotBlank @Size(max = 64) String login, @NotBlank @Size(max = 120) String displayName,
                              @jakarta.validation.constraints.Email @Size(max = 160) String email, @Size(max = 30) String phone,
                              @jakarta.validation.constraints.NotNull UUID orgUnitId,
-                             @Size(max = 10) List<AccountService.GrantRequest> roles, UUID driverId) { }
+                             @Size(max = 10) List<AccountService.GrantRequest> roles, UUID driverId,
+                             @Size(max = 30) String driverStaffNumber) { }
 
     public record ReasonRequest(@NotBlank @Size(min = 5, max = 500) String reason) { }
 
@@ -49,7 +50,8 @@ public class AdminController {
     public org.springframework.http.ResponseEntity<AccountService.Created> create(@Valid @RequestBody UserCreate c) {
         return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
                 .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "no-store")
-                .body(accounts.create(c.login(), c.displayName(), c.email(), c.phone(), c.orgUnitId(), c.roles(), c.driverId()));
+                .body(accounts.create(c.login(), c.displayName(), c.email(), c.phone(), c.orgUnitId(), c.roles(),
+                        c.driverId() != null ? c.driverId() : accounts.driverByStaffNumber(c.driverStaffNumber(), c.orgUnitId())));
     }
 
     @GetMapping("/users/{id}/grants")

@@ -127,19 +127,197 @@ final class UsersView extends ScrollPane {
             r.getStyleClass().add("list-row");
             r.setStyle("-fx-min-height: 64;");
             r.setAccessibleText(u.displayName() + ", " + u.grants().stream().map(g -> g.role().label).toList() + ", " + status.getText());
+            if (!shell.gateway().isDemo()) {
+                r.getStyleClass().add("clickable");
+                r.setOnMouseClicked(e -> accountSheet(u));
+            }
             rows.add(r);
         }
-        Button create = new Button("Nouveau compte", Icons.stroke(Icons.PLUS, 15, "white"));
-        create.getStyleClass().add("btn-filled");
-        create.setDisable(true);
-        Tooltip.install(create, new Tooltip("Création de compte : non exposée par l'API (fédération OIDC / RH prévue) ; suspension et réactivation disponibles."));
-        StackPane wrap = new StackPane(create);   // infobulle visible même bouton inactif
-        Tooltip.install(wrap, new Tooltip("Création de compte : non exposée par l'API (fédération OIDC / RH prévue) ; suspension et réactivation disponibles."));
-        HBox bar = new HBox(Ui.label(users.size() + " comptes", "title3"), Ui.spacer(), wrap);
+        Button create = Views.filled("Nouveau compte", Icons.PLUS, this::createSheet);
+        create.setDisable(shell.gateway().isDemo());
+        Button unit = Views.tinted("Nouvelle entité", Icons.PLUS, this::orgSheet);
+        unit.setDisable(shell.gateway().isDemo() || !shell.session().can(Permission.ADMIN_SETTINGS));
+        HBox bar = new HBox(10, Ui.label(users.size() + " comptes", "title3"), Ui.spacer(), unit, create);
         bar.setAlignment(Pos.CENTER_LEFT);
         return List.of(bar, Ui.insetGroup(null, rows,
                 "Règles appliquées par la base : aucune auto-attribution de rôle, délégation toujours bornée dans le temps, "
-                        + "suspension = révocation immédiate des sessions. Création et modification : API du lot 2."));
+                        + "suspension = révocation immédiate des sessions. Touchez un compte pour gérer ses rôles et son mot de passe."));
+    }
+
+    private void reload() {
+        Ui.async(() -> shell.gateway().users(), list -> {
+            users = list;
+            col.getChildren().set(1, roleTiles(list));
+            render(current);
+        }, err -> shell.toasts().info("Actualisation impossible", err.getMessage()));
+    }
+
+    /** Création : mot de passe provisoire affiché une seule fois, changement imposé à la première connexion. */
+    private void createSheet() {
+        Ui.async(() -> new Object[]{shell.gateway().orgUnits("admin:users"), shell.gateway().roles()}, r -> {
+            @SuppressWarnings("unchecked") List<cm.camtel.nextfleet.desktop.data.Prod.OrgUnit> units = (List<cm.camtel.nextfleet.desktop.data.Prod.OrgUnit>) r[0];
+            @SuppressWarnings("unchecked") List<cm.camtel.nextfleet.desktop.data.Prod.RoleInfo> roles = (List<cm.camtel.nextfleet.desktop.data.Prod.RoleInfo>) r[1];
+            var login = FormSheet.text("Ex. f.kamga");
+            var name = FormSheet.text("Prénom et nom");
+            var email = FormSheet.text("Facultatif");
+            var phone = FormSheet.text("Facultatif");
+            var org = FormSheet.combo(units);
+            var role = FormSheet.combo(roles);
+            var staff = FormSheet.text("Matricule de la fiche conducteur (rôle Agent ou conducteur)");
+            FormSheet f = new FormSheet("Nouveau compte", "Créer", shell::closeSheet)
+                    .intro("Un mot de passe provisoire est généré ; il ne s'affiche qu'une fois. La personne le remplace à sa première connexion.")
+                    .row("Identifiant *", login, "Nom affiché *", name).row("E-mail", email, "Téléphone", phone)
+                    .field("Entité *", org).field("Rôle *", role).field("Fiche conducteur", staff);
+            f.onSubmit(() -> shell.gateway().createAccount(new cm.camtel.nextfleet.desktop.data.Prod.AccountDraft(FormSheet.req(login, "Identifiant"),
+                    FormSheet.req(name, "Nom affiché"), FormSheet.opt(email), FormSheet.opt(phone), FormSheet.pick(org, "Entité").id(),
+                    FormSheet.pick(role, "Rôle").code(), FormSheet.opt(staff))), (cm.camtel.nextfleet.desktop.data.Prod.CreatedAccount c) -> {
+                shell.closeSheet();
+                showTemporaryPassword("Compte créé", c.login(), c.temporaryPassword());
+                reload();
+            });
+            shell.openSheet(f, 500);
+        }, err -> shell.toasts().info("Création impossible", err.getMessage()));
+    }
+
+    private void showTemporaryPassword(String title, String login, String temp) {
+        javafx.scene.input.ClipboardContent cc = new javafx.scene.input.ClipboardContent();
+        cc.putString(temp);
+        AlertDialog.show(shell, Ui.symbolTile(Icons.KEY, "tile-green"), title,
+                "Identifiant : " + login + "\nMot de passe provisoire : " + temp
+                        + "\n\nRemettez-le en main propre ou par un canal sûr ; il ne sera plus affiché.",
+                List.of(AlertDialog.Action.normal("Copier le mot de passe", () -> javafx.scene.input.Clipboard.getSystemClipboard().setContent(cc)),
+                        AlertDialog.Action.preferred("Terminé", () -> { })));
+    }
+
+    private void accountSheet(UserAccount u) {
+        Ui.async(() -> shell.gateway().grants(u.id()), grants -> {
+            VBox box = new VBox(14);
+            box.getStyleClass().add("sheet");
+            Button close = new Button("Fermer");
+            close.getStyleClass().add("btn-plain");
+            close.setCancelButton(true);
+            close.setOnAction(e -> shell.closeSheet());
+            StackPane bar = new StackPane(Ui.label(u.displayName(), "headline"), close);
+            StackPane.setAlignment(close, Pos.CENTER_LEFT);
+            bar.setMinHeight(40);
+            Label sub = Ui.label(u.login() + " · " + u.orgUnit() + " · " + ("ACTIVE".equals(u.status()) ? "actif" : "suspendu"), "footnote", "muted");
+            List<Node> rows = new ArrayList<>();
+            for (cm.camtel.nextfleet.desktop.data.Prod.RoleGrant g : grants) {
+                String detail = g.scopeName() + (g.validUntil() != null ? " · jusqu'au " + D.format(g.validUntil().atZone(java.time.ZoneId.of("Africa/Douala"))) : "")
+                        + (g.revokedAt() != null ? " · retiré" : "");
+                Node accessory = null;
+                if (g.active()) {
+                    Button revoke = new Button("Retirer");
+                    revoke.getStyleClass().addAll("btn-plain", "destructive");
+                    revoke.setOnAction(e -> revokeSheet(u, g));
+                    accessory = revoke;
+                }
+                rows.add(Views.row(null, g.roleLabel(), detail, accessory, null));
+            }
+            Button grant = Views.sheetAction("Attribuer un rôle", "btn-tinted", () -> grantSheet(u));
+            Button reset = Views.sheetAction("Réinitialiser le mot de passe", "btn-tinted", () -> resetSheet(u));
+            boolean active = "ACTIVE".equals(u.status());
+            Button status = Views.sheetAction(active ? "Suspendre le compte" : "Réactiver le compte", active ? "btn-destructive" : "btn-tinted",
+                    () -> statusSheet(u, !active));
+            for (Button b : List.of(grant, reset, status)) b.setMaxWidth(Double.MAX_VALUE);
+            box.getChildren().addAll(bar, sub, Ui.insetGroup("Rôles et périmètres", rows.isEmpty() ? List.of(Ui.listRow(null, "Aucun rôle", null, null, null)) : rows,
+                    "Un rôle retiré prend effet immédiatement, y compris sur les sessions ouvertes."), grant, reset, status);
+            ScrollPane sp = new ScrollPane(box);
+            sp.setFitToWidth(true);
+            shell.openSheet(sp, 460);
+        }, err -> shell.toasts().info("Compte inaccessible", err.getMessage()));
+    }
+
+    private void grantSheet(UserAccount u) {
+        Ui.async(() -> new Object[]{shell.gateway().orgUnits("admin:users"), shell.gateway().roles()}, r -> {
+            @SuppressWarnings("unchecked") List<cm.camtel.nextfleet.desktop.data.Prod.OrgUnit> units = (List<cm.camtel.nextfleet.desktop.data.Prod.OrgUnit>) r[0];
+            @SuppressWarnings("unchecked") List<cm.camtel.nextfleet.desktop.data.Prod.RoleInfo> roles = (List<cm.camtel.nextfleet.desktop.data.Prod.RoleInfo>) r[1];
+            var role = FormSheet.combo(roles);
+            var org = FormSheet.combo(units);
+            var until = FormSheet.date(null);
+            FormSheet f = new FormSheet("Attribuer un rôle", "Attribuer", shell::closeSheet)
+                    .intro(u.displayName() + ". Une date de fin fait de l'attribution une délégation temporaire.")
+                    .field("Rôle *", role).field("Périmètre *", org).field("Jusqu'au (délégation)", until);
+            f.onSubmit(() -> {
+                java.time.Instant end = until.getValue() == null ? null
+                        : until.getValue().plusDays(1).atStartOfDay(java.time.ZoneId.of("Africa/Douala")).toInstant();
+                shell.gateway().grantRole(u.id(), FormSheet.pick(role, "Rôle").code(), FormSheet.pick(org, "Périmètre").id(), end);
+                return FormSheet.pick(role, "Rôle").label();
+            }, (String label) -> {
+                shell.closeSheet();
+                shell.toasts().success("Rôle attribué", label + " · " + u.displayName());
+                reload();
+            });
+            shell.openSheet(f, 440);
+        }, err -> shell.toasts().info("Attribution impossible", err.getMessage()));
+    }
+
+    private void revokeSheet(UserAccount u, cm.camtel.nextfleet.desktop.data.Prod.RoleGrant g) {
+        var reason = FormSheet.area("Ex. Changement d'affectation");
+        FormSheet f = new FormSheet("Retirer le rôle", "Retirer", shell::closeSheet).intro(g.roleLabel() + " · " + g.scopeName() + " · " + u.displayName())
+                .field("Motif *", reason);
+        f.onSubmit(() -> {
+            if (reason.getText().strip().length() < 5) throw new IllegalArgumentException("Motif : 5 caractères au moins.");
+            shell.gateway().revokeGrant(u.id(), g.id(), reason.getText().strip());
+            return true;
+        }, ok -> {
+            shell.closeSheet();
+            shell.toasts().success("Rôle retiré", g.roleLabel() + " · " + u.displayName());
+            reload();
+        });
+        shell.openSheet(f, 440);
+    }
+
+    private void resetSheet(UserAccount u) {
+        var reason = FormSheet.area("Ex. Oubli signalé au support le 21/10");
+        FormSheet f = new FormSheet("Réinitialiser", "Réinitialiser", shell::closeSheet)
+                .intro(u.displayName() + " : ses sessions ouvertes sont fermées et un nouveau mot de passe provisoire est généré.")
+                .field("Motif *", reason);
+        f.onSubmit(() -> {
+            if (reason.getText().strip().length() < 5) throw new IllegalArgumentException("Motif : 5 caractères au moins.");
+            return shell.gateway().resetPassword(u.id(), reason.getText().strip());
+        }, (String temp) -> {
+            shell.closeSheet();
+            showTemporaryPassword("Mot de passe réinitialisé", u.login(), temp);
+        });
+        shell.openSheet(f, 440);
+    }
+
+    private void statusSheet(UserAccount u, boolean activate) {
+        var reason = FormSheet.area(activate ? "Ex. Retour de congé" : "Ex. Départ de l'entreprise");
+        FormSheet f = new FormSheet(activate ? "Réactiver le compte" : "Suspendre le compte", "Confirmer", shell::closeSheet)
+                .intro(u.displayName() + (activate ? "" : " : ses sessions sont révoquées immédiatement."))
+                .field("Motif *", reason);
+        f.onSubmit(() -> {
+            if (reason.getText().strip().length() < 5) throw new IllegalArgumentException("Motif : 5 caractères au moins.");
+            shell.gateway().setAccountStatus(u.id(), activate, reason.getText().strip());
+            return true;
+        }, ok -> {
+            shell.closeSheet();
+            shell.toasts().success(activate ? "Compte réactivé" : "Compte suspendu", u.displayName());
+            reload();
+        });
+        shell.openSheet(f, 440);
+    }
+
+    private void orgSheet() {
+        Ui.async(() -> shell.gateway().orgUnits("admin:settings"), units -> {
+            var name = FormSheet.text("Ex. Direction régionale du Littoral");
+            var code = FormSheet.text("Ex. DR-LITTORAL");
+            var parent = FormSheet.combo(units);
+            FormSheet f = new FormSheet("Nouvelle entité", "Créer", shell::closeSheet)
+                    .intro("Directions, agences ou sites : les droits sont attribués par entité, et s'étendent à ses sous-entités.")
+                    .field("Nom *", name).field("Code *", code).field("Rattachée à *", parent);
+            f.onSubmit(() -> {
+                String c = FormSheet.req(code, "Code").toUpperCase(Locale.ROOT);
+                if (!c.matches("^[A-Z0-9][A-Z0-9_-]{1,29}$")) throw new IllegalArgumentException("Code : majuscules, chiffres, tiret (2 à 30 caractères).");
+                return shell.gateway().createOrgUnit(c, FormSheet.req(name, "Nom"), FormSheet.pick(parent, "Rattachement").id());
+            }, (cm.camtel.nextfleet.desktop.data.Prod.OrgUnit o) -> {
+                shell.closeSheet();
+                shell.toasts().success("Entité créée", o.name());
+            });
+            shell.openSheet(f, 440);
+        }, err -> shell.toasts().info("Création impossible", err.getMessage()));
     }
 
     /** Matrice dérivée du noyau métier (identique à la base, vérifiée par test). */

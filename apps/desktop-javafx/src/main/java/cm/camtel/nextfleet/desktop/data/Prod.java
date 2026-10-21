@@ -38,7 +38,7 @@ public final class Prod {
     }
 
     public record AccountDraft(String login, String displayName, String email, String phone, UUID orgUnitId, String role,
-                               UUID driverId) { }
+                               String driverStaffNumber) { }
 
     /** Le mot de passe provisoire n'est connu qu'ici, une seule fois. */
     public record CreatedAccount(String userId, String login, String temporaryPassword) { }

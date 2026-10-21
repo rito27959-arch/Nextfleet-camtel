@@ -27,7 +27,7 @@ import java.util.Locale;
 
 /**
  * Conducteurs (NF-12) — parité avec l'ancien NexFleet : matricule, téléphone, permis et catégories, CNI,
- * véhicule affecté, compte à rebours des validités. Lecture seule dans ce lot ; saisie au lot 2.
+ * véhicule affecté, compte à rebours des validités ; création avec permis.
  */
 public final class DriversView extends ScrollPane {
 
@@ -36,8 +36,15 @@ public final class DriversView extends ScrollPane {
     private final VBox body = new VBox(16);
     private final PauseTransition debounce = new PauseTransition(Duration.millis(220));
 
+    private final AppShell shell;
+
     public DriversView(FleetGateway gateway) {
+        this(gateway, null);
+    }
+
+    public DriversView(FleetGateway gateway, AppShell shell) {
         this.gateway = gateway;
+        this.shell = shell;
         setFitToWidth(true);
         VBox titles = new VBox(4, Ui.label("Conducteurs", "large-title"),
                 Ui.label("Permis, pièces d'identité et affectations, avec leurs échéances.", "body", "muted"));
@@ -49,7 +56,10 @@ public final class DriversView extends ScrollPane {
         StackPane.setAlignment(sbox.getChildren().get(1), Pos.CENTER_LEFT);
         sbox.getChildren().get(1).setTranslateX(12);
         sbox.getChildren().get(1).setMouseTransparent(true);
-        HBox head = new HBox(titles, Ui.spacer(), sbox);
+        HBox head = new HBox(12, titles, Ui.spacer(), sbox);
+        if (shell != null && !gateway.isDemo() && shell.session().can(cm.camtel.nextfleet.domain.security.Permission.DRIVER_WRITE)) {
+            head.getChildren().add(Views.filled("Nouveau conducteur", Icons.PLUS, this::createSheet));
+        }
         head.setAlignment(Pos.BOTTOM_LEFT);
         VBox root = new VBox(20, head, body);
         root.getStyleClass().add("content");
@@ -123,5 +133,45 @@ public final class DriversView extends ScrollPane {
         if (trailing != null) h.getChildren().add(trailing);
         h.setAlignment(Pos.CENTER_LEFT);
         return h;
+    }
+
+    private void createSheet() {
+        Ui.async(() -> gateway.orgUnits("driver:write"), units -> {
+            if (units.isEmpty()) {
+                shell.toasts().info("Création impossible", "Vous ne gérez les conducteurs d'aucune entité.");
+                return;
+            }
+            var org = FormSheet.combo(units);
+            var staff = FormSheet.text("Ex. MAT-2041");
+            var name = FormSheet.text("Prénom et nom");
+            var phone = FormSheet.text("+237 6 …");
+            var email = FormSheet.text("Facultatif");
+            var cni = FormSheet.text("Numéro de CNI");
+            var cniUntil = FormSheet.date(null);
+            var license = FormSheet.text("Numéro du permis");
+            var cats = FormSheet.text("Ex. B, C");
+            cats.setText("B");
+            var licUntil = FormSheet.date(null);
+            FormSheet f = new FormSheet("Nouveau conducteur", "Ajouter", shell::closeSheet)
+                    .intro("Les dates de fin du permis et de la CNI alimentent les échéances et les notifications.")
+                    .row("Matricule *", staff, "Nom complet *", name).row("Téléphone", phone, "E-mail", email)
+                    .field("Entité *", org).section("Pièce d'identité").row("Numéro", cni, "Valable jusqu'au", cniUntil)
+                    .section("Permis de conduire").field("Numéro", license).row("Catégories", cats, "Valable jusqu'au", licUntil);
+            f.onSubmit(() -> {
+                java.util.List<String> categories = java.util.Arrays.stream(cats.getText().toUpperCase(java.util.Locale.ROOT).split("[ ,;]+"))
+                        .filter(c -> !c.isBlank()).toList();
+                if (FormSheet.opt(license) != null && licUntil.getValue() == null) {
+                    throw new IllegalArgumentException("Permis : indiquez la date de fin de validité.");
+                }
+                return gateway.createDriver(new cm.camtel.nextfleet.desktop.data.Prod.DriverDraft(FormSheet.req(staff, "Matricule"),
+                        FormSheet.req(name, "Nom complet"), FormSheet.opt(phone), FormSheet.opt(email), FormSheet.pick(org, "Entité").id(),
+                        FormSheet.opt(cni), cniUntil.getValue(), FormSheet.opt(license), categories, licUntil.getValue()));
+            }, (cm.camtel.nextfleet.desktop.data.Models.Driver d) -> {
+                shell.closeSheet();
+                shell.toasts().success("Conducteur ajouté", d.fullName() + " · " + d.staffNumber());
+                load();
+            });
+            shell.openSheet(f, 500);
+        }, err -> shell.toasts().info("Création impossible", err.getMessage()));
     }
 }

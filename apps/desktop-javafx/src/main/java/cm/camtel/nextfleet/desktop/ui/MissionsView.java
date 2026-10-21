@@ -48,7 +48,17 @@ final class MissionsView extends BorderPane {
             filter = i;
             renderList();
         });
-        VBox header = new VBox(10, Ui.label("Missions", "large-title"), seg);
+        HBox titleRow = new HBox(8, Ui.label("Missions", "large-title"), Ui.spacer());
+        titleRow.setAlignment(Pos.CENTER_LEFT);
+        if (shell.session().can(Permission.MISSION_MANAGE)) {
+            Button add = new Button(null, Icons.stroke(Icons.PLUS, 16, "white"));
+            add.getStyleClass().addAll("btn-filled", "btn-capsule");
+            add.setAccessibleText("Nouvelle mission");
+            add.setTooltip(new javafx.scene.control.Tooltip("Nouvelle mission"));
+            add.setOnAction(e -> createSheet());
+            titleRow.getChildren().add(add);
+        }
+        VBox header = new VBox(10, titleRow, seg);
         header.getStyleClass().add("split-list-header");
         ScrollPane sp = new ScrollPane(list);
         sp.setFitToWidth(true);
@@ -188,6 +198,24 @@ final class MissionsView extends BorderPane {
             Motion.pressable(end);
             actions.getChildren().add(end);
         }
+        if (shell.session().can(Permission.MISSION_MANAGE) && m.status() == MissionStatus.DRAFT) {
+            Button auth = new Button("Autoriser");
+            auth.setMinWidth(Region.USE_PREF_SIZE);
+            auth.getStyleClass().add("btn-filled");
+            auth.setOnAction(e -> Ui.async(() -> shell.gateway().authorizeMission(m.id()), done -> {
+                shell.toasts().success("Mission autorisée", m.reference() + " : le conducteur peut la démarrer depuis son téléphone.");
+                load();
+            }, err -> AlertDialog.show(shell, Ui.symbolTile(Icons.CLOSE, "tile-red"), "Autorisation impossible", err.getMessage(),
+                    List.of(AlertDialog.Action.preferred("OK", () -> { })))));
+            actions.getChildren().add(auth);
+        }
+        if (shell.session().can(Permission.MISSION_MANAGE) && (m.status() == MissionStatus.DRAFT || m.status() == MissionStatus.AUTHORIZED)) {
+            Button cancel = new Button("Annuler…");
+            cancel.setMinWidth(Region.USE_PREF_SIZE);
+            cancel.getStyleClass().add("btn-gray");
+            cancel.setOnAction(e -> cancelSheet(m));
+            actions.getChildren().add(cancel);
+        }
         HBox headRow = new HBox(10, head, Ui.spacer(), actions);
         headRow.setAlignment(Pos.CENTER_LEFT);
         VBox top = new VBox(6, headRow, title, route, meta);
@@ -211,6 +239,85 @@ final class MissionsView extends BorderPane {
                             load();
                         }, err -> AlertDialog.show(shell, Ui.symbolTile(Icons.CLOSE, "tile-red"), "Clôture impossible", err.getMessage(),
                                 List.of(AlertDialog.Action.preferred("OK", () -> { })))))));
+    }
+
+    private void cancelSheet(Mission m) {
+        javafx.scene.control.TextArea reason = FormSheet.area("Ex. Site fermé ce jour-là");
+        FormSheet f = new FormSheet("Annuler la mission", "Confirmer", shell::closeSheet).intro(m.reference() + " · " + m.purpose())
+                .field("Motif *", reason);
+        f.onSubmit(() -> {
+            if (reason.getText().strip().length() < 5) throw new IllegalArgumentException("Motif : 5 caractères au moins.");
+            return shell.gateway().cancelMission(m.id(), reason.getText().strip());
+        }, (Mission done) -> {
+            shell.closeSheet();
+            shell.toasts().success("Mission annulée", done.reference());
+            load();
+        });
+        shell.openSheet(f, 440);
+    }
+
+    /** Création : la mission est un brouillon jusqu'à son autorisation par une AUTRE personne habilitée. */
+    private void createSheet() {
+        Ui.async(() -> new Object[]{shell.gateway().vehicles(null, null, 0, 200).items(), shell.gateway().driverRefs()}, r -> {
+            @SuppressWarnings("unchecked") List<cm.camtel.nextfleet.desktop.data.Models.Vehicle> vehicles = (List<cm.camtel.nextfleet.desktop.data.Models.Vehicle>) r[0];
+            @SuppressWarnings("unchecked") List<cm.camtel.nextfleet.desktop.data.Prod.DriverRef> drivers = (List<cm.camtel.nextfleet.desktop.data.Prod.DriverRef>) r[1];
+            if (vehicles.isEmpty() || drivers.isEmpty()) {
+                shell.toasts().info("Création impossible", vehicles.isEmpty() ? "Aucun véhicule dans votre périmètre." : "Aucun conducteur enregistré.");
+                return;
+            }
+            var vehicle = FormSheet.combo(vehicles.stream().filter(v -> v.status() != cm.camtel.nextfleet.desktop.data.Models.VehicleStatus.ARCHIVED).toList());
+            vehicle.setConverter(new javafx.util.StringConverter<>() {
+                @Override
+                public String toString(cm.camtel.nextfleet.desktop.data.Models.Vehicle v) {
+                    return v == null ? "" : v.registration() + " · " + v.label() + " · " + v.status().label;
+                }
+
+                @Override
+                public cm.camtel.nextfleet.desktop.data.Models.Vehicle fromString(String s) {
+                    return null;
+                }
+            });
+            var driver = FormSheet.combo(drivers);
+            var purpose = FormSheet.text("Ex. Maintenance BTS Mvog-Mbi");
+            var origin = FormSheet.text("Ex. Siège CAMTEL, Yaoundé");
+            var destination = FormSheet.text("Ex. Obala");
+            var day = FormSheet.date(Views.today());
+            var start = FormSheet.text("HH:MM");
+            start.setText("08:00");
+            var endDay = FormSheet.date(Views.today());
+            var end = FormSheet.text("HH:MM");
+            end.setText("17:00");
+            FormSheet f = new FormSheet("Nouvelle mission", "Créer", shell::closeSheet)
+                    .intro("La mission est créée en brouillon ; une autre personne habilitée l'autorise. La localisation ne démarre "
+                            + "que lorsque le conducteur lance la mission sur son téléphone, après la notice d'information.")
+                    .field("Objet *", purpose).field("Véhicule *", vehicle).field("Conducteur *", driver)
+                    .row("Départ", origin, "Destination", destination).row("Début *", day, "Heure", start).row("Fin *", endDay, "Heure", end);
+            f.onSubmit(() -> {
+                java.time.Instant s0 = at(FormSheet.day(day, "Début", true), start.getText());
+                java.time.Instant e0 = at(FormSheet.day(endDay, "Fin", true), end.getText());
+                if (!e0.isAfter(s0)) throw new IllegalArgumentException("La fin prévue doit suivre le début.");
+                return shell.gateway().createMission(new cm.camtel.nextfleet.desktop.data.Prod.MissionDraft(FormSheet.pick(vehicle, "Véhicule").id(),
+                        FormSheet.pick(driver, "Conducteur").id(), FormSheet.req(purpose, "Objet"), FormSheet.opt(origin), FormSheet.opt(destination), s0, e0));
+            }, (Mission created) -> {
+                shell.closeSheet();
+                shell.toasts().success("Mission créée", created.reference() + " : à faire autoriser par une autre personne habilitée.");
+                selected = created.id();
+                seg.select(1);
+                filter = 1;
+                load();
+            });
+            shell.openSheet(f, 500);
+        }, err -> shell.toasts().info("Création impossible", err.getMessage()));
+    }
+
+    private static java.time.Instant at(java.time.LocalDate d, String hhmm) {
+        try {
+            String t = hhmm == null || hhmm.isBlank() ? "08:00" : hhmm.strip();
+            if (t.length() == 4) t = "0" + t;
+            return d.atTime(java.time.LocalTime.parse(t)).atZone(Views.DOUALA).toInstant();
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new IllegalArgumentException("Heure : format HH:MM attendu.");
+        }
     }
 
     /** Pour la recette visuelle. */

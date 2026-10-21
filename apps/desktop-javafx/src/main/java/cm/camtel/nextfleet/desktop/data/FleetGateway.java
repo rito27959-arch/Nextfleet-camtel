@@ -324,6 +324,10 @@ public interface FleetGateway {
 
     // ------------------------------------------------------------------ production : comptes
 
+    default Prod.OrgUnit createOrgUnit(String code, String name, UUID parentId) {
+        throw notYet("La création d'entité");
+    }
+
     default java.util.List<Prod.RoleInfo> roles() {
         throw notYet("La liste des rôles");
     }

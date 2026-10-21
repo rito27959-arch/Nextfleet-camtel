@@ -168,7 +168,7 @@ public final class VehiclesView extends BorderPane {
     }
 
     private void openSheet(Vehicle v) {
-        VehicleSheet sheet = new VehicleSheet(v, gateway, () -> {
+        VehicleSheet sheet = new VehicleSheet(v, gateway, shell, () -> {
             closeOverlay();
             table.getSelectionModel().clearSelection();
         }, session.can(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_ARCHIVE) ? () -> confirmArchive(v) : null);

@@ -224,6 +224,7 @@ jobs:
           - { os: ubuntu-22.04, label: 'DEB (Ubuntu/Debian)', type: deb, classifier: linux, icon: nexfleet.png }
           - { os: windows-2022, label: 'EXE (Windows)', type: exe, classifier: win, icon: nexfleet.ico }
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     defaults:
       run: { shell: bash }
     steps:
@@ -278,7 +279,7 @@ jobs:
         if: matrix.type == 'exe'
         run: |
           MSI=$(cygpath -w "$(ls dist/*.msi)")
-          if ! msiexec //i "$MSI" //qn //l*v msi.log; then
+          if ! timeout 600 msiexec //i "$MSI" //qn //norestart //l*v msi.log; then
             echo "::error title=MSI — échec d'installation::$(iconv -f UTF-16LE -t UTF-8 msi.log 2>/dev/null | grep -iE 'error|erreur|return value 3' | tail -15 | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"} {print}')"; exit 1
           fi
           EXE=$(find "$LOCALAPPDATA" "$PROGRAMFILES" -maxdepth 3 -iname NexFleet.exe 2>/dev/null | head -1)
@@ -288,7 +289,7 @@ jobs:
           N=$(ls win-shots/*.png 2>/dev/null | wc -l)
           echo "::notice title=Windows — application lancée::${N} écrans capturés par l'application installée par le MSI"
           [ "$N" -ge 20 ] || { echo "::error title=Windows — lancement::$(tail -30 run.log | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"} {print}')"; exit 1; }
-          msiexec //x "$MSI" //qn
+          timeout 300 msiexec //x "$MSI" //qn //norestart || echo "::warning title=MSI::désinstallation non terminée"
           echo "::notice title=MSI désinstallé::retiré proprement"
           # la version portable démarre aussi, sans installation
           7z x -bd -oportable dist/*portable.zip > /dev/null

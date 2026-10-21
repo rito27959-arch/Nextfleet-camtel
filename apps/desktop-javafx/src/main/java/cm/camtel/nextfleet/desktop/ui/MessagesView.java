@@ -59,7 +59,12 @@ final class MessagesView extends BorderPane {
     private GatewayException lastError;
     private String selected;
 
-    private record Pending(String clientId, String conversationId, String body, Instant at, boolean failed) { }
+    private record Pending(String clientId, String conversationId, String body, Instant at, boolean failed, java.nio.file.Path file) { }
+
+    private final Button attach = new Button(null, Icons.stroke(Icons.DOC, 16, "-nf-accent"));
+    private final Label attachChip = Ui.label("", "attachment-chip");
+    private java.nio.file.Path attachment;
+    private AutoCloseable realtime;
 
     MessagesView(AppShell shell, String openConversation) {
         this.shell = shell;
@@ -73,7 +78,17 @@ final class MessagesView extends BorderPane {
         StackPane.setAlignment(searchBox.getChildren().get(1), Pos.CENTER_LEFT);
         searchBox.getChildren().get(1).setTranslateX(12);
         searchBox.getChildren().get(1).setMouseTransparent(true);
-        VBox header = new VBox(12, Ui.label("Messages", "large-title"), searchBox);
+        HBox titleRow = new HBox(8, Ui.label("Messages", "large-title"), Ui.spacer());
+        titleRow.setAlignment(Pos.CENTER_LEFT);
+        if (!shell.gateway().isDemo()) {
+            Button compose = new Button(null, Icons.stroke(Icons.PLUS, 16, "white"));
+            compose.getStyleClass().addAll("btn-filled", "btn-capsule");
+            compose.setAccessibleText("Nouvelle conversation");
+            compose.setTooltip(new javafx.scene.control.Tooltip("Nouvelle conversation"));
+            compose.setOnAction(e -> composeSheet());
+            titleRow.getChildren().add(compose);
+        }
+        VBox header = new VBox(12, titleRow, searchBox);
         header.getStyleClass().add("split-list-header");
         ScrollPane sp = new ScrollPane(convList);
         sp.setFitToWidth(true);
@@ -102,7 +117,31 @@ final class MessagesView extends BorderPane {
         send.getStyleClass().add("send-button");
         send.setAccessibleText("Envoyer");
         send.disableProperty().bind(javafx.beans.binding.Bindings.createBooleanBinding(
-                () -> input.getText() == null || input.getText().isBlank(), input.textProperty()));
+                () -> (input.getText() == null || input.getText().isBlank()) && attachChip.getText().isEmpty(), input.textProperty(), attachChip.textProperty()));
+        attach.getStyleClass().add("btn-plain");
+        attach.setAccessibleText("Joindre un fichier");
+        attach.setTooltip(new javafx.scene.control.Tooltip("Joindre une photo ou un PDF (10 Mo maximum)"));
+        attach.setOnAction(e -> {
+            javafx.stage.FileChooser fc = new javafx.stage.FileChooser();
+            fc.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("Photo ou PDF", "*.pdf", "*.jpg", "*.jpeg", "*.png", "*.webp"));
+            java.io.File f = fc.showOpenDialog(getScene().getWindow());
+            if (f != null) {
+                attachment = f.toPath();
+                attachChip.setText("📎 " + f.getName() + "  ✕");
+            }
+        });
+        attachChip.setVisible(false);
+        attachChip.setManaged(false);
+        attachChip.textProperty().addListener((o, a, b) -> {
+            attachChip.setVisible(!b.isEmpty());
+            attachChip.setManaged(!b.isEmpty());
+        });
+        attachChip.setOnMouseClicked(e -> {
+            attachment = null;
+            attachChip.setText("");
+        });
+        attach.setVisible(!shell.gateway().isDemo());
+        attach.setManaged(!shell.gateway().isDemo());
         send.setOnAction(e -> submit());
         input.setOnAction(e -> {
             if (!send.isDisabled()) submit();
@@ -110,8 +149,21 @@ final class MessagesView extends BorderPane {
         Motion.pressable(send);
 
         refresh.setCycleCount(Animation.INDEFINITE);
+        // temps réel : signal « nouveau message » du serveur (le contenu est relu par l'API, droits revérifiés)
+        realtime = shell.gateway().subscribeMessages(conv -> Ui.later(() -> {
+            if (conv.equals(selected)) reloadThread(true);
+            else loadConversationsQuiet();
+            shell.refreshMessagesBadge();
+        }));
         sceneProperty().addListener((o, a, s) -> {
-            if (s == null) refresh.stop();
+            if (s == null) {
+                refresh.stop();
+                try {
+                    realtime.close();
+                } catch (Exception ignored) {
+                    // canal déjà fermé
+                }
+            }
         });
         loadConversations();
     }
@@ -192,7 +244,9 @@ final class MessagesView extends BorderPane {
         HBox head = new HBox(12, avatar(c, 36), t, Ui.spacer());
         if (c.kind() == Chat.Kind.MISSION) head.getChildren().add(Ui.label("Mission", "pill", "pill-ok"));
         head.getStyleClass().add("thread-header");
-        HBox composer = new HBox(10, input, send);
+        HBox line = new HBox(10, attach, input, send);
+        line.setAlignment(Pos.CENTER_LEFT);
+        VBox composer = new VBox(6, attachChip, line);
         composer.getStyleClass().add("composer");
         thread.setTop(head);
         thread.setCenter(bodyScroll);
@@ -241,21 +295,26 @@ final class MessagesView extends BorderPane {
                 nodes.add(separator(l.at()));
                 prevSender = null;
             }
-            if (group && !l.mine() && !l.senderId().equals(prevSender)) nodes.add(Ui.label(l.senderName(), "bubble-sender"));
+            if (group && !l.mine() && !java.util.Objects.equals(senderKey(l), prevSender)) nodes.add(Ui.label(l.senderName(), "bubble-sender"));
             nodes.add(bubble(l.body(), l.mine(), false, false));
+            if (!l.attachments().isEmpty()) nodes.add(attachments(l));
             if (i == lastMine && l.state() != null) nodes.add(meta(l.state().label, false, null));
             prevAt = l.at();
-            prevSender = l.senderId();
+            prevSender = senderKey(l);
         }
         for (Pending p : pending.values()) {
             if (!p.conversationId().equals(selected)) continue;
-            nodes.add(bubble(p.body(), true, !p.failed(), p.failed()));
+            nodes.add(bubble(p.body() + (p.file() != null ? "\n📎 " + p.file().getFileName() : ""), true, !p.failed(), p.failed()));
             nodes.add(p.failed() ? meta(Chat.DeliveryState.ECHEC.label + " · Toucher pour réessayer", true, () -> retry(p))
                     : meta(Chat.DeliveryState.EN_ATTENTE.label, false, null));
         }
         if (nodes.isEmpty()) nodes.add(Ui.statePanel(Icons.BUBBLE, "Aucun message", "Écrivez le premier message de cette conversation."));
         if (lastError != null) nodes.add(0, Ui.errorBanner(lastError, () -> reloadThread(false)));
         body.getChildren().setAll(nodes);
+    }
+
+    private static String senderKey(ChatLine l) {
+        return l.senderId() != null ? l.senderId() : l.senderName();
     }
 
     private Node separator(Instant at) {
@@ -282,6 +341,63 @@ final class MessagesView extends BorderPane {
         return h;
     }
 
+    private Node attachments(ChatLine l) {
+        HBox h = new HBox(6);
+        h.setAlignment(l.mine() ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
+        for (cm.camtel.nextfleet.desktop.data.Prod.Attachment a : l.attachments()) {
+            Label chip = Ui.label("📎 " + a.name() + " · " + Math.max(1, a.sizeBytes() / 1024) + " Ko", "attachment-chip");
+            chip.setAccessibleText("Pièce jointe " + a.name() + ", ouvrir");
+            chip.setOnMouseClicked(e -> Files.open(shell, a.id(), a.name().replaceAll("\\.[A-Za-z0-9]+$", "")));
+            h.getChildren().add(chip);
+        }
+        return h;
+    }
+
+    /** Nouvelle conversation : une personne (conversation directe, réutilisée si elle existe) ou un groupe nommé. */
+    private void composeSheet() {
+        Ui.async(() -> shell.gateway().contacts(), contacts -> {
+            if (contacts.isEmpty()) {
+                shell.toasts().info("Aucun contact", "Personne d'autre n'a accès à la messagerie dans votre périmètre.");
+                return;
+            }
+            TextField filter = FormSheet.text("Rechercher une personne");
+            VBox list = new VBox(4);
+            List<javafx.scene.control.CheckBox> boxes = new ArrayList<>();
+            for (cm.camtel.nextfleet.desktop.data.Prod.Contact c : contacts) {
+                javafx.scene.control.CheckBox cb = new javafx.scene.control.CheckBox(c.displayName() + " · " + c.role() + " · " + c.orgUnit());
+                cb.setUserData(c);
+                boxes.add(cb);
+                list.getChildren().add(cb);
+            }
+            filter.textProperty().addListener((o, a, b) -> {
+                String q = b == null ? "" : b.strip().toLowerCase(Locale.ROOT);
+                for (javafx.scene.control.CheckBox cb : boxes) {
+                    boolean show = q.isEmpty() || cb.getText().toLowerCase(Locale.ROOT).contains(q);
+                    cb.setVisible(show);
+                    cb.setManaged(show);
+                }
+            });
+            ScrollPane sp = new ScrollPane(list);
+            sp.setFitToWidth(true);
+            sp.setPrefHeight(280);
+            TextField title = FormSheet.text("Nom du groupe (plusieurs personnes)");
+            FormSheet f = new FormSheet("Nouvelle conversation", "Ouvrir", shell::closeSheet)
+                    .intro("Seuls les participants lisent les messages. Une conversation à deux est réutilisée si elle existe déjà.")
+                    .field("Destinataires *", filter).node(sp).field("Nom du groupe", title);
+            f.onSubmit(() -> {
+                List<String> ids = boxes.stream().filter(javafx.scene.control.CheckBox::isSelected)
+                        .map(cb -> ((cm.camtel.nextfleet.desktop.data.Prod.Contact) cb.getUserData()).userId()).toList();
+                if (ids.isEmpty()) throw new IllegalArgumentException("Choisissez au moins un destinataire.");
+                return shell.gateway().openConversation(ids, ids.size() > 1 ? FormSheet.opt(title) : null);
+            }, (Conversation c) -> {
+                shell.closeSheet();
+                selected = c.id();
+                loadConversations();
+            });
+            shell.openSheet(f, 460);
+        }, err -> shell.toasts().info("Contacts indisponibles", err.getMessage()));
+    }
+
     private Node meta(String text, boolean failed, Runnable onClick) {
         Label l = Ui.label(text, "bubble-meta");
         if (failed) l.getStyleClass().add("failed");
@@ -296,16 +412,23 @@ final class MessagesView extends BorderPane {
 
     private void submit() {
         String text = input.getText().strip();
-        if (text.isEmpty() || selected == null) return;
-        Pending p = new Pending(UUID.randomUUID().toString(), selected, text, Instant.now(), false);
+        java.nio.file.Path file = attachment;
+        if ((text.isEmpty() && file == null) || selected == null) return;
+        if (text.isEmpty()) text = "Pièce jointe : " + file.getFileName();
+        Pending p = new Pending(UUID.randomUUID().toString(), selected, text, Instant.now(), false, file);
         pending.put(p.clientId(), p);
         input.clear();
+        attachment = null;
+        attachChip.setText("");
         reloadThreadKeepingPending();
         deliver(p);
     }
 
     private void deliver(Pending p) {
-        Ui.async(() -> shell.gateway().sendMessage(p.conversationId(), p.clientId(), p.body()), line -> {
+        Ui.async(() -> {
+            List<UUID> files = p.file() == null ? List.of() : List.of(shell.gateway().upload("CHAT", null, p.file()).id());
+            return shell.gateway().sendMessage(p.conversationId(), p.clientId(), p.body(), files);
+        }, line -> {
             pending.remove(p.clientId());
             loadConversationsQuiet();
             reloadThread(false);
@@ -315,7 +438,7 @@ final class MessagesView extends BorderPane {
                 AlertDialog.show(shell, Ui.symbolTile(Icons.LOCK, "tile-red"), "Message non envoyé", err.getMessage(),
                         List.of(AlertDialog.Action.preferred("OK", () -> { })));
             } else {
-                pending.put(p.clientId(), new Pending(p.clientId(), p.conversationId(), p.body(), p.at(), true));
+                pending.put(p.clientId(), new Pending(p.clientId(), p.conversationId(), p.body(), p.at(), true, p.file()));
             }
             reloadThreadKeepingPending();
         });
@@ -323,7 +446,7 @@ final class MessagesView extends BorderPane {
 
     /** Réémission avec le MÊME identifiant client : le serveur reconnaît le message s'il l'avait déjà reçu. */
     private void retry(Pending p) {
-        Pending again = new Pending(p.clientId(), p.conversationId(), p.body(), p.at(), false);
+        Pending again = new Pending(p.clientId(), p.conversationId(), p.body(), p.at(), false, p.file());
         pending.put(p.clientId(), again);
         reloadThreadKeepingPending();
         deliver(again);

@@ -22,6 +22,10 @@ import java.util.Locale;
 final class VehicleSheet extends VBox {
 
     VehicleSheet(Vehicle v, cm.camtel.nextfleet.desktop.data.FleetGateway gateway, Runnable onClose, Runnable onArchive) {
+        this(v, gateway, null, onClose, onArchive);
+    }
+
+    VehicleSheet(Vehicle v, cm.camtel.nextfleet.desktop.data.FleetGateway gateway, AppShell shell, Runnable onClose, Runnable onArchive) {
         boolean demo = gateway.isDemo();
         getStyleClass().add("sheet");
         Button close = new Button(null, Icons.stroke(Icons.CLOSE, 12, "-nf-muted"));
@@ -79,14 +83,49 @@ final class VehicleSheet extends VBox {
             Motion.stagger(dues.getChildren().subList(1, dues.getChildren().size()));
         }, err -> dues.getChildren().setAll(Ui.label("ÉCHÉANCES", "sheet-section"), Ui.label(err.getMessage(), "muted", "t-12")));
 
-        Label tabs = Ui.label("Vue 3D, photos, documents et historique : prévus aux lots 2 et 4 (écrans 08 à 13).", "muted", "t-12");
-        tabs.setWrapText(true);
-        Button maint = new Button("Voir les entretiens", Icons.stroke(Icons.CALENDAR, 16, "white"));
-        maint.getStyleClass().addAll("btn-primary", "btn-large");
-        maint.setMaxWidth(Double.MAX_VALUE);
-        maint.setDisable(true);
-        Node maintWrapped = DashboardView.wrapTooltip(maint, "Module Entretiens : lot 2 (NF-14).");
-        getChildren().addAll(Ui.spacer(), tabs, maintWrapped);
+        // Documents du véhicule (assurance, vignette, contrôle technique, carte grise) avec justificatif
+        boolean canWrite = shell != null && shell.session().can(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_WRITE);
+        if (!demo) {
+            VBox docs = new VBox(6, Ui.label("DOCUMENTS", "sheet-section"), Ui.skeleton(-1, 18));
+            getChildren().add(docs);
+            Ui.async(() -> gateway.vehicleDocuments(v.id()), list -> {
+                docs.getChildren().setAll(Ui.label("DOCUMENTS", "sheet-section"));
+                if (list.isEmpty()) docs.getChildren().add(Ui.label("Aucun document enregistré.", "muted", "t-12"));
+                DateTimeFormatter df = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.FRANCE);
+                for (cm.camtel.nextfleet.desktop.data.Prod.VehicleDocument d : list) {
+                    HBox row = new HBox(10, Ui.label(docLabel(d.docType()) + (d.reference() != null ? " · " + d.reference() : ""), "t-12", "w-600"),
+                            Ui.spacer(), Ui.label("jusqu'au " + d.validUntil().format(df), "muted", "t-12"));
+                    row.setAlignment(Pos.CENTER_LEFT);
+                    if (d.fileId() != null && shell != null) {
+                        Button open = new Button("Ouvrir");
+                        open.getStyleClass().addAll("btn-plain", "t-12");
+                        open.setOnAction(e -> Files.open(shell, d.fileId(), docLabel(d.docType()).toLowerCase(Locale.FRANCE)));
+                        row.getChildren().add(open);
+                    }
+                    docs.getChildren().add(row);
+                }
+            }, err -> docs.getChildren().setAll(Ui.label("DOCUMENTS", "sheet-section"), Ui.label(err.getMessage(), "muted", "t-12")));
+        }
+        VBox actions = new VBox(8);
+        if (canWrite && !demo) {
+            Button doc = new Button("Ajouter un document", Icons.stroke(Icons.DOC, 15, "-nf-accent"));
+            doc.getStyleClass().add("btn-tinted");
+            doc.setMaxWidth(Double.MAX_VALUE);
+            doc.setOnAction(e -> documentSheet(v, shell));
+            Button assign = new Button(v.driverName() == null ? "Affecter un conducteur" : "Changer de conducteur", Icons.stroke(Icons.USER, 15, "-nf-accent"));
+            assign.getStyleClass().add("btn-tinted");
+            assign.setMaxWidth(Double.MAX_VALUE);
+            assign.setOnAction(e -> assignSheet(v, shell));
+            actions.getChildren().addAll(doc, assign);
+        }
+        if (shell != null && (shell.visible(AppShell.Section.MAINTENANCE) || shell.visible(AppShell.Section.WORKSHOP))) {
+            Button maint = new Button("Voir les entretiens", Icons.stroke(Icons.WRENCH, 16, "white"));
+            maint.getStyleClass().addAll("btn-primary", "btn-large");
+            maint.setMaxWidth(Double.MAX_VALUE);
+            maint.setOnAction(e -> shell.show(shell.visible(AppShell.Section.WORKSHOP) ? AppShell.Section.WORKSHOP : AppShell.Section.MAINTENANCE));
+            actions.getChildren().add(maint);
+        }
+        getChildren().addAll(Ui.spacer(), actions);
         if (onArchive != null) {
             Button archive = new Button("Archiver le véhicule…");
             archive.getStyleClass().add("btn-gray");
@@ -96,6 +135,73 @@ final class VehicleSheet extends VBox {
             getChildren().add(archive);
         }
         setAccessibleText("Fiche du véhicule " + v.registration());
+    }
+
+    static String docLabel(String type) {
+        return switch (type) {
+            case "ASSURANCE" -> "Assurance";
+            case "CONTROLE_TECHNIQUE" -> "Contrôle technique";
+            case "VIGNETTE" -> "Vignette";
+            case "CARTE_GRISE" -> "Carte grise";
+            default -> "Autre document";
+        };
+    }
+
+    private static void documentSheet(Vehicle v, AppShell shell) {
+        var type = FormSheet.combo(java.util.List.of("ASSURANCE", "VIGNETTE", "CONTROLE_TECHNIQUE", "CARTE_GRISE", "AUTRE"));
+        type.setConverter(new javafx.util.StringConverter<>() {
+            @Override
+            public String toString(String t) {
+                return t == null ? "" : docLabel(t);
+            }
+
+            @Override
+            public String fromString(String s) {
+                return s;
+            }
+        });
+        var ref = FormSheet.text("Ex. numéro de police");
+        var from = FormSheet.date(null);
+        var until = FormSheet.date(Views.today().plusYears(1));
+        FormSheet.FilePick file = new FormSheet.FilePick("Joindre le document");
+        FormSheet f = new FormSheet("Nouveau document", "Enregistrer", shell::closeSheet).intro(v.registration() + " · " + v.label()
+                        + ". L'échéance apparaît aussitôt dans les échéances et les notifications.")
+                .field("Type *", type).field("Référence", ref).row("Valable du", from, "au *", until).field("Justificatif", file);
+        f.onSubmit(() -> {
+            java.util.UUID fileId = file.path() == null ? null : shell.gateway().upload("VEHICLE_DOCUMENT", v.id(), file.path()).id();
+            return shell.gateway().addVehicleDocument(v.id(), FormSheet.pick(type, "Type"), FormSheet.opt(ref), from.getValue(),
+                    FormSheet.day(until, "Fin de validité", true), fileId);
+        }, (cm.camtel.nextfleet.desktop.data.Prod.VehicleDocument d) -> {
+            shell.closeSheet();
+            shell.toasts().success("Document enregistré", docLabel(d.docType()) + " · " + v.registration());
+        });
+        shell.openSheet(f, 460);
+    }
+
+    private static void assignSheet(Vehicle v, AppShell shell) {
+        Ui.async(() -> shell.gateway().driverRefs(), drivers -> {
+            java.util.List<Object> items = new java.util.ArrayList<>(drivers);
+            items.add(0, "Aucun conducteur attitré");
+            var who = FormSheet.combo(items);
+            if (!drivers.isEmpty()) who.getSelectionModel().select(1);
+            var reason = FormSheet.text("Ex. Affectation au service technique");
+            FormSheet f = new FormSheet("Conducteur attitré", "Affecter", shell::closeSheet)
+                    .intro(v.registration() + " · " + v.label() + ". L'affectation précédente se termine maintenant ; l'historique est conservé.")
+                    .field("Conducteur", who).field("Motif *", reason);
+            f.onSubmit(() -> {
+                Object o = who.getValue();
+                java.util.UUID id = o instanceof cm.camtel.nextfleet.desktop.data.Prod.DriverRef d ? d.id() : null;
+                String r = FormSheet.req(reason, "Motif");
+                if (r.length() < 5) throw new IllegalArgumentException("Motif : 5 caractères au moins.");
+                shell.gateway().assignDriver(v.id(), id, r);
+                return o instanceof cm.camtel.nextfleet.desktop.data.Prod.DriverRef d ? d.fullName() : "aucun conducteur";
+            }, (String name) -> {
+                shell.closeSheet();
+                shell.toasts().success("Affectation enregistrée", v.registration() + " → " + name);
+                shell.openVehicles(v.registration());
+            });
+            shell.openSheet(f, 440);
+        }, err -> shell.toasts().info("Affectation impossible", err.getMessage()));
     }
 
     private static Node tile(String icon, String caption, String value) {

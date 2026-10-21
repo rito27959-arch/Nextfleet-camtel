@@ -331,6 +331,7 @@ public final class Ui {
 
     /** « maintenant », « il y a 12 min », « il y a 3 h », « hier », « lun. 14:05 » (fuseau Africa/Douala). */
     public static String relativeTime(java.time.Instant at, java.time.Instant now) {
+        if (at == null) return "—";
         long min = java.time.Duration.between(at, now).toMinutes();
         if (min < 1) return "maintenant";
         if (min < 60) return "il y a " + min + " min";
