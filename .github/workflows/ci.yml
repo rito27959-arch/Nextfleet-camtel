@@ -286,9 +286,12 @@ jobs:
           set +e +o pipefail
           exec > >(tee win.log) 2>&1
           trap 'iconv -c -f UTF-16LE -t UTF-8 msi.log 2>/dev/null | grep -iE "return value 3|error|erreur|INSTALLDIR|APPDIR|ProductCode" | tail -25 >> win.log' EXIT
-          MSI=$(cygpath -w "$(ls dist/*.msi)")
+          MSI=$(cygpath -wa "$(ls dist/*.msi)")
+          LOGW=$(cygpath -wa msi.log)
           echo "MSI: $MSI"
-          timeout 600 msiexec //i "$MSI" //qn //norestart //l*v msi.log
+          # msiexec lancé par PowerShell : arguments Windows intacts (le bash MSYS réécrit les options « //x »)
+          timeout 600 powershell -NoProfile -NonInteractive -Command \
+            "\$p = Start-Process msiexec.exe -ArgumentList @('/i', '\"$MSI\"', '/qn', '/norestart', '/l*v', '\"$LOGW\"') -Wait -PassThru; exit \$p.ExitCode"
           RC=$?
           echo "msiexec code $RC"
           if [ "$RC" -ne 0 ]; then
@@ -301,7 +304,8 @@ jobs:
           N=$(ls win-shots/*.png 2>/dev/null | wc -l)
           echo "::notice title=Windows — application lancée::${N} écrans capturés par l'application installée par le MSI"
           [ "$N" -ge 20 ] || { echo "::error title=Windows — lancement::$(tail -30 run.log | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"} {print}')"; exit 1; }
-          timeout 300 msiexec //x "$MSI" //qn //norestart || echo "::warning title=MSI::désinstallation non terminée"
+          timeout 300 powershell -NoProfile -NonInteractive -Command \
+            "\$p = Start-Process msiexec.exe -ArgumentList @('/x', '\"$MSI\"', '/qn', '/norestart') -Wait -PassThru; exit \$p.ExitCode" || echo "::warning title=MSI::désinstallation non terminée"
           echo "::notice title=MSI désinstallé::retiré proprement"
           # la version portable démarre aussi, sans installation
           7z x -bd -oportable dist/*portable.zip > /dev/null
