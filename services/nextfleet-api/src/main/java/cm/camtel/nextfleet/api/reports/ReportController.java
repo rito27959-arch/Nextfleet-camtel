@@ -129,7 +129,7 @@ public class ReportController {
     }
 
     @GetMapping("/api/v1/reports/{code}.csv")
-    @Transactional(readOnly = true, noRollbackFor = AccessDeniedException.class)
+    @Transactional(noRollbackFor = AccessDeniedException.class)   // l'export est journalisé : transaction en écriture
     public ResponseEntity<byte[]> export(@PathVariable String code, @RequestParam(required = false) LocalDate from,
                                          @RequestParam(required = false) LocalDate to) {
         Report r = REPORTS.get(code);
