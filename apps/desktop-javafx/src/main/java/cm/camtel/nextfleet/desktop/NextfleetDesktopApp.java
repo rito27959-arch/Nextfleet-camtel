@@ -156,6 +156,8 @@ public class NextfleetDesktopApp extends Application {
     }
 
     public static void main(String[] args) {
+        // dates (sélecteurs, formats) à la française quel que soit le réglage du poste
+        java.util.Locale.setDefault(java.util.Locale.FRANCE);
         launch(args);
     }
 }

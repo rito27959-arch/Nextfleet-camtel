@@ -90,6 +90,10 @@ public final class ScreenshotTour {
         add(() -> app.showLogin(null));
         add(() -> login("maintenance"));
         add(() -> shot("25-maintenance-atelier"));
+        add(() -> app.scene().getRoot().lookupAll(".list-row.clickable").stream().findFirst()
+                .ifPresent(n -> n.fireEvent(new javafx.scene.input.MouseEvent(javafx.scene.input.MouseEvent.MOUSE_CLICKED, 0, 0, 0, 0,
+                        javafx.scene.input.MouseButton.PRIMARY, 1, false, false, false, false, true, false, false, true, false, false, null))));
+        add(() -> shot("25b-atelier-detail-intervention"));
         add(() -> app.showLogin(null));
         add(() -> login("controleur"));
         add(() -> shell().show(AppShell.Section.MISSIONS));
@@ -171,7 +175,13 @@ public final class ScreenshotTour {
         add(() -> shot("etat-erreur-reseau"));
         add(() -> ((DemoFleetGateway) app.gateway()).setNetworkDown(false));
         add(() -> shell().show(AppShell.Section.FUEL));
-        add(() -> shot("etat-module-non-disponible"));
+        add(() -> shot("30-carburant-bons"));
+        add(() -> shell().show(AppShell.Section.COSTS));
+        add(() -> shot("31-couts-budget"));
+        add(() -> shell().show(AppShell.Section.REPORTS));
+        add(() -> shot("32-rapports"));
+        add(() -> shell().show(AppShell.Section.MAINTENANCE));
+        add(() -> shot("33-entretiens-gestionnaire"));
         add(() -> app.showLogin(null));
         add(() -> login("auditeur"));
         add(() -> shell().show(AppShell.Section.VEHICLES));

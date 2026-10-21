@@ -556,6 +556,106 @@ public final class DemoFleetGateway implements FleetGateway {
         return ops().audit(requireSession());
     }
 
+    // ------------------------------------------------------------------ production (données fictives de formation)
+
+    private DemoProduction prod;
+
+    private DemoProduction prod() {
+        if (prod == null) prod = new DemoProduction(clock, vehicles);
+        return prod;
+    }
+
+    private Session requireAny(cm.camtel.nextfleet.domain.security.Permission... ps) {
+        Session s = requireSession();
+        for (cm.camtel.nextfleet.domain.security.Permission p : ps) if (s.can(p)) return s;
+        throw new GatewayException(GatewayException.Kind.FORBIDDEN, "Vous n'avez pas les droits nécessaires pour cette action.");
+    }
+
+    @Override
+    public List<Prod.Category> maintenanceCategories() {
+        pause();
+        return prod().categories;
+    }
+
+    @Override
+    public List<Prod.WorkOrder> workOrders(boolean openOnly) {
+        pause();
+        requireAny(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_READ, cm.camtel.nextfleet.domain.security.Permission.MAINTENANCE_WRITE);
+        return prod().orders.stream().filter(o -> !openOnly || o.status().open()).toList();
+    }
+
+    @Override
+    public Prod.WorkOrder requestWork(UUID vehicleId, String categoryCode, String title) {
+        pause();
+        Session s = requireAny(cm.camtel.nextfleet.domain.security.Permission.MAINTENANCE_WRITE, cm.camtel.nextfleet.domain.security.Permission.VEHICLE_WRITE,
+                cm.camtel.nextfleet.domain.security.Permission.MISSION_DRIVE);
+        return prod().request(vehicleId, categoryCode, title, s.displayName());
+    }
+
+    @Override
+    public Prod.WorkOrder transitionWork(UUID orderId, long version, Prod.WorkTransition t) {
+        pause();
+        Session s = require(cm.camtel.nextfleet.domain.security.Permission.MAINTENANCE_WRITE);
+        return prod().transition(orderId, version, t, s.displayName());
+    }
+
+    @Override
+    public List<Prod.OilChange> oilChanges() {
+        pause();
+        return prod().oils;
+    }
+
+    @Override
+    public List<Prod.Supplier> suppliers() {
+        pause();
+        return prod().suppliers;
+    }
+
+    @Override
+    public List<Prod.FuelOrder> fuelOrders() {
+        pause();
+        requireAny(cm.camtel.nextfleet.domain.security.Permission.FUEL_ORDER_CREATE, cm.camtel.nextfleet.domain.security.Permission.FUEL_ORDER_APPROVE,
+                cm.camtel.nextfleet.domain.security.Permission.FUEL_FILL_CREATE, cm.camtel.nextfleet.domain.security.Permission.COST_READ);
+        return prod().fuelOrders;
+    }
+
+    @Override
+    public List<Prod.FuelFill> fuelFills() {
+        pause();
+        requireAny(cm.camtel.nextfleet.domain.security.Permission.FUEL_ORDER_CREATE, cm.camtel.nextfleet.domain.security.Permission.FUEL_ORDER_APPROVE,
+                cm.camtel.nextfleet.domain.security.Permission.FUEL_FILL_CREATE, cm.camtel.nextfleet.domain.security.Permission.COST_READ);
+        return prod().fills;
+    }
+
+    @Override
+    public void approveFuelOrder(UUID orderId, String comment) {
+        pause();
+        Session s = require(cm.camtel.nextfleet.domain.security.Permission.FUEL_ORDER_APPROVE);
+        prod().fuelOrders.replaceAll(o -> o.id().equals(orderId) ? new Prod.FuelOrder(o.id(), o.orderNumber(), o.vehicleId(), o.registration(),
+                o.supplierName(), o.requestedBy(), s.displayName(), o.authorizedLiters(), o.authorizedAmountXaf(), o.deliveredLiters(),
+                o.deliveredAmountXaf(), o.validUntil(), Prod.FuelOrderStatus.APPROVED, o.reason(), o.createdAt(), o.mine(), o.version() + 1) : o);
+    }
+
+    @Override
+    public Prod.CostSummary costs(int year) {
+        pause();
+        requireAny(cm.camtel.nextfleet.domain.security.Permission.COST_READ, cm.camtel.nextfleet.domain.security.Permission.VEHICLE_WRITE);
+        return prod().costs(year);
+    }
+
+    @Override
+    public List<Prod.ReportInfo> reports() {
+        pause();
+        return requireSession().can(cm.camtel.nextfleet.domain.security.Permission.REPORT_EXPORT) ? DemoProduction.REPORTS : List.of();
+    }
+
+    @Override
+    public byte[] exportReport(String code, LocalDate from, LocalDate to) {
+        pause();
+        require(cm.camtel.nextfleet.domain.security.Permission.REPORT_EXPORT);
+        return prod().report(code);
+    }
+
     private Session require(cm.camtel.nextfleet.domain.security.Permission p) {
         Session s = requireSession();
         if (!s.can(p)) throw new GatewayException(GatewayException.Kind.FORBIDDEN, "Vous n'avez pas les droits nécessaires pour cette action.");

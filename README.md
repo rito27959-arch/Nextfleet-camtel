@@ -3,8 +3,12 @@
 Plateforme de gestion du parc automobile CAMTEL : API Java 21 / Spring Boot, PostgreSQL + PostGIS, client bureau JavaFX
 (Windows, Linux) et application Android Java avec collecte GPS de mission et vues 3D Filament. Référence : cahier des charges V4.0 et document d'architecture V5.0.
 
-> **Statut : version pilote 0.5.1 — refonte « Liquid Glass teinté » façon iOS 26 (bureau et Android, voir [`docs/RECHERCHE_DESIGN_IOS26.md`](docs/RECHERCHE_DESIGN_IOS26.md)), suivi GPS en direct (Traccar, WebSocket, cartes MapLibre / tuiles), pile d'hébergement Docker éprouvée en CI, bureau DEB/EXE, Android APK.** Voir [`docs/ETAT_AVANCEMENT.md`](docs/ETAT_AVANCEMENT.md) pour ce qui est réellement prouvé.
-> Document de conception et code en cours de réalisation : ni homologation, ni avis DSIR/DS, ni mise en production.
+> **Statut : version 0.6.0 — mode production.** Serveur en service (`https://api-production-a1d8.up.railway.app`, base vide,
+> comptes créés par l'administrateur avec mot de passe provisoire). Tous les écrans du bureau et d'Android sont branchés sur
+> l'API : véhicules, conducteurs, échéances et documents, missions, entretiens, carburant, coûts et budget, rapports CSV,
+> messagerie avec pièces jointes en temps réel, comptes et droits, suivi GPS. Démonstration seulement sur demande (`--demo`).
+> Voir [`docs/ETAT_AVANCEMENT.md`](docs/ETAT_AVANCEMENT.md) pour ce qui est réellement prouvé et ce qui reste à essayer sur
+> le terrain (collecte GPS sur un vrai téléphone, boîtier véhicule). Aucune homologation ni avis DSIR/DS n'est revendiqué.
 
 ## Arborescence
 
@@ -54,7 +58,7 @@ Modèles 3D : `shared/assets3d/LICENCES.md` (créations originales et Khronos To
 
 ## Mode démonstration : six comptes
 
-Lancer le client bureau sans `--api=` ouvre le mode démonstration (données fictives, badge DÉMO). Mot de passe commun : `demo`.
+Le client bureau se connecte par défaut au serveur de production. `--demo` ouvre la démonstration hors ligne (données fictives, badge DÉMO, mot de passe commun : `demo`).
 
 | Identifiant | Profil | Espace d'accueil |
 |---|---|---|

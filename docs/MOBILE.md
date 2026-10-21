@@ -71,3 +71,14 @@ modèle : `tools/import-3d-model.md`. Seuls les modèles redistribuables sont ch
 - Comportement des surcouches constructeurs qui arrêtent les services de premier plan (Tecno, Infinix, Xiaomi…) : à mesurer.
 - Messagerie en temps réel : l'application interroge l'API REST (le temps réel GPS, lui, passe par WebSocket).
 - Taille de l'APK : ~66 Mo (bibliothèques natives MapLibre et Filament pour ARM et x86_64) ; des APK par architecture la réduiraient de moitié.
+
+## Mode production (0.6.0)
+
+- **Serveur** : production par défaut (`https://api-production-a1d8.up.railway.app`), modifiable depuis la connexion ou
+  Profil → Serveur. Démonstration hors ligne : sept appuis sur le logo de l'écran de connexion.
+- **Mot de passe provisoire** : remplacement imposé à la première connexion (le serveur refuse tout le reste) ;
+  changement volontaire depuis le profil.
+- **Mon véhicule** (onglet Missions) : demander un bon de carburant, déclarer un plein avec photo du reçu, signaler une
+  panne, faire le contrôle avant départ. Chaque saisie est revérifiée par le serveur (droits, solde du bon, compteur).
+- **Messagerie** : nouvelle conversation, photos et PDF joints (5 max, 10 Mo chacun), messages reçus en temps réel ;
+  les pièces jointes s'ouvrent dans une visionneuse interne et ne quittent pas le cache privé de l'application.
