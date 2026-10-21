@@ -67,4 +67,81 @@ public interface Repository {
         }, 5, 5, java.util.concurrent.TimeUnit.SECONDS);
         return ex::shutdownNow;
     }
+
+    // ------------------------------------------------------------------ production (serveur) : non disponible en démonstration
+
+    static RepositoryException demoOnly(String what) {
+        return new RepositoryException(RepositoryException.Kind.SERVER, what + " : disponible avec le serveur NexFleet uniquement.");
+    }
+
+    default void changePassword(char[] current, char[] next) {
+        throw demoOnly("Le changement de mot de passe");
+    }
+
+    default java.util.List<Models.Contact> contacts() {
+        throw demoOnly("La liste des contacts");
+    }
+
+    default Models.Conversation openConversation(java.util.List<String> userIds, String title) {
+        throw demoOnly("La création de conversation");
+    }
+
+    default Models.ChatLine send(String conversationId, String clientMessageId, String body, java.util.List<String> attachmentIds) {
+        if (attachmentIds == null || attachmentIds.isEmpty()) return send(conversationId, clientMessageId, body);
+        throw demoOnly("L'envoi de pièces jointes");
+    }
+
+    /** Dépôt d'un justificatif (PDF, JPEG, PNG, WebP, 10 Mo max) ; renvoie son identifiant. */
+    default String upload(String purpose, String vehicleId, String fileName, byte[] content) {
+        throw demoOnly("Le dépôt de fichiers");
+    }
+
+    default byte[] download(String fileId) {
+        throw demoOnly("Le téléchargement de fichiers");
+    }
+
+    /** Signal « nouveau message » en temps réel (identifiant de conversation). */
+    default AutoCloseable messagesLive(java.util.function.Consumer<String> onConversation) {
+        return () -> { };
+    }
+
+    default java.util.List<Models.VehicleRef> vehicles() {
+        throw demoOnly("La liste des véhicules");
+    }
+
+    default java.util.List<Models.Supplier> suppliers() {
+        throw demoOnly("La liste des stations");
+    }
+
+    default java.util.List<Models.FuelOrder> fuelOrders() {
+        throw demoOnly("Les bons de carburant");
+    }
+
+    default Models.FuelOrder requestFuel(String vehicleId, String supplierId, double liters, double amountXaf,
+                                         java.time.LocalDate validUntil, String reason) {
+        throw demoOnly("La demande de bon");
+    }
+
+    default void recordFill(String requestKey, String fuelOrderId, String exceptionReason, String vehicleId, String supplierId,
+                            java.time.Instant filledAt, Double odometerKm, double liters, double unitPriceXaf, boolean fullTank,
+                            String receiptReference, String receiptFileId) {
+        throw demoOnly("La saisie de plein");
+    }
+
+    default java.util.List<Models.Category> maintenanceCategories() {
+        throw demoOnly("L'atelier");
+    }
+
+    default String requestWork(String vehicleId, String categoryCode, String title) {
+        throw demoOnly("Le signalement de panne");
+    }
+
+    default java.util.List<Models.InspectionPoint> inspectionPoints() {
+        throw demoOnly("Le contrôle du véhicule");
+    }
+
+    /** {@code items} : code du point → {état, commentaire, "1" si critique}. Renvoie le résultat (CONFORME, RESERVES, NON_CONFORME). */
+    default String inspect(String vehicleId, String kind, Double odometerKm, java.util.Map<String, String[]> items, String notes) {
+        throw demoOnly("Le contrôle du véhicule");
+    }
 }

@@ -90,11 +90,21 @@ final class ProfilePage implements Page {
         LinearLayout device = Ui.group(a);
         device.addView(Ui.groupRow(a, R.drawable.ic_tab_track, 0xFF0088FF, "Émetteur GPS", TrackingState.of(a).deviceId(), null));
         device.addView(Ui.separator(a, 58));
-        device.addView(Ui.groupRow(a, R.drawable.ic_tab_map, 0xFF6155F5, "Environnement", s.demo ? "Démonstration" : "Serveur", null));
+        device.addView(Ui.groupRow(a, R.drawable.ic_tab_map, 0xFF6155F5, "Environnement", s.demo ? "Démonstration"
+                : android.net.Uri.parse(cm.camtel.nextfleet.mobile.data.ServerConfig.url(a)).getHost(), null));
         device.addView(Ui.separator(a, 58));
         device.addView(Ui.groupRow(a, R.drawable.ic_tab_profile, 0xFF8E8E93, "Version", "0.5.1", null));
         col.addView(device);
         col.addView(footer("Police Inter (SIL OFL 1.1) · 3D Google Filament (Apache 2.0) · cartes MapLibre (BSD) et OpenStreetMap."));
+
+        if (!s.demo) {
+            LinearLayout security = Ui.group(a);
+            security.addView(Ui.groupRow(a, R.drawable.ic_tab_profile, 0xFF8E8E93, "Changer mon mot de passe", null,
+                    v -> a.startActivity(new android.content.Intent(a, ChangePasswordActivity.class))));
+            LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            sp.topMargin = Ui.dp(a, 18);
+            col.addView(security, sp);
+        }
 
         // déconnexion, seule dans son groupe
         LinearLayout out = Ui.group(a);

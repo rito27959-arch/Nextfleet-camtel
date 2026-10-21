@@ -21,7 +21,8 @@ import cm.camtel.nextfleet.mobile.data.Models;
 import cm.camtel.nextfleet.mobile.data.Repository;
 
 /**
- * Connexion (NF-01) : mode démonstration (données fictives, identifiants publics) ou serveur NexFleet (HTTPS).
+ * Connexion (NF-01) au serveur NexFleet (HTTPS, adresse de production livrée, modifiable). Le mode démonstration (données
+ * fictives) n'est plus proposé : il reste accessible pour les formations en touchant sept fois l'icône.
  * Message d'échec générique ; le mot de passe n'est jamais conservé.
  */
 public final class LoginActivity extends Activity {
@@ -29,7 +30,10 @@ public final class LoginActivity extends Activity {
     private EditText server, login, password;
     private TextView error;
     private Button submit, modeDemo, modeServer;
-    private boolean demo = true;
+    private boolean demo = false;
+    private int taps;
+    private LinearLayout segRow, demoBlock;
+    private TextView serverLine;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -58,9 +62,15 @@ public final class LoginActivity extends Activity {
         icon.setBackground(Ui.rounded(this, Ui.NAVY, 20));
         icon.setClipToOutline(true);
         icon.setElevation(Ui.dp(this, 6));
+        icon.setOnClickListener(v -> {
+            if (++taps == 7) {
+                segRow.setVisibility(View.VISIBLE);
+                android.widget.Toast.makeText(this, "Mode démonstration (formation) disponible.", android.widget.Toast.LENGTH_SHORT).show();
+            }
+        });
         col.addView(icon);
         col.addView(Ui.largeTitle(this, "Bienvenue"));
-        col.addView(Ui.muted(this, "NexFleet CAMTEL — missions, localisation, messages et catalogue 3D.", 15));
+        col.addView(Ui.muted(this, "NexFleet CAMTEL — missions, carburant, atelier, messages et suivi du parc.", 15));
 
         LinearLayout seg = Ui.row(this, 0);
         seg.setBackground(Ui.rounded(this, Ui.FILL, 999));
@@ -69,9 +79,20 @@ public final class LoginActivity extends Activity {
         modeServer = segment("Serveur NexFleet", v -> setMode(false));
         seg.addView(modeDemo, new LinearLayout.LayoutParams(0, Ui.dp(this, 38), 1f));
         seg.addView(modeServer, new LinearLayout.LayoutParams(0, Ui.dp(this, 38), 1f));
+        segRow = seg;
+        seg.setVisibility(View.GONE);
         col.addView(seg);
 
         server = field("Adresse du serveur (https://…)", InputType.TYPE_TEXT_VARIATION_URI);
+        server.setText(cm.camtel.nextfleet.mobile.data.ServerConfig.url(this));
+        serverLine = Ui.muted(this, "", 13);
+        serverLine.setPadding(Ui.dp(this, 4), 0, Ui.dp(this, 4), 0);
+        serverLine.setOnClickListener(v -> {
+            server.setVisibility(server.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+            if (server.getVisibility() == View.VISIBLE) server.requestFocus();
+        });
+        serverLine.setContentDescription("Modifier l'adresse du serveur");
+        col.addView(serverLine);
         login = field("Identifiant", InputType.TYPE_TEXT_VARIATION_NORMAL);
         password = field("Mot de passe", InputType.TYPE_TEXT_VARIATION_PASSWORD);
         password.setImeOptions(EditorInfo.IME_ACTION_DONE);
@@ -96,9 +117,10 @@ public final class LoginActivity extends Activity {
         submit = Ui.button(this, "Se connecter", Ui.Style.FILLED, v -> attempt());
         col.addView(submit);
 
+        demoBlock = Ui.column(this, 6);
         TextView demoHeader = Ui.text(this, "COMPTES DE DÉMONSTRATION · MOT DE PASSE « demo »", 13, Ui.MUTED, NexFleetApp.get().regular());
         demoHeader.setPadding(Ui.dp(this, 16), Ui.dp(this, 12), 0, 0);
-        col.addView(demoHeader);
+        demoBlock.addView(demoHeader);
         LinearLayout accounts = Ui.group(this);
         String[][] demoRoles = {{"conducteur", "DRIVER"}, {"gestionnaire", "FLEET_MANAGER"}, {"maintenance", "MAINTENANCE"}, {"controleur", "CONTROLLER"}};
         for (String[] a : demoRoles) {
@@ -122,8 +144,14 @@ public final class LoginActivity extends Activity {
             row.setContentDescription("Se connecter avec le compte de démonstration " + r.label);
             accounts.addView(row);
         }
-        col.addView(accounts);
-        col.addView(Ui.muted(this, "Connexion fédérée CAMTEL (OIDC) disponible après accord de la DSIR.", 12));
+        demoBlock.addView(accounts);
+        col.addView(demoBlock);
+        TextView forgot = Ui.text(this, "Mot de passe oublié ?", 15, Ui.ACCENT_TEXT, NexFleetApp.get().regular());
+        forgot.setPadding(Ui.dp(this, 4), Ui.dp(this, 6), 0, Ui.dp(this, 6));
+        forgot.setOnClickListener(v -> Ui.alert(this, "Mot de passe oublié", "Contactez l'administrateur NexFleet de votre direction : "
+                + "il vous remet un mot de passe provisoire, que vous remplacez à la première connexion.", null, "OK", null));
+        col.addView(forgot);
+        col.addView(Ui.muted(this, "Compte remis par l'administrateur NexFleet de votre direction.", 12));
 
         ScrollView sv = new ScrollView(this);
         sv.setFillViewport(true);
@@ -131,7 +159,7 @@ public final class LoginActivity extends Activity {
         sv.setBackground(Ui.backdrop());
         Ui.applyInsets(sv, true, true);
         setContentView(sv);
-        setMode(true);
+        setMode(false);
     }
 
     private Button segment(String label, View.OnClickListener l) {
@@ -144,7 +172,11 @@ public final class LoginActivity extends Activity {
 
     private void setMode(boolean d) {
         demo = d;
-        server.setVisibility(d ? View.GONE : View.VISIBLE);
+        server.setVisibility(View.GONE);
+        serverLine.setVisibility(d ? View.GONE : View.VISIBLE);
+        demoBlock.setVisibility(d ? View.VISIBLE : View.GONE);
+        String host = android.net.Uri.parse(server.getText().toString().trim()).getHost();
+        serverLine.setText("Serveur : " + (host == null ? "non configuré" : host) + " · Modifier");
         modeDemo.setBackground(d ? Ui.rounded(this, Ui.SURFACE, 999) : null);
         modeServer.setBackground(!d ? Ui.rounded(this, Ui.SURFACE, 999) : null);
         modeDemo.setElevation(d ? Ui.dp(this, 2) : 0);
@@ -173,11 +205,14 @@ public final class LoginActivity extends Activity {
     private void attempt() {
         String l = login.getText().toString().trim();
         char[] p = password.getText().toString().toCharArray();
-        String url = server.getText().toString().trim();
-        if (l.isEmpty() || p.length == 0 || (!demo && !url.startsWith("https://") && !url.startsWith("http://10.0.2.2"))) {
-            showError(!demo && !url.startsWith("https://") ? "Indiquez l'adresse HTTPS du serveur NexFleet." : "Renseignez l'identifiant et le mot de passe.");
+        String url = server.getText().toString().trim().replaceAll("/+$", "");
+        if (l.isEmpty() || p.length == 0 || (!demo && !cm.camtel.nextfleet.mobile.data.ServerConfig.valid(url))) {
+            showError(!demo && !cm.camtel.nextfleet.mobile.data.ServerConfig.valid(url) ? "Indiquez l'adresse HTTPS du serveur NexFleet."
+                    : "Renseignez l'identifiant et le mot de passe.");
+            if (!demo) server.setVisibility(View.VISIBLE);
             return;
         }
+        if (!demo) cm.camtel.nextfleet.mobile.data.ServerConfig.save(this, url);
         error.setVisibility(View.GONE);
         submit.setEnabled(false);
         submit.setText("Connexion…");
@@ -185,7 +220,12 @@ public final class LoginActivity extends Activity {
         Ui.async(() -> repo.login(l, p), s -> {
             NexFleetApp.get().setSession(s);
             password.setText("");
-            open();
+            if (s.mustChangePassword) {
+                startActivity(new Intent(this, ChangePasswordActivity.class).putExtra("forced", true));
+                finish();
+            } else {
+                open();
+            }
         }, e -> {
             submit.setEnabled(true);
             submit.setText("Se connecter");

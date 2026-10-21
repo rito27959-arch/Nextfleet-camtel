@@ -24,6 +24,7 @@ final class MessagesPage implements Page {
     private final MainActivity a;
     private final ScrollView scroll;
     private final LinearLayout col;
+    private AutoCloseable realtime;
 
     MessagesPage(MainActivity a) {
         this.a = a;
@@ -51,6 +52,23 @@ final class MessagesPage implements Page {
 
     @Override
     public void onShow() {
+        if (realtime == null) realtime = NexFleetApp.get().repository().messagesLive(conv -> reload());
+        reload();
+    }
+
+    @Override
+    public void onHide() {
+        if (realtime != null) {
+            try {
+                realtime.close();
+            } catch (Exception ignored) {
+                // déjà fermé
+            }
+            realtime = null;
+        }
+    }
+
+    private void reload() {
         Ui.async(() -> NexFleetApp.get().repository().conversations(), this::render, e -> {
             col.removeAllViews();
             col.addView(Ui.largeTitle(a, "Messages"));
@@ -61,8 +79,18 @@ final class MessagesPage implements Page {
     private void render(List<Conversation> list) {
         col.removeAllViews();
         TextView t = Ui.largeTitle(a, "Messages");
-        t.setPadding(Ui.dp(a, 4), 0, 0, Ui.dp(a, 12));
-        col.addView(t);
+        LinearLayout head = Ui.row(a, 8);
+        head.setPadding(Ui.dp(a, 4), 0, 0, Ui.dp(a, 12));
+        head.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        if (!NexFleetApp.get().repository().isDemo()) {
+            TextView plus = Ui.text(a, "+", 26, 0xFFFFFFFF, NexFleetApp.get().semibold());
+            plus.setGravity(Gravity.CENTER);
+            plus.setBackground(Ui.rounded(a, Ui.ACCENT, 999));
+            plus.setContentDescription("Nouvelle conversation");
+            plus.setOnClickListener(v -> compose());
+            head.addView(plus, new LinearLayout.LayoutParams(Ui.dp(a, 40), Ui.dp(a, 40)));
+        }
+        col.addView(head);
         LinearLayout group = Ui.group(a);
         for (int i = 0; i < list.size(); i++) {
             Conversation c = list.get(i);
@@ -112,6 +140,43 @@ final class MessagesPage implements Page {
         r.setOnClickListener(v -> a.startActivity(new Intent(a, ThreadActivity.class).putExtra("id", c.id).putExtra("title", c.title)));
         r.setContentDescription(c.title + (c.unread > 0 ? ", " + c.unread + " non lus" : ""));
         return r;
+    }
+
+    /** Nouvelle conversation : une personne (conversation réutilisée si elle existe) ou un groupe nommé. */
+    private void compose() {
+        Ui.async(() -> NexFleetApp.get().repository().contacts(), contacts -> {
+            if (contacts.isEmpty()) {
+                Ui.alert(a, "Aucun contact", "Personne d'autre n'a accès à la messagerie dans votre périmètre.", null, "OK", null);
+                return;
+            }
+            LinearLayout box = Ui.column(a, 4);
+            box.setPadding(Ui.dp(a, 20), Ui.dp(a, 8), Ui.dp(a, 20), 0);
+            java.util.List<android.widget.CheckBox> checks = new java.util.ArrayList<>();
+            for (cm.camtel.nextfleet.mobile.data.Models.Contact c : contacts) {
+                android.widget.CheckBox cb = new android.widget.CheckBox(a);
+                cb.setText(c.displayName + " · " + c.role);
+                cb.setTag(c.userId);
+                cb.setTypeface(NexFleetApp.get().regular());
+                checks.add(cb);
+                box.addView(cb);
+            }
+            android.widget.EditText title = new android.widget.EditText(a);
+            title.setHint("Nom du groupe (plusieurs personnes)");
+            box.addView(title);
+            ScrollView sv = new ScrollView(a);
+            sv.addView(box);
+            new android.app.AlertDialog.Builder(a).setTitle("Nouvelle conversation").setView(sv)
+                    .setNegativeButton("Annuler", null)
+                    .setPositiveButton("Ouvrir", (d, w) -> {
+                        java.util.List<String> ids = new java.util.ArrayList<>();
+                        for (android.widget.CheckBox cb : checks) if (cb.isChecked()) ids.add((String) cb.getTag());
+                        if (ids.isEmpty()) return;
+                        String name = title.getText().toString().trim();
+                        Ui.async(() -> NexFleetApp.get().repository().openConversation(ids, ids.size() > 1 ? name : null),
+                                conv -> a.startActivity(new Intent(a, ThreadActivity.class).putExtra("id", conv.id).putExtra("title", conv.title)),
+                                e -> Ui.alert(a, "Conversation impossible", e.getMessage(), null, "OK", null));
+                    }).show();
+        }, e -> Ui.alert(a, "Contacts indisponibles", e.getMessage(), null, "OK", null));
     }
 
     private static String when(Conversation c) {

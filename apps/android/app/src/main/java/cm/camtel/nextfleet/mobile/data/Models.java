@@ -89,8 +89,16 @@ public final class Models {
         public final boolean mine;
         public final Chat.DeliveryState state;
 
+        public final List<Attachment> attachments;
+
         public ChatLine(long seq, String senderName, String body, Instant at, boolean mine, Chat.DeliveryState state,
                         String clientMessageId) {
+            this(seq, senderName, body, at, mine, state, clientMessageId, List.of());
+        }
+
+        public ChatLine(long seq, String senderName, String body, Instant at, boolean mine, Chat.DeliveryState state,
+                        String clientMessageId, List<Attachment> attachments) {
+            this.attachments = attachments;
             this.seq = seq;
             this.senderName = senderName;
             this.body = body;
@@ -151,6 +159,128 @@ public final class Models {
             this.lon = lon;
             this.speedKmh = speedKmh;
             this.recordedAt = recordedAt;
+        }
+    }
+
+    // ------------------------------------------------------------------ production
+
+    public static final class Attachment {
+        public final String id, name, mimeType;
+        public final long sizeBytes;
+
+        public Attachment(String id, String name, String mimeType, long sizeBytes) {
+            this.id = id;
+            this.name = name;
+            this.mimeType = mimeType;
+            this.sizeBytes = sizeBytes;
+        }
+    }
+
+    public static final class Contact {
+        public final String userId, displayName, role, orgUnit;
+
+        public Contact(String userId, String displayName, String role, String orgUnit) {
+            this.userId = userId;
+            this.displayName = displayName;
+            this.role = role;
+            this.orgUnit = orgUnit;
+        }
+    }
+
+    /** Véhicule du périmètre (choix dans les formulaires terrain). */
+    public static final class VehicleRef {
+        public final String id, registration, label, status;
+
+        public VehicleRef(String id, String registration, String label, String status) {
+            this.id = id;
+            this.registration = registration;
+            this.label = label;
+            this.status = status;
+        }
+
+        @Override
+        public String toString() {
+            return registration + " · " + label;
+        }
+    }
+
+    public static final class Supplier {
+        public final String id, name, kind;
+
+        public Supplier(String id, String name, String kind) {
+            this.id = id;
+            this.name = name;
+            this.kind = kind;
+        }
+
+        @Override
+        public String toString() {
+            return name;
+        }
+    }
+
+    public static final class FuelOrder {
+        public final String id, orderNumber, vehicleId, registration, supplierId, supplierName, status;
+        public final double authorizedLiters, deliveredLiters;
+        public final java.time.LocalDate validUntil;
+
+        public FuelOrder(String id, String orderNumber, String vehicleId, String registration, String supplierId, String supplierName,
+                         String status, double authorizedLiters, double deliveredLiters, java.time.LocalDate validUntil) {
+            this.id = id;
+            this.orderNumber = orderNumber;
+            this.vehicleId = vehicleId;
+            this.registration = registration;
+            this.supplierId = supplierId;
+            this.supplierName = supplierName;
+            this.status = status;
+            this.authorizedLiters = authorizedLiters;
+            this.deliveredLiters = deliveredLiters;
+            this.validUntil = validUntil;
+        }
+
+        public String statusLabel() {
+            switch (status) {
+                case "SUBMITTED": return "À valider";
+                case "APPROVED": return "Validé";
+                case "PARTIALLY_CONSUMED": return "Entamé";
+                case "SETTLED": return "Soldé";
+                case "CANCELLED": return "Annulé";
+                case "EXPIRED": return "Expiré";
+                default: return "Brouillon";
+            }
+        }
+
+        public boolean usable() {
+            return "APPROVED".equals(status) || "PARTIALLY_CONSUMED".equals(status);
+        }
+
+        @Override
+        public String toString() {
+            return orderNumber + " · " + registration + " · reste " + Math.round((authorizedLiters - deliveredLiters) * 10) / 10.0 + " L";
+        }
+    }
+
+    public static final class Category {
+        public final String code, label;
+
+        public Category(String code, String label) {
+            this.code = code;
+            this.label = label;
+        }
+
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
+    public static final class InspectionPoint {
+        public final String code, label, hint;
+
+        public InspectionPoint(String code, String label, String hint) {
+            this.code = code;
+            this.label = label;
+            this.hint = hint;
         }
     }
 }

@@ -14,6 +14,8 @@ public final class Session {
     public final String displayName;
     public final List<String> roles;
     public final boolean demo;
+    /** Mot de passe provisoire : seul le changement de mot de passe est permis tant qu'il n'est pas remplacé. */
+    public volatile boolean mustChangePassword;
 
     public Session(String token, String login, String displayName, List<String> roles, boolean demo) {
         this.token = token;

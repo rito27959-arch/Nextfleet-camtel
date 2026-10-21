@@ -41,6 +41,9 @@
         <activity android:name=".ui.MainActivity" android:exported="false" />
         <activity android:name=".ui.ThreadActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ui.ModelViewerActivity" android:exported="false" />
+        <activity android:name=".ui.FieldActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".ui.ChangePasswordActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".ui.AttachmentActivity" android:exported="false" />
 
         <service
             android:name=".tracking.TrackingService"

@@ -2,6 +2,7 @@ package cm.camtel.nextfleet.mobile.ui;
 
 import android.app.Activity;
 import android.content.res.ColorStateList;
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -18,6 +19,7 @@ import android.widget.TextView;
 
 import cm.camtel.nextfleet.domain.chat.Chat;
 import cm.camtel.nextfleet.mobile.NexFleetApp;
+import cm.camtel.nextfleet.mobile.data.Models;
 import cm.camtel.nextfleet.mobile.R;
 import cm.camtel.nextfleet.mobile.data.Models.ChatLine;
 import cm.camtel.nextfleet.mobile.data.Repository;
@@ -47,6 +49,11 @@ public final class ThreadActivity extends Activity {
     private ImageButton send;
     private String conversationId;
     private List<ChatLine> lines = List.of();
+    private static final int PICK_FILE = 52;
+    private byte[] attachment;
+    private String attachmentName;
+    private TextView attachChip;
+    private AutoCloseable realtime;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -103,6 +110,20 @@ public final class ThreadActivity extends Activity {
             submit();
             return true;
         });
+        if (!NexFleetApp.get().repository().isDemo()) {
+            ImageButton attach = new ImageButton(this);
+            attach.setImageResource(R.drawable.ic_attach);
+            attach.setBackground(Ui.glass(this, 999));
+            attach.setContentDescription("Joindre une photo ou un PDF");
+            attach.setOnClickListener(v -> {
+                Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                i.setType("*/*");
+                i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/jpeg", "image/png", "image/webp", "application/pdf"});
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                startActivityForResult(Intent.createChooser(i, "Joindre une photo ou un PDF"), PICK_FILE);
+            });
+            composer.addView(attach, new LinearLayout.LayoutParams(Ui.dp(this, 44), Ui.dp(this, 44)));
+        }
         composer.addView(input, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         send = new ImageButton(this);
         send.setImageResource(R.drawable.ic_send);
@@ -115,27 +136,84 @@ public final class ThreadActivity extends Activity {
             @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) { }
             @Override public void onTextChanged(CharSequence s, int st, int b, int c) { }
             @Override public void afterTextChanged(Editable s) {
-                boolean on = s.toString().trim().length() > 0;
-                send.setEnabled(on);
-                send.setBackground(Ui.rounded(ThreadActivity.this, on ? Ui.ACCENT : 0xFFC7C7CC, 999));
+                refreshSend();
             }
         });
         send.setEnabled(false);
         send.setBackground(Ui.rounded(this, 0xFFC7C7CC, 999));
+        attachChip = Ui.text(this, "", 13, Ui.TEXT, NexFleetApp.get().regular());
+        attachChip.setPadding(Ui.dp(this, 14), Ui.dp(this, 6), Ui.dp(this, 14), Ui.dp(this, 6));
+        attachChip.setBackground(Ui.rounded(this, Ui.FILL, 999));
+        attachChip.setVisibility(View.GONE);
+        attachChip.setContentDescription("Retirer la pièce jointe");
+        attachChip.setOnClickListener(v -> {
+            attachment = null;
+            attachChip.setVisibility(View.GONE);
+            refreshSend();
+        });
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        cp.leftMargin = Ui.dp(this, 14);
+        root.addView(attachChip, cp);
         root.addView(composer);
         Ui.applyInsets(composer, false, true);
         setContentView(root);
+    }
+
+    private void refreshSend() {
+        boolean on = input.getText().toString().trim().length() > 0 || attachment != null;
+        send.setEnabled(on);
+        send.setBackground(Ui.rounded(this, on ? Ui.ACCENT : 0xFFC7C7CC, 999));
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != PICK_FILE || resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        android.net.Uri uri = data.getData();
+        try (java.io.InputStream in = getContentResolver().openInputStream(uri)) {
+            if (in == null) throw new java.io.IOException("illisible");
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[16384];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+                if (out.size() > 10 * 1024 * 1024) throw new IllegalArgumentException("Fichier trop volumineux (10 Mo maximum).");
+            }
+            attachment = out.toByteArray();
+            attachmentName = "piece";
+            try (android.database.Cursor c = getContentResolver().query(uri, new String[]{android.provider.OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+                if (c != null && c.moveToFirst()) attachmentName = c.getString(0);
+            }
+            attachChip.setText("📎 " + attachmentName + "  ✕");
+            attachChip.setVisibility(View.VISIBLE);
+            refreshSend();
+        } catch (java.io.IOException | IllegalArgumentException e) {
+            attachment = null;
+            Ui.alert(this, "Pièce jointe", e instanceof IllegalArgumentException ? e.getMessage() : "Fichier illisible.", null, "OK", null);
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         reload(true);
+        // temps réel : le serveur signale un nouveau message ; le fil est relu par l'API (droits revérifiés)
+        realtime = NexFleetApp.get().repository().messagesLive(conv -> {
+            if (conv.equals(conversationId)) reload(true);
+        });
     }
 
     @Override
     protected void onPause() {
         handler.removeCallbacksAndMessages(null);
+        if (realtime != null) {
+            try {
+                realtime.close();
+            } catch (Exception ignored) {
+                // déjà fermé
+            }
+            realtime = null;
+        }
         super.onPause();
     }
 
@@ -180,6 +258,19 @@ public final class ThreadActivity extends Activity {
                 list.addView(who);
             }
             list.addView(bubble(l.body, l.mine, false, false));
+            for (Models.Attachment f : l.attachments) {
+                TextView chip = Ui.text(this, "📎 " + f.name + " · " + Math.max(1, f.sizeBytes / 1024) + " Ko", 13,
+                        l.mine ? Ui.ACCENT_TEXT : Ui.TEXT, NexFleetApp.get().semibold());
+                chip.setPadding(Ui.dp(this, 12), Ui.dp(this, 6), Ui.dp(this, 12), Ui.dp(this, 6));
+                chip.setBackground(Ui.rounded(this, Ui.FILL, 999));
+                chip.setContentDescription("Ouvrir la pièce jointe " + f.name);
+                chip.setOnClickListener(v -> startActivity(new Intent(this, AttachmentActivity.class).putExtra("id", f.id).putExtra("name", f.name)));
+                LinearLayout row = new LinearLayout(this);
+                row.setGravity(l.mine ? Gravity.END : Gravity.START);
+                row.setPadding(0, Ui.dp(this, 2), 0, Ui.dp(this, 2));
+                row.addView(chip);
+                list.addView(row);
+            }
             if (i == lastMine && l.state != null) list.addView(meta(l.state.label, false, null));
             prev = l.at;
             prevSender = l.senderName;
@@ -213,11 +304,17 @@ public final class ThreadActivity extends Activity {
         return t;
     }
 
+    private final Map<String, Object[]> pendingFiles = new LinkedHashMap<>();   // clientId → {octets, nom}
+
     private void submit() {
         String text = input.getText().toString().trim();
-        if (text.isEmpty()) return;
+        if (text.isEmpty() && attachment == null) return;
+        if (text.isEmpty()) text = "Pièce jointe : " + attachmentName;
         String id = UUID.randomUUID().toString();
-        pending.put(id, new String[]{text, "0"});
+        pending.put(id, new String[]{attachment == null ? text : text + "\n📎 " + attachmentName, "0", text});
+        if (attachment != null) pendingFiles.put(id, new Object[]{attachment, attachmentName});
+        attachment = null;
+        attachChip.setVisibility(View.GONE);
         input.setText("");
         render(null);
         deliver(id);
@@ -229,8 +326,14 @@ public final class ThreadActivity extends Activity {
         if (p == null) return;
         p[1] = "0";
         render(null);
-        Ui.async(() -> NexFleetApp.get().repository().send(conversationId, clientId, p[0]), line -> {
+        Object[] file = pendingFiles.get(clientId);
+        Ui.async(() -> {
+            Repository repo = NexFleetApp.get().repository();
+            List<String> ids = file == null ? List.of() : List.of(repo.upload("CHAT", null, (String) file[1], (byte[]) file[0]));
+            return repo.send(conversationId, clientId, p.length > 2 ? p[2] : p[0], ids);
+        }, line -> {
             pending.remove(clientId);
+            pendingFiles.remove(clientId);
             reload(false);
         }, e -> {
             boolean refused = e instanceof Repository.RepositoryException
@@ -238,6 +341,7 @@ public final class ThreadActivity extends Activity {
                     || ((Repository.RepositoryException) e).kind == Repository.RepositoryException.Kind.VALIDATION);
             if (refused) {
                 pending.remove(clientId);
+                pendingFiles.remove(clientId);
                 Ui.alert(this, "Message non envoyé", e.getMessage(), null, "OK", null);
             } else {
                 p[1] = "1";

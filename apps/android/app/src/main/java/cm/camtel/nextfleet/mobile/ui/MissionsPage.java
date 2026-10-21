@@ -13,6 +13,7 @@ import android.widget.TextView;
 
 import cm.camtel.nextfleet.domain.security.Permission;
 import cm.camtel.nextfleet.mobile.NexFleetApp;
+import cm.camtel.nextfleet.mobile.R;
 import cm.camtel.nextfleet.mobile.data.Catalogue;
 import cm.camtel.nextfleet.mobile.data.Models.Mission;
 import cm.camtel.nextfleet.mobile.data.Models.MissionStatus;
@@ -129,6 +130,7 @@ final class MissionsPage implements Page, TrackingBus.Listener {
         note.setBackground(Ui.rounded(a, 0x1F0088FF, 16));
         note.setTextColor(Ui.TEXT);
         col.addView(note);
+        if (!NexFleetApp.get().repository().isDemo()) col.addView(fieldActions(s));
         if (!others.isEmpty()) {
             TextView h = Ui.text(a, "TOUTES LES MISSIONS", 13, Ui.MUTED, NexFleetApp.get().regular());
             h.setPadding(Ui.dp(a, 6), Ui.dp(a, 8), 0, 0);
@@ -252,5 +254,41 @@ final class MissionsPage implements Page, TrackingBus.Listener {
                     TrackingService.drain(a);
                     load();
                 }, e -> Ui.alert(a, "Clôture impossible", e.getMessage(), null, "OK", null)));
+    }
+
+    /** Actions terrain selon les droits : carburant, plein avec reçu, panne, contrôle avant départ. */
+    private View fieldActions(Session s) {
+        LinearLayout box = Ui.column(a, 6);
+        TextView h = Ui.text(a, "MON VÉHICULE", 13, Ui.MUTED, NexFleetApp.get().regular());
+        h.setPadding(Ui.dp(a, 6), Ui.dp(a, 8), 0, 0);
+        box.addView(h);
+        LinearLayout g = Ui.group(a);
+        boolean any = false;
+        if (s.can(Permission.FUEL_ORDER_CREATE)) {
+            g.addView(Ui.groupRow(a, R.drawable.ic_tab_track, 0xFF0088FF, "Demander un bon carburant", null,
+                    v -> a.startActivity(FieldActivity.open(a, FieldActivity.FUEL))));
+            any = true;
+        }
+        if (s.can(Permission.FUEL_FILL_CREATE)) {
+            if (any) g.addView(Ui.separator(a, 58));
+            g.addView(Ui.groupRow(a, R.drawable.ic_tab_track, 0xFF34C759, "Saisir un plein", null,
+                    v -> a.startActivity(FieldActivity.open(a, FieldActivity.FILL))));
+            any = true;
+        }
+        if (s.can(Permission.MISSION_DRIVE) || s.can(Permission.MAINTENANCE_WRITE) || s.can(Permission.VEHICLE_WRITE)) {
+            if (any) g.addView(Ui.separator(a, 58));
+            g.addView(Ui.groupRow(a, R.drawable.ic_tab_cube, 0xFFFF8D28, "Signaler une panne", null,
+                    v -> a.startActivity(FieldActivity.open(a, FieldActivity.WORK))));
+            any = true;
+        }
+        if (s.can(Permission.MISSION_DRIVE) || s.can(Permission.MAINTENANCE_WRITE)) {
+            if (any) g.addView(Ui.separator(a, 58));
+            g.addView(Ui.groupRow(a, R.drawable.ic_tab_missions, 0xFF6155F5, "Contrôle avant départ", null,
+                    v -> a.startActivity(FieldActivity.open(a, FieldActivity.CHECK))));
+            any = true;
+        }
+        if (!any) return new View(a);
+        box.addView(g);
+        return box;
     }
 }

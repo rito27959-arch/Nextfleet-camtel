@@ -44,6 +44,11 @@ public final class MainActivity extends Activity {
             finish();
             return;
         }
+        if (s.mustChangePassword) {
+            startActivity(new Intent(this, ChangePasswordActivity.class).putExtra("forced", true));
+            finish();
+            return;
+        }
         TrackingService.createChannel(this);
         content = new FrameLayout(this);
         boolean field = s.can(Permission.MISSION_DRIVE) || s.can(Permission.MISSION_MANAGE) || s.can(Permission.GPS_READ);
