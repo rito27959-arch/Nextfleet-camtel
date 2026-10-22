@@ -24,7 +24,8 @@ import java.util.UUID;
 public class AdminService {
 
     public record UserView(UUID id, String login, String displayName, String email, String orgUnit, String status,
-                           List<String> roles, Instant lockedUntil, Instant createdAt, long version) { }
+                           List<String> roles, Instant lockedUntil, Instant createdAt, long version,
+                           UUID driverId, String driverStaffNumber) { }
 
     public record AuditView(long id, Instant occurredAt, String actor, String action, String objectType, String objectId,
                             String reason, String requestId, String hash, String previousHash) { }
@@ -58,8 +59,10 @@ public class AdminService {
         return jdbc.query("""
                 SELECT u.id, u.login, u.display_name, u.email, o.name, u.status, u.locked_until, u.created_at, u.version,
                        coalesce((SELECT array_agg(DISTINCT g.role_code ORDER BY g.role_code) FROM user_role_grant g
-                                  WHERE g.user_id = u.id AND g.revoked_at IS NULL AND (g.valid_until IS NULL OR g.valid_until > now())), '{}') AS roles
+                                  WHERE g.user_id = u.id AND g.revoked_at IS NULL AND (g.valid_until IS NULL OR g.valid_until > now())), '{}') AS roles,
+                       d.id AS driver_id, d.staff_number AS driver_staff
                   FROM app_user u JOIN organisation_unit o ON o.id = u.org_unit_id
+                  LEFT JOIN driver d ON d.user_id = u.id
                  WHERE u.org_unit_id IN (:s)
                    AND (CAST(:q AS text) IS NULL OR u.login_normalized LIKE '%' || lower(CAST(:q AS text)) || '%'
                         OR lower(u.display_name) LIKE '%' || lower(CAST(:q AS text)) || '%')
@@ -67,7 +70,7 @@ public class AdminService {
                 new MapSqlParameterSource("s", s).addValue("q", q == null || q.isBlank() ? null : q.strip()),
                 (rs, i) -> new UserView(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5),
                         rs.getString(6), List.of((String[]) rs.getArray("roles").getArray()), ts(rs.getTimestamp(7)), ts(rs.getTimestamp(8)),
-                        rs.getLong(9)));
+                        rs.getLong(9), rs.getObject("driver_id", UUID.class), rs.getString("driver_staff")));
     }
 
     /** ACTIVE ↔ SUSPENDED ; jamais sur son propre compte ; motif obligatoire ; sessions révoquées à la suspension. */

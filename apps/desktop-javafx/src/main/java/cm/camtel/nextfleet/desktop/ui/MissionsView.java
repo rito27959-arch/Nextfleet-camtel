@@ -311,7 +311,7 @@ final class MissionsView extends BorderPane {
                 java.time.Instant e0 = at(FormSheet.day(endDay, "Fin", true), end.getText());
                 if (!e0.isAfter(s0)) throw new IllegalArgumentException("La fin prévue doit suivre le début.");
                 return shell.gateway().createMission(new cm.camtel.nextfleet.desktop.data.Prod.MissionDraft(FormSheet.pick(vehicle, "Véhicule").id(),
-                        FormSheet.pick(driver, "Conducteur").id(), FormSheet.req(purpose, "Objet"), FormSheet.opt(origin), FormSheet.opt(destination), s0, e0));
+                        withAccount(FormSheet.pick(driver, "Conducteur")).id(), FormSheet.req(purpose, "Objet"), FormSheet.opt(origin), FormSheet.opt(destination), s0, e0));
             }, (Mission created) -> {
                 shell.closeSheet();
                 shell.toasts().success("Mission créée", created.reference() + " : à faire autoriser par une autre personne habilitée.");
@@ -345,5 +345,14 @@ final class MissionsView extends BorderPane {
 
     private static int inFilterIndex(Mission m) {
         return m.status() == MissionStatus.ACTIVE ? 0 : m.status() == MissionStatus.FINISHED ? 2 : 1;
+    }
+
+    /** Un conducteur sans compte ne pourrait jamais démarrer la mission : on l'explique avant même d'appeler le serveur. */
+    private static cm.camtel.nextfleet.desktop.data.Prod.DriverRef withAccount(cm.camtel.nextfleet.desktop.data.Prod.DriverRef d) {
+        if (Boolean.FALSE.equals(d.hasAccount())) {
+            throw new IllegalArgumentException(d.fullName() + " n'a pas de compte NexFleet : il ne pourrait pas démarrer la mission. "
+                    + "Liez sa fiche à un compte dans Comptes et rôles.");
+        }
+        return d;
     }
 }

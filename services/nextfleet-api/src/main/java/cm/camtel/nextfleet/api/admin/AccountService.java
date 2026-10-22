@@ -37,6 +37,9 @@ public class AccountService {
 
     public record Created(AdminService.UserView user, String temporaryPassword) { }
 
+    /** Fiche conducteur rattachée à un compte (créée à partir du compte ou existante). */
+    public record DriverLink(UUID driverId, String staffNumber, String fullName, boolean created) { }
+
     public record RoleView(String code, String label, List<String> permissions) { }
 
     static final Set<String> ROLES = Set.of("FLEET_MANAGER", "DRIVER", "MAINTENANCE", "CONTROLLER", "ADMIN", "AUDITOR");
@@ -70,7 +73,7 @@ public class AccountService {
 
     @Transactional(noRollbackFor = AccessDeniedException.class)
     public Created create(String login, String displayName, String email, String phone, UUID orgUnitId,
-                          List<GrantRequest> grants, UUID driverId) {
+                          List<GrantRequest> grants, UUID driverId, String driverStaffNumber) {
         AuthenticatedUser me = access.currentUser();
         access.require("admin:users", orgUnitId, "app_user", "new");
         String l = login.strip();
@@ -89,7 +92,11 @@ public class AccountService {
         audit.record(me.userId(), "CREATE", "app_user", id.toString(), null, null,
                 Map.of("login", l, "displayName", displayName.strip(), "orgUnitId", orgUnitId.toString()));
         for (GrantRequest g : grants == null ? List.<GrantRequest>of() : grants) grant(id, g, "Création du compte");
-        if (driverId != null) linkDriver(id, driverId);
+        boolean driverRole = grants != null && grants.stream().anyMatch(g -> "DRIVER".equals(g.role()));
+        // un compte « conducteur » a toujours sa fiche : sans elle, aucune mission ne pourrait lui être confiée
+        if (driverId != null || driverRole || (driverStaffNumber != null && !driverStaffNumber.isBlank())) {
+            attachDriver(id, driverId, driverStaffNumber);
+        }
         return new Created(user(id), temp);
     }
 
@@ -209,6 +216,72 @@ public class AccountService {
                 new MapSqlParameterSource("s", staffNumber).addValue("scope", scope.isEmpty() ? List.of(orgUnitId) : scope), UUID.class);
         if (found.isEmpty()) throw new IllegalArgumentException("Aucun conducteur actif avec le matricule « " + staffNumber.strip() + " » dans votre périmètre.");
         return found.get(0);
+    }
+
+    /**
+     * Rattache un compte existant à une fiche conducteur : la fiche désignée, sinon celle du matricule indiqué si elle
+     * existe sans compte, sinon une fiche créée à partir du compte lui-même (nom, téléphone, e-mail, entité), sans
+     * aucune donnée inventée. Le rôle Conducteur est ajouté au compte s'il ne l'a pas : il pourra démarrer ses missions.
+     */
+    @Transactional(noRollbackFor = AccessDeniedException.class)
+    public DriverLink attachDriver(UUID userId, UUID driverId, String staffNumber) {
+        UUID userOrg = orgOf(userId);
+        access.require("admin:users", userOrg, "app_user", userId.toString());
+        List<Map<String, Object>> existing = jdbc.queryForList("SELECT id, staff_number, full_name FROM driver WHERE user_id = :u",
+                new MapSqlParameterSource("u", userId));
+        if (!existing.isEmpty()) {
+            throw new IllegalArgumentException("Ce compte est déjà lié à la fiche conducteur « " + existing.get(0).get("full_name")
+                    + " » (matricule " + existing.get(0).get("staff_number") + ").");
+        }
+        String sn = staffNumber == null ? "" : staffNumber.strip();
+        boolean created = false;
+        if (driverId == null && !sn.isEmpty()) {
+            List<UUID> found = jdbc.queryForList("""
+                    SELECT id FROM driver WHERE upper(staff_number) = upper(:s) AND archived_at IS NULL""",
+                    new MapSqlParameterSource("s", sn), UUID.class);
+            if (!found.isEmpty()) driverId = found.get(0);
+        }
+        if (driverId == null) {
+            Map<String, Object> u = jdbc.queryForMap("SELECT login, display_name, email, phone, hr_identifier FROM app_user WHERE id = :u",
+                    new MapSqlParameterSource("u", userId));
+            String number = !sn.isEmpty() ? sn : u.get("hr_identifier") != null ? (String) u.get("hr_identifier")
+                    : ((String) u.get("login")).toUpperCase(java.util.Locale.ROOT);
+            if (number.length() > 30) number = number.substring(0, 30);
+            Integer taken = jdbc.queryForObject("SELECT count(*) FROM driver WHERE upper(staff_number) = upper(:s)",
+                    new MapSqlParameterSource("s", number), Integer.class);
+            if (taken != null && taken > 0) {
+                throw new IllegalArgumentException("Le matricule « " + number + " » est déjà celui d'une autre fiche conducteur.");
+            }
+            driverId = jdbc.queryForObject("""
+                    INSERT INTO driver(staff_number, full_name, phone, email, org_unit_id) VALUES (:s, :n, :p, :e, :o) RETURNING id""",
+                    new MapSqlParameterSource("s", number).addValue("n", u.get("display_name")).addValue("p", u.get("phone"))
+                            .addValue("e", u.get("email")).addValue("o", userOrg), UUID.class);
+            audit.record(access.currentUser().userId(), "CREATE", "driver", driverId.toString(), "Fiche créée à partir du compte", null,
+                    Map.of("staffNumber", number, "userId", userId.toString()));
+            created = true;
+        }
+        linkDriver(userId, driverId);
+        Integer hasRole = jdbc.queryForObject("""
+                SELECT count(*) FROM user_role_grant WHERE user_id = :u AND role_code = 'DRIVER' AND revoked_at IS NULL
+                   AND (valid_until IS NULL OR valid_until > now())""", new MapSqlParameterSource("u", userId), Integer.class);
+        if ((hasRole == null || hasRole == 0) && !access.currentUser().userId().equals(userId)) {
+            grant(userId, new GrantRequest("DRIVER", userOrg, null, false), "Fiche conducteur liée au compte");
+        }
+        Map<String, Object> d = jdbc.queryForMap("SELECT staff_number, full_name FROM driver WHERE id = :d", new MapSqlParameterSource("d", driverId));
+        return new DriverLink(driverId, (String) d.get("staff_number"), (String) d.get("full_name"), created);
+    }
+
+    /** Détache la fiche conducteur d'un compte (erreur de rattachement) ; refusé tant qu'une mission est autorisée ou en cours. */
+    @Transactional(noRollbackFor = AccessDeniedException.class)
+    public void detachDriver(UUID userId, String reason) {
+        access.require("admin:users", orgOf(userId), "app_user", userId.toString());
+        List<UUID> d = jdbc.queryForList("SELECT id FROM driver WHERE user_id = :u", new MapSqlParameterSource("u", userId), UUID.class);
+        if (d.isEmpty()) throw new IllegalArgumentException("Ce compte n'est lié à aucune fiche conducteur.");
+        Integer open = jdbc.queryForObject("SELECT count(*) FROM mission WHERE driver_id = :d AND status IN ('AUTHORIZED','ACTIVE')",
+                new MapSqlParameterSource("d", d.get(0)), Integer.class);
+        if (open != null && open > 0) throw new IllegalArgumentException("Une mission autorisée ou en cours est confiée à ce conducteur : clôturez-la ou annulez-la d'abord.");
+        jdbc.update("UPDATE driver SET user_id = NULL, version = version + 1 WHERE id = :d", new MapSqlParameterSource("d", d.get(0)));
+        audit.record(access.currentUser().userId(), "UNLINK_DRIVER", "app_user", userId.toString(), reason, null, Map.of("driverId", d.get(0).toString()));
     }
 
     private void linkDriver(UUID userId, UUID driverId) {

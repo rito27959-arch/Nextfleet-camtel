@@ -114,12 +114,20 @@ public final class DriversView extends ScrollPane {
         VBox rows = new VBox(10,
                 row(Icons.CAR, "Véhicule affecté", d.assignedVehicle() == null ? "Aucun" : d.assignedVehicle(), null),
                 row(Icons.PHONE, "Téléphone", d.phone(), null),
-                row(Icons.ID_CARD, "Permis " + String.join(", ", d.licenseCategories()), d.licenseExpiresOn().format(f),
+                d.licenseExpiresOn() == null
+                        ? row(Icons.ID_CARD, "Permis", "Non renseigné", null)
+                        : row(Icons.ID_CARD, "Permis " + String.join(", ", d.licenseCategories()), d.licenseExpiresOn().format(f),
                         Ui.dueChip(due(DueKind.PERMIS, d, d.licenseExpiresOn(), today))),
                 d.idCardExpiresOn() == null
                         ? row(Icons.SHIELD, "Carte d'identité", "Non renseignée", null)
                         : row(Icons.SHIELD, "Carte d'identité", d.idCardExpiresOn().format(f),
                         Ui.dueChip(due(DueKind.CNI, d, d.idCardExpiresOn(), today))));
+        if (!gateway.isDemo()) {
+            // compte lié : condition pour recevoir une mission (le conducteur la démarre sur son téléphone)
+            rows.getChildren().add(d.userLogin() != null
+                    ? row(Icons.LOCK, "Compte NexFleet", d.userLogin(), null)
+                    : row(Icons.LOCK, "Compte NexFleet", "Aucun : ne peut pas recevoir de mission", Views.pill("Sans compte", "warning")));
+        }
         VBox card = new VBox(14, top, Ui.divider(), rows);
         card.getStyleClass().addAll("card", "driver-card");
         card.setAccessibleText("Conducteur " + d.fullName() + ", matricule " + d.staffNumber());

@@ -215,7 +215,8 @@ public interface FleetGateway {
     }
 
     default java.util.List<Prod.DriverRef> driverRefs() {
-        return drivers("").stream().map(d -> new Prod.DriverRef(d.id(), d.fullName(), d.staffNumber())).toList();
+        return drivers("").stream().map(d -> new Prod.DriverRef(d.id(), d.fullName(), d.staffNumber(),
+                isDemo() ? null : d.userLogin() != null)).toList();
     }
 
     default Models.Driver createDriver(Prod.DriverDraft draft) {
@@ -351,6 +352,15 @@ public interface FleetGateway {
     /** Renvoie le nouveau mot de passe provisoire (affiché une seule fois). */
     default String resetPassword(String userId, String reason) {
         throw notYet("La réinitialisation de mot de passe");
+    }
+
+    /** Rattache un compte à une fiche conducteur : celle indiquée, celle du matricule, ou une fiche créée à partir du compte. */
+    default Prod.DriverLink attachDriver(String userId, UUID driverId, String staffNumber) {
+        throw notYet("Le rattachement à une fiche conducteur");
+    }
+
+    default void detachDriver(String userId, String reason) {
+        throw notYet("Le détachement de la fiche conducteur");
     }
 
     default void setAccountStatus(String userId, boolean active, String reason) {

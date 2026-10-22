@@ -61,12 +61,20 @@ public final class Prod {
     public record MissionDraft(UUID vehicleId, UUID driverId, String purpose, String origin, String destination,
                                Instant plannedStart, Instant plannedEnd) { }
 
-    public record DriverRef(UUID id, String fullName, String staffNumber) {
+    /** hasAccount : la fiche est liée à un compte (seul un conducteur avec compte peut démarrer une mission) ; null = inconnu. */
+    public record DriverRef(UUID id, String fullName, String staffNumber, Boolean hasAccount) {
+        public DriverRef(UUID id, String fullName, String staffNumber) {
+            this(id, fullName, staffNumber, null);
+        }
+
         @Override
         public String toString() {
-            return fullName + " · " + staffNumber;
+            return fullName + " · " + staffNumber + (Boolean.FALSE.equals(hasAccount) ? " · sans compte" : "");
         }
     }
+
+    /** Fiche conducteur rattachée à un compte. */
+    public record DriverLink(UUID driverId, String staffNumber, String fullName, boolean created) { }
 
     // ---------------------------------------------------------------- atelier
 

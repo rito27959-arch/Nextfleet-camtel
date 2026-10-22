@@ -51,7 +51,21 @@ public class AdminController {
         return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
                 .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(accounts.create(c.login(), c.displayName(), c.email(), c.phone(), c.orgUnitId(), c.roles(),
-                        c.driverId() != null ? c.driverId() : accounts.driverByStaffNumber(c.driverStaffNumber(), c.orgUnitId())));
+                        c.driverId(), c.driverStaffNumber()));
+    }
+
+    public record DriverLinkRequest(UUID driverId, @Size(max = 30) String staffNumber) { }
+
+    /** Rattache un compte existant à une fiche conducteur (existante ou créée à partir du compte). */
+    @PostMapping("/users/{id}/driver")
+    public AccountService.DriverLink attachDriver(@PathVariable UUID id, @RequestBody(required = false) DriverLinkRequest r) {
+        return accounts.attachDriver(id, r == null ? null : r.driverId(), r == null ? null : r.staffNumber());
+    }
+
+    @PostMapping("/users/{id}/driver/unlink")
+    public org.springframework.http.ResponseEntity<Void> detachDriver(@PathVariable UUID id, @jakarta.validation.Valid @RequestBody ReasonRequest r) {
+        accounts.detachDriver(id, r.reason());
+        return org.springframework.http.ResponseEntity.noContent().build();
     }
 
     @GetMapping("/users/{id}/grants")

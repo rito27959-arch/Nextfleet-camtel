@@ -71,9 +71,16 @@ public final class Models {
                                 List<Vehicle> recentVehicles, Instant refreshedAt) { }
 
     /** Conducteur (NF-12 ; champs repris de l'ancien NexFleet : matricule, permis, CNI). */
+    /** userLogin : compte NexFleet lié à la fiche (null = aucun, ou inconnu en démonstration). */
     public record Driver(UUID id, String fullName, String staffNumber, String phone, String licenseNumber,
                          List<String> licenseCategories, LocalDate licenseExpiresOn, LocalDate idCardExpiresOn,
-                         String assignedVehicle, String site) {
+                         String assignedVehicle, String site, String userLogin) {
+        public Driver(UUID id, String fullName, String staffNumber, String phone, String licenseNumber,
+                      List<String> licenseCategories, LocalDate licenseExpiresOn, LocalDate idCardExpiresOn,
+                      String assignedVehicle, String site) {
+            this(id, fullName, staffNumber, phone, licenseNumber, licenseCategories, licenseExpiresOn, idCardExpiresOn, assignedVehicle, site, null);
+        }
+
         public String initials() {
             String[] p = fullName.trim().split("\\s+");
             String a = p.length > 0 && !p[0].isEmpty() ? p[0].substring(0, 1) : "";

@@ -48,8 +48,13 @@ public final class Ops {
 
     public record Grant(Role role, String scope, LocalDate until, boolean delegation) { }
 
+    /** driverStaffNumber : matricule de la fiche conducteur liée au compte (null si aucune). */
     public record UserAccount(String id, String login, String displayName, String orgUnit, List<Grant> grants,
-                              String status, Instant lastSeen) { }
+                              String status, Instant lastSeen, String driverStaffNumber) {
+        public UserAccount(String id, String login, String displayName, String orgUnit, List<Grant> grants, String status, Instant lastSeen) {
+            this(id, login, displayName, orgUnit, grants, status, lastSeen, null);
+        }
+    }
 
     /** Événement du journal chaîné (SHA-256 du précédent + contenu) ; jamais le contenu d'un message. */
     public record AuditEntry(long seq, Instant at, String actor, String action, String object, String detail, String hash,

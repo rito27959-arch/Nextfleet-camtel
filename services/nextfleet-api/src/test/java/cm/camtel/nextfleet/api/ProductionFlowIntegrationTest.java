@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -355,6 +356,44 @@ class ProductionFlowIntegrationTest {
         assertTrue(json(call(get("/api/v1/notifications"), driver, null)).toString().contains("Mission autorisée"));
         call(post("/api/v1/missions/" + mission + "/cancel"), chef, "{\"reason\":\"Site fermé ce jour-là\"}")
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
+
+        // ------------------------------------------------------------ comptes ↔ fiches conducteur
+        // une fiche sans compte ne peut pas recevoir de mission (personne ne pourrait la démarrer)
+        String orphan = json(call(post("/api/v1/drivers"), mgr, """
+                {"staffNumber":"MAT-3000","fullName":"Awa Sans Compte","orgUnitId":"%s"}""".formatted(org)).andExpect(status().isCreated()))
+                .get("id").asText();
+        Instant later = Instant.now().plus(2, ChronoUnit.DAYS);
+        String missionBody = """
+                {"vehicleId":"%s","driverId":"%%s","purpose":"Tournée BTS","origin":"Yaoundé","destination":"Mbalmayo",
+                 "plannedStart":"%s","plannedEnd":"%s"}""".formatted(veh, later, later.plus(5, ChronoUnit.HOURS));
+        call(post("/api/v1/missions"), mgr, missionBody.formatted(orphan)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(containsString("pas de compte")));
+        // compte déjà créé SANS fiche : rattaché après coup, fiche créée à partir du compte, rôle Conducteur ajouté
+        String lateId = json(call(post("/api/v1/admin/users"), admin, """
+                {"login":"paul.ndi","displayName":"Paul Ndi","phone":"+237 6 55 44 33 22","orgUnitId":"%s","roles":[]}""".formatted(org))
+                .andExpect(status().isCreated())).get("user").get("id").asText();
+        call(post("/api/v1/admin/users/" + lateId + "/driver"), admin, "{\"staffNumber\":\"MAT-3001\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.created").value(true)).andExpect(jsonPath("$.staffNumber").value("MAT-3001"))
+                .andExpect(jsonPath("$.fullName").value("Paul Ndi"));
+        call(post("/api/v1/admin/users/" + lateId + "/driver"), admin, "{}").andExpect(status().isBadRequest());   // déjà lié
+        assertTrue(json(call(get("/api/v1/admin/users/" + lateId + "/grants"), admin, null)).toString().contains("DRIVER"));
+        JsonNode paul = json(call(get("/api/v1/drivers?q=ndi"), mgr, null)).get(0);
+        assertEquals("paul.ndi", paul.get("userLogin").asText());
+        assertEquals("+237 6 55 44 33 22", paul.get("phone").asText());
+        call(post("/api/v1/missions"), mgr, missionBody.formatted(paul.get("id").asText())).andExpect(status().isCreated());
+        // la fiche existante sans compte est rattachée à un nouveau compte : elle devient assignable
+        String awaId = json(call(post("/api/v1/admin/users"), admin, """
+                {"login":"awa.sanscompte","displayName":"Awa","orgUnitId":"%s","driverId":"%s","roles":[]}""".formatted(org, orphan))
+                .andExpect(status().isCreated())).get("user").get("id").asText();
+        call(post("/api/v1/missions"), mgr, missionBody.formatted(orphan)).andExpect(status().isCreated());
+        // un compte créé avec le rôle Conducteur reçoit sa fiche d'office
+        call(post("/api/v1/admin/users"), admin, """
+                {"login":"jean.essomba","displayName":"Jean Essomba","orgUnitId":"%s","driverStaffNumber":"MAT-3002","roles":[{"role":"DRIVER"}]}"""
+                .formatted(org)).andExpect(status().isCreated());
+        assertEquals("jean.essomba", json(call(get("/api/v1/drivers?q=MAT-3002"), mgr, null)).get(0).get("userLogin").asText());
+        // détachement motivé (erreur de rattachement), possible tant qu'aucune mission n'est autorisée ou en cours
+        call(post("/api/v1/admin/users/" + awaId + "/driver/unlink"), admin, "{\"reason\":\"Mauvaise personne rattachée\"}")
+                .andExpect(status().isNoContent());
 
         // ------------------------------------------------------------ écarts, journal, réinitialisation
         call(get("/api/v1/anomalies"), ctl, null).andExpect(status().isOk());

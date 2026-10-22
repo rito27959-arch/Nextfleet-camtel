@@ -74,6 +74,11 @@ final class FormSheet extends ScrollPane {
         return this;
     }
 
+    /** Note explicative sous les champs déjà ajoutés. */
+    FormSheet footer(String text) {
+        return intro(text);
+    }
+
     FormSheet field(String label, Node control) {
         Label l = Ui.label(label, "field-label");
         l.setLabelFor(control);

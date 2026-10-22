@@ -204,7 +204,8 @@ public final class HttpFleetGateway implements FleetGateway {
         n.path("licenseCategories").forEach(c -> cats.add(c.asText()));
         return new Models.Driver(UUID.fromString(n.path("id").asText()), n.path("fullName").asText(), n.path("staffNumber").asText(),
                 n.path("phone").asText(null), n.path("licenseNumber").asText(null), cats, date(n, "licenseExpiresOn"),
-                date(n, "idCardExpiresOn"), n.path("assignedVehicle").asText(null), n.path("orgUnitName").asText(null));
+                date(n, "idCardExpiresOn"), n.path("assignedVehicle").asText(null), n.path("orgUnitName").asText(null),
+                n.path("userLogin").asText(null));
     }
 
     @Override
@@ -539,9 +540,24 @@ public final class HttpFleetGateway implements FleetGateway {
             n.path("roles").forEach(r -> cm.camtel.nextfleet.domain.security.Role.ofCode(r.asText())
                     .ifPresent(role -> grants.add(new Ops.Grant(role, n.path("orgUnit").asText(""), null, false))));
             out.add(new Ops.UserAccount(n.path("id").asText(), n.path("login").asText(), n.path("displayName").asText(),
-                    n.path("orgUnit").asText(""), grants, n.path("status").asText(), null));
+                    n.path("orgUnit").asText(""), grants, n.path("status").asText(), null, n.path("driverStaffNumber").asText(null)));
         });
         return out;
+    }
+
+    @Override
+    public Prod.DriverLink attachDriver(String userId, UUID driverId, String staffNumber) {
+        ObjectNode b = json.createObjectNode();
+        if (driverId != null) b.put("driverId", driverId.toString());
+        if (staffNumber != null && !staffNumber.isBlank()) b.put("staffNumber", staffNumber.strip());
+        JsonNode r = send("POST", "/api/v1/admin/users/" + userId + "/driver", b, true);
+        return new Prod.DriverLink(UUID.fromString(r.path("driverId").asText()), r.path("staffNumber").asText(),
+                r.path("fullName").asText(), r.path("created").asBoolean());
+    }
+
+    @Override
+    public void detachDriver(String userId, String reason) {
+        send("POST", "/api/v1/admin/users/" + userId + "/driver/unlink", json.createObjectNode().put("reason", reason), true);
     }
 
     private volatile long lastChainBreak = -1;

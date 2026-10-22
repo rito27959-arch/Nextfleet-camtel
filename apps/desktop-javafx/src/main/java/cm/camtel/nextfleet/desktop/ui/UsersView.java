@@ -163,11 +163,13 @@ final class UsersView extends ScrollPane {
             var phone = FormSheet.text("Facultatif");
             var org = FormSheet.combo(units);
             var role = FormSheet.combo(roles);
-            var staff = FormSheet.text("Matricule de la fiche conducteur (rôle Agent ou conducteur)");
+            var staff = FormSheet.text("Matricule (facultatif) : fiche existante ou créée avec le compte");
             FormSheet f = new FormSheet("Nouveau compte", "Créer", shell::closeSheet)
                     .intro("Un mot de passe provisoire est généré ; il ne s'affiche qu'une fois. La personne le remplace à sa première connexion.")
                     .row("Identifiant *", login, "Nom affiché *", name).row("E-mail", email, "Téléphone", phone)
-                    .field("Entité *", org).field("Rôle *", role).field("Fiche conducteur", staff);
+                    .field("Entité *", org).field("Rôle *", role).field("Matricule conducteur", staff)
+                    .footer("Rôle Conducteur : la fiche conducteur est créée avec le compte (ou rattachée si ce matricule existe déjà). "
+                            + "Il pourra recevoir des missions immédiatement.");
             f.onSubmit(() -> shell.gateway().createAccount(new cm.camtel.nextfleet.desktop.data.Prod.AccountDraft(FormSheet.req(login, "Identifiant"),
                     FormSheet.req(name, "Nom affiché"), FormSheet.opt(email), FormSheet.opt(phone), FormSheet.pick(org, "Entité").id(),
                     FormSheet.pick(role, "Rôle").code(), FormSheet.opt(staff))), (cm.camtel.nextfleet.desktop.data.Prod.CreatedAccount c) -> {
@@ -221,7 +223,27 @@ final class UsersView extends ScrollPane {
                     () -> statusSheet(u, !active));
             for (Button b : List.of(grant, reset, status)) b.setMaxWidth(Double.MAX_VALUE);
             box.getChildren().addAll(bar, sub, Ui.insetGroup("Rôles et périmètres", rows.isEmpty() ? List.of(Ui.listRow(null, "Aucun rôle", null, null, null)) : rows,
-                    "Un rôle retiré prend effet immédiatement, y compris sur les sessions ouvertes."), grant, reset, status);
+                    "Un rôle retiré prend effet immédiatement, y compris sur les sessions ouvertes."));
+            // fiche conducteur : un compte sans fiche ne peut recevoir aucune mission
+            Node driverRow;
+            List<Button> driverActions = new ArrayList<>();
+            if (u.driverStaffNumber() != null) {
+                Button detach = new Button("Détacher");
+                detach.getStyleClass().addAll("btn-plain", "destructive");
+                detach.setOnAction(e -> detachSheet(u));
+                driverRow = Views.row(Ui.symbolTile(Icons.USER, "tile-green"), "Matricule " + u.driverStaffNumber(),
+                        "Peut recevoir et démarrer des missions", detach, null);
+            } else {
+                driverRow = Views.row(Ui.symbolTile(Icons.USER, "tile-orange"), "Aucune fiche conducteur",
+                        "Ce compte ne peut pas recevoir de mission", null, null);
+                driverActions.add(Views.sheetAction("Créer sa fiche conducteur", "btn-tinted", () -> attachSheet(u, false)));
+                driverActions.add(Views.sheetAction("Lier à une fiche existante", "btn-tinted", () -> attachSheet(u, true)));
+            }
+            box.getChildren().add(Ui.insetGroup("Fiche conducteur", List.of(driverRow),
+                    u.driverStaffNumber() != null ? null : "La fiche reprend le nom, le téléphone et l'entité du compte : rien n'est à inventer."));
+            for (Button b : driverActions) b.setMaxWidth(Double.MAX_VALUE);
+            box.getChildren().addAll(driverActions);
+            box.getChildren().addAll(grant, reset, status);
             ScrollPane sp = new ScrollPane(box);
             sp.setFitToWidth(true);
             shell.openSheet(sp, 460);
@@ -263,6 +285,65 @@ final class UsersView extends ScrollPane {
         }, ok -> {
             shell.closeSheet();
             shell.toasts().success("Rôle retiré", g.roleLabel() + " · " + u.displayName());
+            reload();
+        });
+        shell.openSheet(f, 440);
+    }
+
+    /**
+     * Rattache le compte à une fiche conducteur. « Créer » : fiche faite à partir du compte, seul le matricule CAMTEL
+     * est demandé (facultatif). « Lier » : choix parmi les fiches existantes sans compte.
+     */
+    private void attachSheet(UserAccount u, boolean existing) {
+        if (!existing) {
+            var staff = FormSheet.text("Matricule CAMTEL (facultatif)");
+            FormSheet f = new FormSheet("Fiche conducteur", "Créer", shell::closeSheet)
+                    .intro("La fiche de " + u.displayName() + " reprend le nom, le téléphone, l'e-mail et l'entité du compte. "
+                            + "Le rôle Conducteur est ajouté s'il manque. Permis et pièce d'identité se complètent ensuite dans Conducteurs.")
+                    .field("Matricule", staff)
+                    .footer("Sans matricule, l'identifiant du compte sert de matricule provisoire (modifiable ensuite).");
+            f.onSubmit(() -> shell.gateway().attachDriver(u.id(), null, FormSheet.opt(staff)), (cm.camtel.nextfleet.desktop.data.Prod.DriverLink l) -> {
+                shell.closeSheet();
+                shell.toasts().success("Fiche conducteur créée", l.fullName() + " · matricule " + l.staffNumber() + " : peut recevoir des missions.");
+                reload();
+            });
+            shell.openSheet(f, 460);
+            return;
+        }
+        Ui.async(() -> shell.gateway().drivers(""), drivers -> {
+            List<cm.camtel.nextfleet.desktop.data.Prod.DriverRef> free = drivers.stream().filter(d -> d.userLogin() == null)
+                    .map(d -> new cm.camtel.nextfleet.desktop.data.Prod.DriverRef(d.id(), d.fullName(), d.staffNumber(), false)).toList();
+            if (free.isEmpty()) {
+                shell.toasts().info("Aucune fiche libre", "Toutes les fiches conducteur ont déjà un compte. Créez plutôt la fiche à partir du compte.");
+                return;
+            }
+            var pick = FormSheet.combo(free);
+            FormSheet f = new FormSheet("Lier à une fiche", "Lier", shell::closeSheet)
+                    .intro("Fiches conducteur existantes sans compte. Une fois liée, " + u.displayName() + " verra ses missions sur son téléphone.")
+                    .field("Fiche *", pick);
+            f.onSubmit(() -> shell.gateway().attachDriver(u.id(), FormSheet.pick(pick, "Fiche").id(), null),
+                    (cm.camtel.nextfleet.desktop.data.Prod.DriverLink l) -> {
+                        shell.closeSheet();
+                        shell.toasts().success("Fiche liée", l.fullName() + " · " + u.login());
+                        reload();
+                    });
+            shell.openSheet(f, 460);
+        }, err -> shell.toasts().info("Fiches inaccessibles", err.getMessage()));
+    }
+
+    private void detachSheet(UserAccount u) {
+        var reason = FormSheet.area("Ex. Mauvaise personne rattachée");
+        FormSheet f = new FormSheet("Détacher la fiche", "Détacher", shell::closeSheet)
+                .intro("La fiche " + u.driverStaffNumber() + " est conservée mais ne sera plus liée à " + u.displayName()
+                        + ". Impossible si une mission autorisée ou en cours lui est confiée.")
+                .field("Motif *", reason);
+        f.onSubmit(() -> {
+            if (reason.getText().strip().length() < 5) throw new IllegalArgumentException("Motif : 5 caractères au moins.");
+            shell.gateway().detachDriver(u.id(), reason.getText().strip());
+            return true;
+        }, ok -> {
+            shell.closeSheet();
+            shell.toasts().success("Fiche détachée", u.displayName());
             reload();
         });
         shell.openSheet(f, 440);

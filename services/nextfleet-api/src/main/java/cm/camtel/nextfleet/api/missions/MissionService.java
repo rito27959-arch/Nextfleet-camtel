@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -107,6 +108,14 @@ public class MissionService {
         access.require("mission:manage", org, "mission", "new");
         if (c.plannedEnd() == null || c.plannedStart() == null || !c.plannedEnd().isAfter(c.plannedStart())) {
             throw new IllegalArgumentException("La fin prévue doit suivre le début prévu.");
+        }
+        List<Map<String, Object>> drv = jdbc.queryForList("SELECT user_id, full_name, archived_at FROM driver WHERE id = :d",
+                new MapSqlParameterSource("d", c.driverId()));
+        if (drv.isEmpty() || drv.get(0).get("archived_at") != null) throw new IllegalArgumentException("Conducteur introuvable ou archivé.");
+        if (drv.get(0).get("user_id") == null) {
+            // sans compte, personne ne pourrait démarrer la mission sur son téléphone : refus explicite plutôt qu'une mission morte
+            throw new IllegalArgumentException("« " + drv.get(0).get("full_name") + " » n'a pas de compte NexFleet : il ne pourrait pas "
+                    + "démarrer la mission. Liez sa fiche à un compte (Comptes et rôles → le compte → Fiche conducteur).");
         }
         AuthenticatedUser u = access.currentUser();
         UUID id = UUID.randomUUID();
