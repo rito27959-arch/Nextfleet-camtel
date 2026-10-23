@@ -17,6 +17,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   APP_VERSION: 0.7.1
 
@@ -42,6 +46,7 @@ jobs:
   java:
     name: Maven — noyau, passerelles, API (Testcontainers), bureau
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     services:
       pg:
         image: postgis/postgis:16-3.4
@@ -346,7 +351,7 @@ jobs:
 
   publication:
     name: Publication (étiquette vX.Y.Z)
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publier)
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publier) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]'))
     needs: [base-de-donnees, java, android, bureau-paquets]
     runs-on: ubuntu-24.04
     permissions:

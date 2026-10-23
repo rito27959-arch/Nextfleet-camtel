@@ -38,3 +38,7 @@ Le serveur vérifie le rôle Conducteur actif, son périmètre, le statut du com
 ## Tests
 
 `python3 -m unittest discover -s tools/tests -v` vérifie les sources intactes et l'archive complète. Avec `NF_LEGACY_TEST_DSN` sur une base de test migrée, la suite vérifie l'import PostgreSQL, les totaux, le réimport et l'annulation sur source modifiée. La CI l'exécute avec des données synthétiques uniquement. `ProductionFlowIntegrationTest` vérifie le parcours gestionnaire → compte existant → mission visible par le conducteur ainsi que les refus d'accès.
+
+## Paquets et publication
+
+La CI construit l'APK, le MSI, le ZIP portable Windows et le DEB. Après une hausse de version, un commit sur `main` portant le marqueur `[release]` publie ces paquets uniquement si les tests et constructions requis réussissent. Le lancement manuel avec `publier` et les tags `v*` restent disponibles. Les images serveur sont publiées séparément ; Railway doit utiliser la nouvelle image et passer ses contrôles de santé avant l'import.

@@ -58,7 +58,8 @@ class ProductionFlowIntegrationTest {
     @Container
     static PostgreSQLContainer<?> pg = new PostgreSQLContainer<>(
             DockerImageName.parse("postgis/postgis:16-3.4").asCompatibleSubstituteFor("postgres"))
-            .withInitScript("test-extensions.sql");
+            .withInitScript("test-extensions.sql")
+            .withCommand("postgres", "-c", "statement_timeout=30000", "-c", "lock_timeout=5000");
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry r) {
@@ -377,6 +378,21 @@ class ProductionFlowIntegrationTest {
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM driver WHERE user_id = ?::uuid", Integer.class, existingId));
         String existingToken = firstLogin("conducteur.existant", existingAccount.get("temporaryPassword").asText());
         call(post("/api/v1/drivers/from-account"), existingToken, linkBody).andExpect(status().isForbidden());
+        String existingSheet = json(call(post("/api/v1/drivers"), mgr, """
+                {"staffNumber":"TEST-LINK-071","fullName":"Identité de la fiche","orgUnitId":"%s"}"""
+                .formatted(org)).andExpect(status().isCreated())).get("id").asText();
+        call(post("/api/v1/drivers/from-account"), mgr, "{\"userId\":\"" + existingId + "\",\"driverId\":\"" + existingSheet + "\"}")
+                .andExpect(status().isBadRequest());
+        String sheetAccount = json(call(post("/api/v1/admin/users"), admin, """
+                {"login":"compte.fiche","displayName":"Identité du compte fiche","orgUnitId":"%s","roles":[]}"""
+                .formatted(org)).andExpect(status().isCreated())).get("user").get("id").asText();
+        call(post("/api/v1/admin/users/" + sheetAccount + "/grants"), admin, "{\"role\":\"DRIVER\"}").andExpect(status().isCreated());
+        String sheetBody = "{\"userId\":\"" + sheetAccount + "\",\"driverId\":\"" + existingSheet + "\"}";
+        call(post("/api/v1/drivers/from-account"), mgr, sheetBody).andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(existingSheet)).andExpect(jsonPath("$.fullName").value("Identité de la fiche"));
+        jdbc.update("UPDATE app_user SET status='SUSPENDED' WHERE id=?::uuid", sheetAccount);
+        call(post("/api/v1/drivers/from-account"), mgr, sheetBody).andExpect(status().isBadRequest());
+        assertFalse(json(call(get("/api/v1/drivers/accounts"), mgr, null)).toString().contains(sheetAccount));
         String outside = json(call(post("/api/v1/admin/org-units"), admin, "{\"code\":\"OUTSIDE\",\"name\":\"Autre périmètre\"}")
                 .andExpect(status().isCreated())).get("id").asText();
         String outsideId = json(call(post("/api/v1/admin/users"), admin, """

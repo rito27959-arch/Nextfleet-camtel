@@ -133,7 +133,9 @@ public class DriverService {
     @Transactional(noRollbackFor = AccessDeniedException.class)
     public DriverView fromAccount(UUID userId, UUID driverId) {
         var p = new MapSqlParameterSource("u", userId);
-        var users = jdbc.queryForList("SELECT * FROM app_user WHERE id = :u FOR UPDATE", p);
+        // Serialise linking without blocking the audit FK's KEY SHARE lock when the caller is this account.
+        // FOR UPDATE here would deadlock a self-request denied by recordDenied's autonomous transaction.
+        var users = jdbc.queryForList("SELECT * FROM app_user WHERE id = :u FOR NO KEY UPDATE", p);
         if (users.isEmpty()) throw new NotFoundException("Compte introuvable.");
         var user = users.get(0);
         UUID org = (UUID) user.get("org_unit_id");
