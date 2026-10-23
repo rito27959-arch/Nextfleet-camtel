@@ -223,6 +223,14 @@ public interface FleetGateway {
         throw notYet("La création de conducteur");
     }
 
+    default java.util.List<Prod.DriverAccount> driverAccounts() { return java.util.List.of(); }
+
+    default java.util.List<Prod.LegacyOperation> legacyOperations(int year) { return java.util.List.of(); }
+
+    default Models.Driver driverFromAccount(UUID userId, UUID driverId) {
+        throw notYet("Le rattachement d'un compte conducteur");
+    }
+
     default java.util.List<Prod.VehicleDocument> vehicleDocuments(UUID vehicleId) {
         throw notYet("Les documents du véhicule");
     }

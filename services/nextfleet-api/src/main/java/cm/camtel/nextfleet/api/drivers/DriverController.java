@@ -39,6 +39,8 @@ public class DriverController {
 
     public record ReasonRequest(@NotBlank @Size(min = 5, max = 500) String reason) { }
 
+    public record FromAccountRequest(@NotNull UUID userId, UUID driverId) { }
+
     private final DriverService service;
 
     public DriverController(DriverService service) {
@@ -55,6 +57,16 @@ public class DriverController {
     public ResponseEntity<DriverService.DriverView> get(@PathVariable UUID id) {
         DriverService.DriverView d = service.get(id);
         return ResponseEntity.ok().eTag("\"" + d.version() + "\"").body(d);
+    }
+
+    @GetMapping("/api/v1/drivers/accounts")
+    public List<DriverService.DriverAccount> accounts() {
+        return service.accounts();
+    }
+
+    @PostMapping("/api/v1/drivers/from-account")
+    public DriverService.DriverView fromAccount(@Valid @RequestBody FromAccountRequest request) {
+        return service.fromAccount(request.userId(), request.driverId());
     }
 
     @PostMapping("/api/v1/drivers")

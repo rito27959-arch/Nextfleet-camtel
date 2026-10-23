@@ -57,6 +57,7 @@ final class CostsView extends ScrollPane {
         });
         List<Node> actions = new ArrayList<>();
         actions.add(years);
+        if (!shell.gateway().isDemo()) actions.add(Views.tinted("Historique importé", Icons.DOWNLOAD, this::legacySheet));
         if (shell.session().can(Permission.VEHICLE_WRITE)) actions.add(Views.tinted("Importer un budget", Icons.DOWNLOAD, this::importSheet));
         return Views.header("Coûts", "Dépenses réelles de l'exercice comparées au budget. Montants en francs CFA.", actions.toArray(Node[]::new));
     }
@@ -80,6 +81,24 @@ final class CostsView extends ScrollPane {
         }
         col.getChildren().setAll(nodes);
         Motion.stagger(col.getChildren());
+    }
+
+    private void legacySheet() {
+        Ui.async(() -> shell.gateway().legacyOperations(year), rows -> {
+            FormSheet f = new FormSheet("Historique importé · " + year, "Fermer", shell::closeSheet)
+                    .intro("Ces dépenses proviennent de l'ancien parc et sont incluses dans les totaux. Les justificatifs et visas absents n'ont pas été reconstitués.");
+            for (var row : rows) {
+                Label detail = Ui.label((row.registration() == null ? "Dépense générale" : row.registration())
+                        + " · " + row.label() + " · " + Ui.compactXaf(row.amountXaf())
+                        + (row.provider() == null ? "" : "\n" + row.provider())
+                        + (row.notes() == null || row.notes().isBlank() ? "" : "\n" + row.notes()), "body");
+                detail.setWrapText(true);
+                f.field(row.occurredOn().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")), detail);
+            }
+            if (rows.isEmpty()) f.intro("Aucune opération historique importée pour cet exercice.");
+            f.onSubmit(() -> true, done -> shell.closeSheet());
+            shell.openSheet(f, 600);
+        }, err -> shell.toasts().info("Lecture impossible", err.getMessage()));
     }
 
     private Node chart(Prod.CostSummary c) {

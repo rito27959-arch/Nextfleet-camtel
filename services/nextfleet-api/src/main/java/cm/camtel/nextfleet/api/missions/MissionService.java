@@ -66,9 +66,12 @@ public class MissionService {
     private final GpsProperties gps;
     private final Clock clock;
     private final cm.camtel.nextfleet.api.live.TraccarClient traccar;
+    private final cm.camtel.nextfleet.api.drivers.DriverService drivers;
 
     public MissionService(NamedParameterJdbcTemplate jdbc, AccessService access, AuditService audit, GpsProperties gps, Clock clock,
-                          cm.camtel.nextfleet.api.live.TraccarClient traccar) {
+                          cm.camtel.nextfleet.api.live.TraccarClient traccar,
+                          cm.camtel.nextfleet.api.drivers.DriverService drivers) {
+        this.drivers = drivers;
         this.traccar = traccar;
         this.jdbc = jdbc;
         this.access = access;
@@ -106,6 +109,7 @@ public class MissionService {
         UUID org = jdbc.queryForObject("SELECT org_unit_id FROM vehicle WHERE id = :v AND archived_at IS NULL",
                 new MapSqlParameterSource("v", c.vehicleId()), UUID.class);
         access.require("mission:manage", org, "mission", "new");
+        drivers.requireAssignable(c.driverId());
         if (c.plannedEnd() == null || c.plannedStart() == null || !c.plannedEnd().isAfter(c.plannedStart())) {
             throw new IllegalArgumentException("La fin prévue doit suivre le début prévu.");
         }
