@@ -29,6 +29,11 @@ public class CostController {
         return service.budget(year == null ? CostService.currentYear() : year);
     }
 
+    @GetMapping("/api/v1/costs/legacy")
+    public List<CostService.LegacyOperation> legacy(@RequestParam(required = false) Integer year) {
+        return service.legacyOperations(year == null ? CostService.currentYear() : year);
+    }
+
     /** Corps : le texte CSV (UTF-8). Réimport sans doublon. */
     @PostMapping(value = "/api/v1/budget-lines/import", consumes = {MediaType.TEXT_PLAIN_VALUE, "text/csv"})
     public CostService.ImportResult importBudget(@RequestParam int year, @RequestParam UUID orgUnitId,

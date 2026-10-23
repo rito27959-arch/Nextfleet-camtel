@@ -33,6 +33,22 @@ public class DriverService {
 
     public record LicenseInput(String licenseNumber, List<String> categories, LocalDate issuedOn, LocalDate expiresOn, UUID fileId) { }
 
+    public record DriverAccount(UUID id, String login, String displayName, String staffNumber,
+                                UUID orgUnitId, String orgUnitName, UUID driverId) { }
+
+    // A role on an ancestor covers the account's organisation; future/revoked grants never qualify.
+    private static final String ELIGIBLE_ACCOUNT = """
+            u.status = 'ACTIVE' AND EXISTS (
+                WITH RECURSIVE ancestors AS (
+                    SELECT id, parent_id FROM organisation_unit WHERE id = u.org_unit_id
+                    UNION ALL SELECT o.id, o.parent_id FROM organisation_unit o JOIN ancestors a ON o.id = a.parent_id
+                )
+                SELECT 1 FROM user_role_grant g WHERE g.user_id = u.id AND g.role_code = 'DRIVER'
+                  AND g.revoked_at IS NULL AND g.valid_from <= now()
+                  AND (g.valid_until IS NULL OR g.valid_until > now())
+                  AND (g.scope_org_id IS NULL OR g.scope_org_id IN (SELECT id FROM ancestors)))
+            """;
+
     private static final String SELECT = """
             SELECT d.id, d.staff_number, d.full_name, d.phone, d.email, d.org_unit_id, o.name AS org_name, d.id_card_number,
                    d.id_card_expires_on, l.license_number, l.categories, l.expires_on, av.vehicle_id, av.registration,
@@ -96,6 +112,71 @@ public class DriverService {
         DriverView v = find(id);
         audit.record(access.currentUser().userId(), "CREATE", "driver", id.toString(), null, null, v);
         return v;
+    }
+
+    @Transactional(readOnly = true)
+    public List<DriverAccount> accounts() {
+        List<UUID> scope = access.scopeFor("driver:write");
+        if (scope.isEmpty()) return List.of();
+        return jdbc.query("""
+                SELECT u.id, u.login, u.display_name, coalesce(nullif(u.hr_identifier, ''), u.login),
+                       u.org_unit_id, o.name, d.id
+                  FROM app_user u JOIN organisation_unit o ON o.id = u.org_unit_id
+                  LEFT JOIN driver d ON d.user_id = u.id
+                 WHERE u.org_unit_id IN (:s) AND (d.id IS NULL OR d.archived_at IS NULL) AND
+                """ + ELIGIBLE_ACCOUNT + " ORDER BY u.display_name, u.login",
+                Map.of("s", scope), (rs, i) -> new DriverAccount(rs.getObject(1, UUID.class), rs.getString(2),
+                        rs.getString(3), rs.getString(4), rs.getObject(5, UUID.class), rs.getString(6), rs.getObject(7, UUID.class)));
+    }
+
+    /** Fleet managers may link an already authorised driver account, but cannot grant roles or change its identity. */
+    @Transactional(noRollbackFor = AccessDeniedException.class)
+    public DriverView fromAccount(UUID userId, UUID driverId) {
+        var p = new MapSqlParameterSource("u", userId);
+        var users = jdbc.queryForList("SELECT * FROM app_user WHERE id = :u FOR UPDATE", p);
+        if (users.isEmpty()) throw new NotFoundException("Compte introuvable.");
+        var user = users.get(0);
+        UUID org = (UUID) user.get("org_unit_id");
+        access.require("driver:write", org, "driver-account", userId.toString());
+        if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM app_user u WHERE u.id = :u AND "
+                + ELIGIBLE_ACCOUNT + ")", p, Boolean.class))) {
+            throw new IllegalArgumentException("Choisissez un compte actif avec le rôle Conducteur dans son entité.");
+        }
+        var linked = jdbc.queryForList("SELECT id FROM driver WHERE user_id = :u", p, UUID.class);
+        if (!linked.isEmpty()) {
+            DriverView existing = find(linked.get(0));
+            access.require("driver:write", existing.orgUnitId(), "driver", existing.id().toString());
+            if (existing.archivedAt() != null) throw new IllegalArgumentException("La fiche liée à ce compte est archivée.");
+            if (driverId != null && !driverId.equals(existing.id()))
+                throw new IllegalArgumentException("Ce compte est déjà lié à un autre conducteur.");
+            return existing; // retry-safe, no duplicate identity or audit entry
+        }
+        DriverView before = null;
+        if (driverId == null) {
+            String staff = trim((String) user.get("hr_identifier"));
+            if (staff == null) staff = (String) user.get("login");
+            if (staff.length() > 30) throw new IllegalArgumentException("Renseignez le matricule RH du compte (30 caractères maximum).");
+            if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM driver WHERE lower(staff_number) = lower(:sn))",
+                    Map.of("sn", staff), Boolean.class)))
+                throw new IllegalArgumentException("Une fiche porte déjà ce matricule. Ouvrez cette fiche et choisissez « Lier un compte ».");
+            driverId = jdbc.queryForObject("""
+                    INSERT INTO driver(user_id, staff_number, full_name, phone, email, org_unit_id)
+                    SELECT id, :sn, display_name, phone, email, org_unit_id FROM app_user WHERE id = :u RETURNING id
+                    """, p.addValue("sn", staff), UUID.class);
+        } else {
+            p.addValue("d", driverId);
+            var rows = jdbc.queryForList("SELECT user_id FROM driver WHERE id = :d FOR UPDATE", p);
+            if (rows.isEmpty()) throw new NotFoundException("Conducteur introuvable.");
+            before = find(driverId);
+            access.require("driver:write", before.orgUnitId(), "driver", driverId.toString());
+            if (before.archivedAt() != null || !org.equals(before.orgUnitId()))
+                throw new IllegalArgumentException("Le compte et la fiche active doivent appartenir à la même entité.");
+            if (rows.get(0).get("user_id") != null) throw new IllegalArgumentException("Cette fiche possède déjà un compte.");
+            jdbc.update("UPDATE driver SET user_id = :u, version = version + 1 WHERE id = :d", p);
+        }
+        DriverView after = find(driverId);
+        audit.record(access.currentUser().userId(), "LINK_ACCOUNT", "driver", driverId.toString(), null, before, after);
+        return after;
     }
 
     @Transactional(noRollbackFor = AccessDeniedException.class)
@@ -197,6 +278,17 @@ public class DriverService {
         List<DriverView> l = jdbc.query(SELECT + " WHERE d.id = :id", new MapSqlParameterSource("id", id), MAPPER);
         if (l.isEmpty()) throw new NotFoundException("Conducteur introuvable.");
         return l.get(0);
+    }
+
+    public void requireAssignable(UUID id) {
+        DriverView d = get(id);
+        if (d.archivedAt() != null) throw new IllegalArgumentException("Conducteur archivé.");
+        if (d.userLogin() == null) throw new IllegalArgumentException("Ce conducteur n'a pas de compte. Ouvrez Conducteurs puis Lier un compte.");
+        if (!Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS(SELECT 1 FROM driver d JOIN app_user u ON u.id = d.user_id
+                 WHERE d.id = :d AND
+                """ + ELIGIBLE_ACCOUNT + ")", Map.of("d", id), Boolean.class)))
+            throw new IllegalArgumentException("Liez cette fiche à un compte actif avec le rôle Conducteur depuis l'écran Conducteurs.");
     }
 
     private static MapSqlParameterSource params(DriverInput in) {

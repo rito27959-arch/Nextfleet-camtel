@@ -9,3 +9,10 @@ build/
 *.keystore
 *.jks
 local.properties
+
+# Données de migration privées (ne jamais publier dans ce dépôt)
+*.db
+*.sqlite
+*.sqlite3
+private-import/
+__pycache__/

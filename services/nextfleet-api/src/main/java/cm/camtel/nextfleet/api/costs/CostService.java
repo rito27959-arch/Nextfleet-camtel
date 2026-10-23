@@ -43,6 +43,23 @@ public class CostService {
 
     public record ImportResult(int read, int inserted, int duplicates, List<String> errors) { }
 
+    public record LegacyOperation(UUID id, String registration, String kind, LocalDate occurredOn, String label,
+                                  BigDecimal amountXaf, BigDecimal liters, String provider, String notes) { }
+
+    @Transactional(readOnly = true)
+    public List<LegacyOperation> legacyOperations(int year) {
+        var scope = readScope();
+        if (scope.isEmpty()) return List.of();
+        return jdbc.query("""
+                SELECT l.id, v.registration, l.kind, l.occurred_on, l.label, l.amount_xaf, l.liters, l.provider, l.notes
+                  FROM legacy_operation l LEFT JOIN vehicle v ON v.id = l.vehicle_id
+                 WHERE l.org_unit_id IN (:s) AND extract(year FROM l.occurred_on) = :y
+                 ORDER BY l.occurred_on DESC, l.id LIMIT 2000
+                """, Map.of("s", scope, "y", year), (rs, i) -> new LegacyOperation(rs.getObject(1, UUID.class),
+                rs.getString(2), rs.getString(3), rs.getObject(4, LocalDate.class), rs.getString(5), rs.getBigDecimal(6),
+                rs.getBigDecimal(7), rs.getString(8), rs.getString(9)));
+    }
+
     private final NamedParameterJdbcTemplate jdbc;
     private final AccessService access;
     private final AuditService audit;
@@ -74,25 +91,13 @@ public class CostService {
         Map<Integer, BigDecimal[]> months = new LinkedHashMap<>();
         for (int m = 1; m <= 12; m++) months.put(m, new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO});
         jdbc.query("""
-                SELECT extract(month FROM f.filled_at AT TIME ZONE 'Africa/Douala')::int, sum(f.amount), sum(f.liters)
-                  FROM fuel_fill f JOIN vehicle v ON v.id = f.vehicle_id
-                 WHERE v.org_unit_id IN (:s) AND extract(year FROM f.filled_at AT TIME ZONE 'Africa/Douala') = :y GROUP BY 1""", p, rs -> {
+                SELECT extract(month FROM occurred_on)::int, kind, sum(amount_xaf), sum(liters)
+                  FROM v_cost_entry WHERE org_unit_id IN (:s) AND extract(year FROM occurred_on) = :y
+                 GROUP BY 1, 2""", p, rs -> {
             BigDecimal[] a = months.get(rs.getInt(1));
-            a[0] = rs.getBigDecimal(2);
-            a[3] = rs.getBigDecimal(3);
-        });
-        jdbc.query("""
-                SELECT extract(month FROM coalesce(mo.immobilised_to, mo.created_at) AT TIME ZONE 'Africa/Douala')::int, sum(mo.cost_xaf)
-                  FROM maintenance_order mo JOIN vehicle v ON v.id = mo.vehicle_id
-                 WHERE v.org_unit_id IN (:s) AND mo.status = 'CLOTUREE' AND mo.cost_xaf IS NOT NULL
-                   AND extract(year FROM coalesce(mo.immobilised_to, mo.created_at) AT TIME ZONE 'Africa/Douala') = :y GROUP BY 1""", p, rs -> {
-            months.get(rs.getInt(1))[1] = rs.getBigDecimal(2);
-        });
-        jdbc.query("""
-                SELECT extract(month FROM oc.done_on)::int, sum(oc.cost_xaf) FROM oil_change oc JOIN vehicle v ON v.id = oc.vehicle_id
-                 WHERE v.org_unit_id IN (:s) AND oc.maintenance_order_id IS NULL AND oc.cost_xaf IS NOT NULL
-                   AND extract(year FROM oc.done_on) = :y GROUP BY 1""", p, rs -> {
-            months.get(rs.getInt(1))[2] = rs.getBigDecimal(2);
+            int column = "FUEL".equals(rs.getString(2)) ? 0 : "OIL".equals(rs.getString(2)) ? 2 : 1;
+            a[column] = a[column].add(rs.getBigDecimal(3));
+            a[3] = a[3].add(rs.getBigDecimal(4));
         });
         List<MonthRow> monthRows = new ArrayList<>();
         BigDecimal fuel = BigDecimal.ZERO, maint = BigDecimal.ZERO, oil = BigDecimal.ZERO, liters = BigDecimal.ZERO;
@@ -109,11 +114,9 @@ public class CostService {
         Map<String, CategoryRow> cats = new LinkedHashMap<>();
         jdbc.query("""
                 SELECT c.code, c.label,
-                       coalesce((SELECT sum(mo.cost_xaf) FROM maintenance_order mo JOIN vehicle v ON v.id = mo.vehicle_id
-                                  WHERE mo.category_code = c.code AND v.org_unit_id IN (:s) AND mo.status = 'CLOTUREE'
-                                    AND extract(year FROM coalesce(mo.immobilised_to, mo.created_at) AT TIME ZONE 'Africa/Douala') = :y), 0)
-                     + CASE WHEN c.code = 'VIDANGE' THEN coalesce((SELECT sum(oc.cost_xaf) FROM oil_change oc JOIN vehicle v ON v.id = oc.vehicle_id
-                                  WHERE v.org_unit_id IN (:s) AND oc.maintenance_order_id IS NULL AND extract(year FROM oc.done_on) = :y), 0) ELSE 0 END,
+                       coalesce((SELECT sum(e.amount_xaf) FROM v_cost_entry e
+                                  WHERE e.category_code = c.code AND e.org_unit_id IN (:s)
+                                    AND extract(year FROM e.occurred_on) = :y), 0),
                        coalesce((SELECT sum(b.annual_amount) FROM budget_plan_line b WHERE b.category_code = c.code
                                   AND b.org_unit_id IN (:s) AND b.fiscal_year = :y), 0)
                   FROM maintenance_category c ORDER BY c.label""", p, rs -> {
@@ -131,17 +134,12 @@ public class CostService {
 
         List<VehicleRow> vehicles = jdbc.query("""
                 SELECT v.id, v.registration, v.make || ' ' || v.model,
-                       coalesce(f.amount, 0), coalesce(m.cost, 0) + coalesce(o.cost, 0), coalesce(f.liters, 0), coalesce(m.n, 0)
-                  FROM vehicle v
-                  LEFT JOIN (SELECT vehicle_id, sum(amount) amount, sum(liters) liters FROM fuel_fill
-                              WHERE extract(year FROM filled_at AT TIME ZONE 'Africa/Douala') = :y GROUP BY vehicle_id) f ON f.vehicle_id = v.id
-                  LEFT JOIN (SELECT vehicle_id, sum(cost_xaf) cost, count(*) n FROM maintenance_order
-                              WHERE status = 'CLOTUREE' AND extract(year FROM coalesce(immobilised_to, created_at) AT TIME ZONE 'Africa/Douala') = :y
-                              GROUP BY vehicle_id) m ON m.vehicle_id = v.id
-                  LEFT JOIN (SELECT vehicle_id, sum(cost_xaf) cost FROM oil_change
-                              WHERE maintenance_order_id IS NULL AND extract(year FROM done_on) = :y GROUP BY vehicle_id) o ON o.vehicle_id = v.id
-                 WHERE v.org_unit_id IN (:s) AND (f.amount IS NOT NULL OR m.cost IS NOT NULL OR o.cost IS NOT NULL)
-                 ORDER BY coalesce(f.amount, 0) + coalesce(m.cost, 0) + coalesce(o.cost, 0) DESC LIMIT 200""", p,
+                       coalesce(sum(e.amount_xaf) FILTER (WHERE e.kind = 'FUEL'), 0),
+                       coalesce(sum(e.amount_xaf) FILTER (WHERE e.kind <> 'FUEL'), 0),
+                       sum(e.liters), count(*) FILTER (WHERE e.kind = 'MAINTENANCE')
+                  FROM v_cost_entry e JOIN vehicle v ON v.id = e.vehicle_id
+                 WHERE e.org_unit_id IN (:s) AND extract(year FROM e.occurred_on) = :y
+                 GROUP BY v.id ORDER BY sum(e.amount_xaf) DESC LIMIT 200""", p,
                 (rs, i) -> new VehicleRow(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getBigDecimal(4),
                         rs.getBigDecimal(5), rs.getBigDecimal(4).add(rs.getBigDecimal(5)), rs.getBigDecimal(6), rs.getInt(7)));
         return new Summary(year, fuel.add(maint).add(oil), fuel, maint, oil, budget, liters, monthRows, categories, vehicles);

@@ -636,6 +636,31 @@ public final class HttpFleetGateway implements FleetGateway {
     }
 
     @Override
+    public List<Prod.DriverAccount> driverAccounts() {
+        List<Prod.DriverAccount> out = new ArrayList<>();
+        send("GET", "/api/v1/drivers/accounts", null, true).forEach(n -> out.add(new Prod.DriverAccount(
+                uuid(n, "id"), n.path("login").asText(), n.path("displayName").asText(), n.path("staffNumber").asText(),
+                uuid(n, "orgUnitId"), n.path("orgUnitName").asText(), uuid(n, "driverId"))));
+        return out;
+    }
+
+    @Override
+    public List<Prod.LegacyOperation> legacyOperations(int year) {
+        List<Prod.LegacyOperation> out = new ArrayList<>();
+        send("GET", "/api/v1/costs/legacy?year=" + year, null, true).forEach(n -> out.add(new Prod.LegacyOperation(
+                uuid(n, "id"), n.path("registration").asText(null), n.path("kind").asText(), date(n, "occurredOn"),
+                n.path("label").asText(), dec0(n, "amountXaf"), dec0(n, "liters"), n.path("provider").asText(null), n.path("notes").asText(null))));
+        return out;
+    }
+
+    @Override
+    public Models.Driver driverFromAccount(UUID userId, UUID driverId) {
+        ObjectNode b = json.createObjectNode().put("userId", userId.toString());
+        if (driverId != null) b.put("driverId", driverId.toString());
+        return toDriver(send("POST", "/api/v1/drivers/from-account", b, true));
+    }
+
+    @Override
     public List<Prod.VehicleDocument> vehicleDocuments(UUID vehicleId) {
         List<Prod.VehicleDocument> out = new ArrayList<>();
         send("GET", "/api/v1/vehicles/" + vehicleId + "/documents", null, true).forEach(n -> out.add(new Prod.VehicleDocument(uuid(n, "id"),

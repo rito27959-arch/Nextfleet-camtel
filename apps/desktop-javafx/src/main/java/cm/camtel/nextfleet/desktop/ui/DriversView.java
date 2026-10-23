@@ -58,7 +58,8 @@ public final class DriversView extends ScrollPane {
         sbox.getChildren().get(1).setMouseTransparent(true);
         HBox head = new HBox(12, titles, Ui.spacer(), sbox);
         if (shell != null && !gateway.isDemo() && shell.session().can(cm.camtel.nextfleet.domain.security.Permission.DRIVER_WRITE)) {
-            head.getChildren().add(Views.filled("Nouveau conducteur", Icons.PLUS, this::createSheet));
+            head.getChildren().add(Views.filled("Depuis un compte", Icons.USER, () -> accountSheet(null)));
+            head.getChildren().add(Views.tinted("Saisie manuelle", Icons.PLUS, this::createSheet));
         }
         head.setAlignment(Pos.BOTTOM_LEFT);
         VBox root = new VBox(20, head, body);
@@ -129,6 +130,10 @@ public final class DriversView extends ScrollPane {
                     : row(Icons.LOCK, "Compte NexFleet", "Aucun : ne peut pas recevoir de mission", Views.pill("Sans compte", "warning")));
         }
         VBox card = new VBox(14, top, Ui.divider(), rows);
+        if (d.userLogin() == null && shell != null && !gateway.isDemo()
+                && shell.session().can(cm.camtel.nextfleet.domain.security.Permission.DRIVER_WRITE)) {
+            card.getChildren().add(Views.tinted("Lier un compte", Icons.USER, () -> accountSheet(d)));
+        }
         card.getStyleClass().addAll("card", "driver-card");
         card.setAccessibleText("Conducteur " + d.fullName() + ", matricule " + d.staffNumber());
         Motion.hoverLift(card);
@@ -187,5 +192,28 @@ public final class DriversView extends ScrollPane {
             });
             shell.openSheet(f, 500);
         }, err -> shell.toasts().info("Création impossible", err.getMessage()));
+    }
+
+    private void accountSheet(Driver existing) {
+        Ui.async(gateway::driverAccounts, accounts -> {
+            var available = accounts.stream().filter(a -> a.driverId() == null).toList();
+            if (available.isEmpty()) {
+                shell.toasts().info("Aucun compte disponible", "Un administrateur doit attribuer le rôle Conducteur à un compte actif de votre périmètre.");
+                return;
+            }
+            var account = FormSheet.combo(available);
+            FormSheet f = new FormSheet(existing == null ? "Conducteur depuis un compte" : "Lier un compte", "Lier", shell::closeSheet)
+                    .intro(existing == null
+                            ? "L'identité, les coordonnées et l'entité sont reprises du compte. Le matricule RH ou l'identifiant du compte sert de matricule. Les pièces peuvent être complétées ensuite."
+                            : "Fiche : " + existing.fullName() + " · " + existing.staffNumber() + ". Sélectionnez son compte dans la même entité.")
+                    .field("Compte conducteur *", account);
+            f.onSubmit(() -> gateway.driverFromAccount(FormSheet.pick(account, "Compte").id(), existing == null ? null : existing.id()),
+                    (Driver linked) -> {
+                        shell.closeSheet();
+                        shell.toasts().success("Compte lié", linked.fullName() + " peut recevoir une mission.");
+                        load();
+                    });
+            shell.openSheet(f, 500);
+        }, err -> shell.toasts().info("Rattachement impossible", err.getMessage()));
     }
 }

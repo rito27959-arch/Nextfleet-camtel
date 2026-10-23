@@ -270,12 +270,23 @@ final class MissionsView extends BorderPane {
         shell.openSheet(f, 440);
     }
 
+    private record DriverChoice(cm.camtel.nextfleet.desktop.data.Prod.DriverRef driver,
+                                cm.camtel.nextfleet.desktop.data.Prod.DriverAccount account) {
+        @Override public String toString() { return account == null ? driver.toString() : account + " · compte existant"; }
+    }
+
     /** Création : la mission est un brouillon jusqu'à son autorisation par une AUTRE personne habilitée. */
     private void createSheet() {
-        Ui.async(() -> new Object[]{shell.gateway().vehicles(null, null, 0, 200).items(), shell.gateway().driverRefs()}, r -> {
+        Ui.async(() -> new Object[]{shell.gateway().vehicles(null, null, 0, 200).items(), shell.gateway().driverRefs(),
+                shell.session().can(cm.camtel.nextfleet.domain.security.Permission.DRIVER_WRITE) && !shell.gateway().isDemo()
+                        ? shell.gateway().driverAccounts() : List.of()}, r -> {
             @SuppressWarnings("unchecked") List<cm.camtel.nextfleet.desktop.data.Models.Vehicle> vehicles = (List<cm.camtel.nextfleet.desktop.data.Models.Vehicle>) r[0];
             @SuppressWarnings("unchecked") List<cm.camtel.nextfleet.desktop.data.Prod.DriverRef> drivers = (List<cm.camtel.nextfleet.desktop.data.Prod.DriverRef>) r[1];
-            if (vehicles.isEmpty() || drivers.isEmpty()) {
+            @SuppressWarnings("unchecked") List<cm.camtel.nextfleet.desktop.data.Prod.DriverAccount> accounts = (List<cm.camtel.nextfleet.desktop.data.Prod.DriverAccount>) r[2];
+            var choices = new java.util.ArrayList<DriverChoice>();
+            drivers.forEach(d -> choices.add(new DriverChoice(d, null)));
+            accounts.stream().filter(a -> a.driverId() == null).forEach(a -> choices.add(new DriverChoice(null, a)));
+            if (vehicles.isEmpty() || choices.isEmpty()) {
                 shell.toasts().info("Création impossible", vehicles.isEmpty() ? "Aucun véhicule dans votre périmètre." : "Aucun conducteur enregistré.");
                 return;
             }
@@ -291,7 +302,7 @@ final class MissionsView extends BorderPane {
                     return null;
                 }
             });
-            var driver = FormSheet.combo(drivers);
+            var driver = FormSheet.combo(choices);
             var purpose = FormSheet.text("Ex. Maintenance BTS Mvog-Mbi");
             var origin = FormSheet.text("Ex. Siège CAMTEL, Yaoundé");
             var destination = FormSheet.text("Ex. Obala");
@@ -310,8 +321,13 @@ final class MissionsView extends BorderPane {
                 java.time.Instant s0 = at(FormSheet.day(day, "Début", true), start.getText());
                 java.time.Instant e0 = at(FormSheet.day(endDay, "Fin", true), end.getText());
                 if (!e0.isAfter(s0)) throw new IllegalArgumentException("La fin prévue doit suivre le début.");
-                return shell.gateway().createMission(new cm.camtel.nextfleet.desktop.data.Prod.MissionDraft(FormSheet.pick(vehicle, "Véhicule").id(),
-                        withAccount(FormSheet.pick(driver, "Conducteur")).id(), FormSheet.req(purpose, "Objet"), FormSheet.opt(origin), FormSheet.opt(destination), s0, e0));
+                var vehicleId = FormSheet.pick(vehicle, "Véhicule").id();
+                var text = FormSheet.req(purpose, "Objet");
+                var chosen = FormSheet.pick(driver, "Conducteur");
+                var driverId = chosen.account() == null ? withAccount(chosen.driver()).id()
+                        : shell.gateway().driverFromAccount(chosen.account().id(), null).id();
+                return shell.gateway().createMission(new cm.camtel.nextfleet.desktop.data.Prod.MissionDraft(vehicleId,
+                        driverId, text, FormSheet.opt(origin), FormSheet.opt(destination), s0, e0));
             }, (Mission created) -> {
                 shell.closeSheet();
                 shell.toasts().success("Mission créée", created.reference() + " : à faire autoriser par une autre personne habilitée.");
@@ -351,7 +367,7 @@ final class MissionsView extends BorderPane {
     private static cm.camtel.nextfleet.desktop.data.Prod.DriverRef withAccount(cm.camtel.nextfleet.desktop.data.Prod.DriverRef d) {
         if (Boolean.FALSE.equals(d.hasAccount())) {
             throw new IllegalArgumentException(d.fullName() + " n'a pas de compte NexFleet : il ne pourrait pas démarrer la mission. "
-                    + "Liez sa fiche à un compte dans Comptes et rôles.");
+                    + "Ouvrez Conducteurs puis Lier un compte sur sa fiche, ou sélectionnez directement son compte existant.");
         }
         return d;
     }
