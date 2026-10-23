@@ -1,6 +1,6 @@
 # NexFleet CAMTEL — intégration continue gratuite (GitHub Actions, dépôt public).
 # Produit : rapports de tests, APK Android, paquet DEB (Ubuntu/Debian), installateur EXE (Windows).
-# Une étiquette vX.Y.Z, ou un lancement manuel avec « publier », publie ces fichiers dans une « Release » GitHub.
+# Une étiquette vX.Y.Z, un commit main [release] ou un lancement manuel « publier » publie les paquets.
 name: ci
 on:
   push:
@@ -28,15 +28,19 @@ jobs:
   base-de-donnees:
     name: Base PostgreSQL + PostGIS (63 tests)
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      pg:
+        image: postgis/postgis:16-3.4
+        env: { POSTGRES_USER: nextfleet, POSTGRES_PASSWORD: nextfleet_dev_only, POSTGRES_DB: postgres }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U nextfleet -d postgres" --health-interval 5s --health-timeout 5s --health-retries 20
     steps:
       - uses: actions/checkout@v5
-      - name: PostgreSQL 16 + PostGIS
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q postgresql-16-postgis-3
-          sudo systemctl start postgresql
-          sudo -u postgres psql -c "CREATE ROLE nextfleet LOGIN PASSWORD 'nextfleet_dev_only' CREATEDB;"
       - name: Migrations V1–V10 et campagne de tests
+        env:
+          NF_ADMIN_PSQL: psql -q -v ON_ERROR_STOP=1 -h localhost -U nextfleet -d postgres
         run: infra/db/tests/run_db_tests.sh
       - name: Migration SQLite — intégrité, coûts, réimport et rollback
         env:
