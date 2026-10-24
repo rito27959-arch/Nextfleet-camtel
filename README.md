@@ -3,7 +3,8 @@
 Plateforme de gestion du parc automobile CAMTEL : API Java 21 / Spring Boot, PostgreSQL + PostGIS, client bureau JavaFX
 (Windows, Linux) et application Android Java avec collecte GPS de mission et vues 3D Filament. Référence : cahier des charges V4.0 et document d'architecture V5.0.
 
-> **Version 0.7.1 — comptes conducteurs existants et migration SQLite.**
+> **Version 0.7.2 — création et autorisation des missions par le gestionnaire de flotte.**
+> Le même gestionnaire peut créer puis autoriser une mission ; le conducteur affecté la démarre ensuite sur son téléphone.
 > Un gestionnaire peut lier une fiche à un compte Conducteur actif ou sélectionner ce compte directement dans Nouvelle mission.
 > L'import privé de `parc.db` et `console.db` conserve les historiques et intègre les dépenses aux coûts.
 > Voir [`docs/MIGRATION_SQLITE.md`](docs/MIGRATION_SQLITE.md) pour l'import, les pièces manquantes et l'activation des anciens comptes.

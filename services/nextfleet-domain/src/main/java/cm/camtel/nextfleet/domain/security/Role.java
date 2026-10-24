@@ -13,7 +13,7 @@ import static cm.camtel.nextfleet.domain.security.Permission.*;
 
 /**
  * Les six profils de la matrice des habilitations du cahier V4 (chap. 03).
- * Règles structurantes : aucune auto-approbation ; l'administrateur technique n'a aucun pouvoir métier implicite ;
+ * Règles structurantes : aucune auto-approbation des bons carburant ; l'administrateur technique n'a aucun pouvoir métier implicite ;
  * l'auditeur ne modifie rien ; le contrôleur est distinct du demandeur.
  * La matrice est la copie exacte des tables {@code role_permission} (V1 + V5), vérifiée par test.
  */

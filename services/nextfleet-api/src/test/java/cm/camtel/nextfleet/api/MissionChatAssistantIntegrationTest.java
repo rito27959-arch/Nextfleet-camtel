@@ -86,6 +86,8 @@ class MissionChatAssistantIntegrationTest {
         user(U_DRIVER, "conducteur.yde", YDE, h, "DRIVER");
         user("00000000-0000-0000-0000-000000000006", "admin.tech", YDE, h, "ADMIN");
         user("00000000-0000-0000-0000-000000000007", "auditeur", YDE, h, "AUDITOR");
+        user("00000000-0000-0000-0000-000000000008", "controleur", YDE, h, "CONTROLLER");
+        user("00000000-0000-0000-0000-000000000009", "atelier", YDE, h, "MAINTENANCE");
         jdbc.update("""
                 INSERT INTO vehicle(id, registration, make, model, org_unit_id, tank_capacity_l, is_demo, category)
                 VALUES (?::uuid,'CE 4401 LT','Toyota','Hilux',?::uuid,80,true,'Pick-up')""", VEH, YDE);
@@ -126,19 +128,37 @@ class MissionChatAssistantIntegrationTest {
         String drv = login("conducteur.yde");
         String admin = login("admin.tech");
         String auditor = login("auditeur");
+        String controller = login("controleur");
+        String maintenance = login("atelier");
 
-        // --- Création et autorisation (aucune auto-approbation)
+        // --- Le gestionnaire peut créer puis autoriser sa propre mission, sans deuxième gestionnaire.
         Instant start = Instant.now().minus(1, ChronoUnit.HOURS);
-        JsonNode m = json(call(post("/api/v1/missions"), mgr, """
+        String createBody = """
                 {"vehicleId":"%s","driverId":"%s","purpose":"Maintenance BTS Mvog-Mbi","origin":"Siège CAMTEL","destination":"BTS Mvog-Mbi",
-                 "plannedStart":"%s","plannedEnd":"%s"}""".formatted(VEH, DRV, start, start.plus(8, ChronoUnit.HOURS)))
+                 "plannedStart":"%s","plannedEnd":"%s"}""".formatted(VEH, DRV, start, start.plus(8, ChronoUnit.HOURS));
+        for (String denied : java.util.List.of(drv, admin, auditor, controller, maintenance, dla)) {
+            call(post("/api/v1/missions"), denied, createBody).andExpect(status().isForbidden());
+        }
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM mission", Integer.class));
+        JsonNode m = json(call(post("/api/v1/missions"), mgr, createBody)
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("DRAFT"))
                 .andExpect(jsonPath("$.category").value("Pick-up")));
         String id = m.get("id").asText();
         String conv = m.get("conversationId").asText();
-        call(post("/api/v1/missions/" + id + "/authorize"), mgr, null).andExpect(status().isBadRequest());
-        call(post("/api/v1/missions/" + id + "/authorize"), mgr2, null)
+        for (String denied : java.util.List.of(drv, admin, auditor, controller, maintenance, dla)) {
+            call(post("/api/v1/missions/" + id + "/authorize"), denied, null).andExpect(status().isForbidden());
+        }
+        call(post("/api/v1/missions/" + id + "/start"), drv, "{\"noticeVersion\":\"NOTICE-GPS-v1\",\"deviceId\":\"AND-TEST01\"}")
+                .andExpect(status().isConflict()); // le brouillon n'est pas encore une autorisation de départ
+        call(post("/api/v1/missions/" + id + "/authorize"), mgr, null)
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("AUTHORIZED"));
+        assertEquals(UUID.fromString(U_MGR), jdbc.queryForObject("SELECT authorized_by FROM mission WHERE id=?::uuid", UUID.class, id));
+        assertNotNull(jdbc.queryForObject("SELECT authorized_at FROM mission WHERE id=?::uuid", java.sql.Timestamp.class, id));
+        call(post("/api/v1/missions/" + id + "/authorize"), mgr, null).andExpect(status().isConflict());
+        call(post("/api/v1/missions/" + id + "/authorize"), mgr2, null).andExpect(status().isConflict());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM audit_event WHERE object_id=? AND action='AUTHORIZE' AND actor_id=?::uuid",
+                Integer.class, id, U_MGR));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM tracking_authorization WHERE mission_id=?::uuid", Integer.class, id));
 
         // --- Cloisonnement : Douala ne voit pas la mission de Yaoundé
         call(get("/api/v1/missions"), dla, null).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));

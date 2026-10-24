@@ -313,7 +313,7 @@ final class MissionsView extends BorderPane {
             var end = FormSheet.text("HH:MM");
             end.setText("17:00");
             FormSheet f = new FormSheet("Nouvelle mission", "Créer", shell::closeSheet)
-                    .intro("La mission est créée en brouillon ; une autre personne habilitée l'autorise. La localisation ne démarre "
+                    .intro("La mission est créée en brouillon. Vous pouvez ensuite l'autoriser depuis sa fiche. La localisation ne démarre "
                             + "que lorsque le conducteur lance la mission sur son téléphone, après la notice d'information.")
                     .field("Objet *", purpose).field("Véhicule *", vehicle).field("Conducteur *", driver)
                     .row("Départ", origin, "Destination", destination).row("Début *", day, "Heure", start).row("Fin *", endDay, "Heure", end);
@@ -330,7 +330,7 @@ final class MissionsView extends BorderPane {
                         driverId, text, FormSheet.opt(origin), FormSheet.opt(destination), s0, e0));
             }, (Mission created) -> {
                 shell.closeSheet();
-                shell.toasts().success("Mission créée", created.reference() + " : à faire autoriser par une autre personne habilitée.");
+                shell.toasts().success("Mission créée", created.reference() + " : ouvrez sa fiche puis cliquez sur Autoriser.");
                 selected = created.id();
                 seg.select(1);
                 filter = 1;

@@ -146,14 +146,12 @@ public class MissionService {
         return row(id).view();
     }
 
-    /** Autorisation par un gestionnaire distinct du créateur (aucune auto-approbation). */
+    /** Autorisation explicite par un gestionnaire du périmètre, y compris le créateur ; décision auditée. */
     @Transactional
     public MissionView authorize(UUID id) {
         Row r = row(id);
         access.require("mission:manage", r.orgUnitId(), "mission", id.toString());
         AuthenticatedUser u = access.currentUser();
-        UUID creator = jdbc.queryForObject("SELECT created_by FROM mission WHERE id = :id", new MapSqlParameterSource("id", id), UUID.class);
-        if (u.userId().equals(creator)) throw new IllegalArgumentException("Une mission ne peut pas être autorisée par son créateur.");
         int n = jdbc.update("""
                 UPDATE mission SET status = 'AUTHORIZED', authorized_by = :me, authorized_at = now(), version = version + 1
                  WHERE id = :id AND status = 'DRAFT'""", new MapSqlParameterSource("id", id).addValue("me", u.userId()));

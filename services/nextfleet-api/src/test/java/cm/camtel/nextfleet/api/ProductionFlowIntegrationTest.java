@@ -403,7 +403,7 @@ class ProductionFlowIntegrationTest {
         String accountMission = json(call(post("/api/v1/missions"), mgr, """
                 {"vehicleId":"%s","driverId":"%s","purpose":"Mission compte existant","plannedStart":"%s","plannedEnd":"%s"}"""
                 .formatted(veh, linkedId, start, start.plus(1, ChronoUnit.HOURS))).andExpect(status().isCreated())).get("id").asText();
-        call(post("/api/v1/missions/" + accountMission + "/authorize"), chef, null).andExpect(status().isOk());
+        call(post("/api/v1/missions/" + accountMission + "/authorize"), mgr, null).andExpect(status().isOk());
         assertTrue(json(call(get("/api/v1/missions"), existingToken, null)).toString().contains(accountMission));
         call(post("/api/v1/missions/" + accountMission + "/cancel"), chef, "{\"reason\":\"Fin du test de rattachement\"}").andExpect(status().isOk());
 
