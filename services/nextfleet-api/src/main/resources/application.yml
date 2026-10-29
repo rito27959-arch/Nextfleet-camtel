@@ -18,8 +18,8 @@ spring:
       enabled: true
   servlet:
     multipart:
-      max-file-size: 10MB         # pièces justificatives : 10 Mo maximum (contrôlé aussi par la base)
-      max-request-size: 11MB
+      max-file-size: 40MB         # pièces justificatives : 10 Mo (vérifié par FileService) ; base de reprise : 40 Mo
+      max-request-size: 41MB
 
 server:
   port: ${PORT:${NF_PORT:8080}}
