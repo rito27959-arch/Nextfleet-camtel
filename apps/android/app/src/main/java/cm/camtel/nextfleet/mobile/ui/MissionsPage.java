@@ -363,7 +363,12 @@ final class MissionsPage implements Page, TrackingBus.Listener {
         Ui.tabular(hour);
         time.addView(day);
         time.addView(hour);
-        c.addView(time, new LinearLayout.LayoutParams(Ui.dp(a, 64), LinearLayout.LayoutParams.WRAP_CONTENT));
+        int tone = m.status == MissionStatus.ACTIVE ? Ui.GREEN : m.status == MissionStatus.AUTHORIZED ? Ui.BLUE : Ui.MUTED;
+        TextView pill = Ui.pill(a, m.status.label, tone);
+        LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        pl.topMargin = Ui.dp(a, 6);
+        time.addView(pill, pl);
+        c.addView(time, new LinearLayout.LayoutParams(Ui.dp(a, 92), LinearLayout.LayoutParams.WRAP_CONTENT));
         View sep = new View(a);
         sep.setBackgroundColor(Ui.SEPARATOR);
         LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(Ui.dp(a, 1), Ui.dp(a, 44));
@@ -377,8 +382,6 @@ final class MissionsPage implements Page, TrackingBus.Listener {
         mid.addView(Ui.text(a, m.registration + (m.driverName == null ? "" : " · " + m.driverName) + " · " + m.reference, 12, Ui.TERTIARY,
                 NexFleetApp.get().regular()));
         c.addView(mid, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        int tone = m.status == MissionStatus.ACTIVE ? Ui.GREEN : m.status == MissionStatus.AUTHORIZED ? Ui.BLUE : Ui.MUTED;
-        c.addView(Ui.pill(a, m.status.label, tone));
         c.setContentDescription(m.purpose + ", " + m.origin + " vers " + m.destination + ", " + m.status.label);
         return c;
     }
@@ -473,9 +476,9 @@ final class MissionsPage implements Page, TrackingBus.Listener {
         box.addView(h);
         for (int k = 0; k < tiles.size(); k += 2) {
             LinearLayout row = Ui.row(a, 10);
-            row.addView(tiles.get(k), new LinearLayout.LayoutParams(0, Ui.dp(a, 112), 1f));
-            if (k + 1 < tiles.size()) row.addView(tiles.get(k + 1), new LinearLayout.LayoutParams(0, Ui.dp(a, 112), 1f));
-            else row.addView(new View(a), new LinearLayout.LayoutParams(0, Ui.dp(a, 112), 1f));
+            row.addView(tiles.get(k), new LinearLayout.LayoutParams(0, Ui.dp(a, 128), 1f));
+            if (k + 1 < tiles.size()) row.addView(tiles.get(k + 1), new LinearLayout.LayoutParams(0, Ui.dp(a, 128), 1f));
+            else row.addView(new View(a), new LinearLayout.LayoutParams(0, Ui.dp(a, 128), 1f));
             box.addView(row);
         }
         return box;
@@ -489,7 +492,7 @@ final class MissionsPage implements Page, TrackingBus.Listener {
         ic.setImageTintList(android.content.res.ColorStateList.valueOf(0xFFFFFFFF));
         ic.setPadding(Ui.dp(a, 8), Ui.dp(a, 8), Ui.dp(a, 8), Ui.dp(a, 8));
         ic.setBackground(Ui.rounded(a, color, 12));
-        t.addView(ic, new LinearLayout.LayoutParams(Ui.dp(a, 40), Ui.dp(a, 40)));
+        t.addView(ic, new LinearLayout.LayoutParams(Ui.dp(a, 36), Ui.dp(a, 36)));
         View gap = new View(a);
         t.addView(gap, new LinearLayout.LayoutParams(1, 0, 1f));
         t.addView(Ui.text(a, title, 16, Ui.TEXT, NexFleetApp.get().semibold()));
