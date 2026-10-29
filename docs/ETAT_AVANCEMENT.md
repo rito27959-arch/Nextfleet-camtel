@@ -1,6 +1,6 @@
-# État réel d'avancement — version 0.7.0 (production, performance et finitions)
+# État réel d'avancement — version 0.8.0 (refonte « NexFleet Pro »)
 
-**21 octobre 2026.** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
+**29 octobre 2026.** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
 Aucune autorisation CAMTEL, aucun avis DSIR ou DS et aucune mise en production ne sont revendiqués.
 
 ## Ce qui fonctionne réellement (preuves exécutées)
@@ -25,6 +25,18 @@ résultats sont lisibles dans l'onglet Actions (annotations « bilan »).
 | Contrats OpenAPI | CI | `openapi.yaml` et `openapi-lot2.yaml` (0.3.0, alignés sur l'implémentation) valides |
 | **Refonte « Liquid Glass teinté » (iOS 26)** | CI + `docs/RECHERCHE_DESIGN_IOS26.md` | Bureau et Android redessinés écran par écran (verre teinté sur la navigation seulement, capsules, rayons concentriques, typographie iOS, alertes iOS 26, réglage « Réduire la transparence »). Contrastes du verre au pire cas vérifiés par `tools/check_contrast.py` ; captures bureau dans `docs/design-reference/captures-v2-ios26/` ; captures Android prises sur émulateur (Pixel 7, API 34) par la CI, branche `captures-android` |
 | Captures | `tools/screenshots.sh` | Lot 2 : 22 captures + 2 GIF, dont `23-catalogue-3d.png` (rendu 3D JavaFX réel) |
+
+### Refonte « NexFleet Pro » (0.8.0)
+
+Fondée sur une recherche documentée (leaders du marché, apps iOS primées) : [`RECHERCHE_REFERENCE_MARCHE.md`](RECHERCHE_REFERENCE_MARCHE.md).
+
+| Élément | Preuve |
+|---|---|
+| Bureau : accueil « À traiter » (documents expirés ou proches, permis, demandes d'atelier, véhicules immobilisés, bons à valider, missions à autoriser), classé par urgence, motif et action en un clic | Compilation, parcours de captures (clair et sombre) |
+| Score de santé par véhicule (0–100) avec ses motifs ; santé de la flotte et véhicules les plus fragiles ; anneau dans la liste | Idem ; barème documenté dans `Health.java` |
+| Fiche véhicule 360° pleine page : identité, santé, chiffres clés, échéances, historique unifié (interventions, vidanges, pleins) | Idem |
+| Navigation regroupée Opérations · Parc · Pilotage ; palette neutre à un seul accent, texte renforcé | Idem ; contrastes vérifiés (`tools/check_contrast.py`) |
+| Android : carte de mission selon la phase (compte à rebours, temps écoulé à la seconde, trajet animé, compteurs de positions en chiffres fixes), tuiles terrain, écran « Papiers du véhicule », 4 onglets pour le conducteur | Compilation, lint et recette émulateur en CI ; **à éprouver sur un vrai téléphone** |
 
 ### Performance et finitions (0.7.0)
 

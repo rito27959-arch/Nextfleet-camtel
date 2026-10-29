@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  APP_VERSION: 0.7.2
+  APP_VERSION: 0.8.0
 
 jobs:
   base-de-donnees:

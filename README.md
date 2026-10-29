@@ -3,7 +3,8 @@
 Plateforme de gestion du parc automobile CAMTEL : API Java 21 / Spring Boot, PostgreSQL + PostGIS, client bureau JavaFX
 (Windows, Linux) et application Android Java avec collecte GPS de mission et vues 3D Filament. Référence : cahier des charges V4.0 et document d'architecture V5.0.
 
-> **Version 0.7.2 — création et autorisation des missions par le gestionnaire de flotte.**
+> **Version 0.8.0 — refonte « NexFleet Pro »** (voir [`docs/RECHERCHE_REFERENCE_MARCHE.md`](docs/RECHERCHE_REFERENCE_MARCHE.md)) : bureau ouvert sur une file « À traiter » classée par urgence, santé expliquée de chaque véhicule, fiche véhicule 360° avec historique unifié, navigation regroupée, palette neutre à un seul accent ; Android : carte de mission selon sa phase (horloge vivante, trajet, compteurs), grandes tuiles terrain, papiers du véhicule pour un contrôle routier.
+> **Depuis 0.7.2** : création et autorisation des missions par le gestionnaire de flotte.
 > Le même gestionnaire peut créer puis autoriser une mission ; le conducteur affecté la démarre ensuite sur son téléphone.
 > Un gestionnaire peut lier une fiche à un compte Conducteur actif ou sélectionner ce compte directement dans Nouvelle mission.
 > L'import privé de `parc.db` et `console.db` conserve les historiques et intègre les dépenses aux coûts.
