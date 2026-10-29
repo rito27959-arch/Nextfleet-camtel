@@ -76,6 +76,14 @@ public final class Prod {
     /** Fiche conducteur rattachée à un compte. */
     public record DriverLink(UUID driverId, String staffNumber, String fullName, boolean created) { }
 
+    public record LegacyOperation(UUID id, String registration, String kind, LocalDate occurredOn, String label,
+                                  BigDecimal amountXaf, BigDecimal liters, String provider, String notes) { }
+
+    public record DriverAccount(UUID id, String login, String displayName, String staffNumber,
+                                UUID orgUnitId, String orgUnitName, UUID driverId) {
+        @Override public String toString() { return displayName + " · " + login + " · " + orgUnitName; }
+    }
+
     // ---------------------------------------------------------------- atelier
 
     public record Category(String code, String label) {

@@ -3,11 +3,12 @@
 Plateforme de gestion du parc automobile CAMTEL : API Java 21 / Spring Boot, PostgreSQL + PostGIS, client bureau JavaFX
 (Windows, Linux) et application Android Java avec collecte GPS de mission et vues 3D Filament. Référence : cahier des charges V4.0 et document d'architecture V5.0.
 
-> **Statut : version 0.7.0 — production, performance et finitions.** Serveur en service
-> (`https://api-production-a1d8.up.railway.app`, base vide, comptes créés par l'administrateur avec mot de passe provisoire).
-> Tous les écrans du bureau et d'Android sont branchés sur l'API. 0.7.0 : réponses compressées et revalidées (ETag),
-> affichage instantané des données déjà vues, recherche universelle Ctrl+K sur le bureau, transitions et retours haptiques
-> façon iOS sur Android, tirer pour actualiser, consultation hors connexion des dernières données.
+> **Version 0.7.2 — création et autorisation des missions par le gestionnaire de flotte.**
+> Le même gestionnaire peut créer puis autoriser une mission ; le conducteur affecté la démarre ensuite sur son téléphone.
+> Un gestionnaire peut lier une fiche à un compte Conducteur actif ou sélectionner ce compte directement dans Nouvelle mission.
+> L'import privé de `parc.db` et `console.db` conserve les historiques et intègre les dépenses aux coûts.
+> Voir [`docs/MIGRATION_SQLITE.md`](docs/MIGRATION_SQLITE.md) pour l'import, les pièces manquantes et l'activation des anciens comptes.
+> Les clients utilisent par défaut `https://api-production-a1d8.up.railway.app` ; la publication des paquets ne vaut pas déploiement serveur.
 > Voir [`docs/ETAT_AVANCEMENT.md`](docs/ETAT_AVANCEMENT.md) pour ce qui est prouvé et ce qui reste à essayer sur le terrain.
 > Aucune homologation ni avis DSIR/DS n'est revendiqué.
 
@@ -23,7 +24,7 @@ services/chat-realtime/    Messagerie temps réel pilote (WebSocket) — testée
 shared/api-contract/       Contrats OpenAPI 3 des lots 1 et 2 — validés
 shared/assets3d/           Modèles 3D GLB redistribuables et leurs licences
 shared/ui-tokens/          Jetons du design system (p. 17 / p. 18)
-infra/db/migrations/       Migrations Flyway V1–V8 — testées sur PostgreSQL 16 + PostGIS
+infra/db/migrations/       Migrations Flyway V1–V10 — testées sur PostgreSQL 16 + PostGIS
 infra/db/tests/            Campagne de tests de la base (63 tests + concurrence) et jeu fictif d'intégration
 infra/deploy/camtel/       Kit d'hébergement CAMTEL : Docker Compose, HTTPS (Caddy), sauvegardes — éprouvé en CI
 infra/docker/              Images API, passerelle GPS, Traccar (publiées sur ghcr.io)

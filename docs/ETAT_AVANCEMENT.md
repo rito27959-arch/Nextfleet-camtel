@@ -47,7 +47,7 @@ résultats sont lisibles dans l'onglet Actions (annotations « bilan »).
 | Android : terrain en production | Serveur de production par défaut ; démonstration cachée (7 appuis sur le logo). Mot de passe provisoire imposé, demande de bon et plein avec photo du reçu, signalement de panne, contrôle avant départ, messagerie avec pièces jointes (visionneuse photo/PDF intégrée) et temps réel |
 
 Scénario lot 2 de l'API (`MissionChatAssistantIntegrationTest`), exécuté sur PostGIS réel :
-création de mission → refus de l'auto-autorisation → autorisation par un tiers → cloisonnement Douala/Yaoundé →
+création réservée au gestionnaire → autorisation par ce même gestionnaire (auditée) → refus aux autres profils et hors périmètre → cloisonnement Douala/Yaoundé →
 démarrage refusé au gestionnaire et avec une notice inconnue → démarrage par le conducteur avec **jeton de mission
 vérifié** (signature, mission) → second démarrage refusé → message envoyé deux fois sans doublon → états Envoyé, Distribué,
 Lu → conversation refusée à un non-participant et à l'auditeur → clôture → assistant désactivé par défaut, activation refusée
@@ -90,3 +90,7 @@ domaine CAMTEL pour le serveur.
 2. Essai terrain : un téléphone Android démarre une mission et apparaît en direct sur le bureau et la carte mobile.
 3. Boîtier GPS véhicule raccordé à Traccar.
 4. Nom de domaine CAMTEL, sauvegardes de la base hors Railway, signature des paquets avec les clés CAMTEL.
+
+### Autorisation des missions (0.7.2)
+
+Le gestionnaire de flotte peut créer puis autoriser sa propre mission depuis sa fiche. La création reste un brouillon : le bouton **Autoriser** enregistre une décision explicite avec son auteur et sa date. Les autres profils ne peuvent ni créer ni autoriser une mission ; le périmètre organisationnel reste contrôlé. Seul le conducteur affecté démarre ensuite la mission et sa collecte GPS. Les brouillons déjà présents bénéficient du correctif serveur, sans migration ni réimport.

@@ -55,6 +55,9 @@ class RoleMatrixTest {
         assertTrue(Role.AUDITOR.permissions().stream().noneMatch(p -> p.code.matches(".*:(write|create|approve|archive|manage|drive|review|validate|use)")),
                 "auditeur : lecture et export seulement");
         assertFalse(Role.DRIVER.has(Permission.FUEL_ORDER_APPROVE), "conducteur : aucune auto-approbation");
+        assertEquals(Set.of(Role.FLEET_MANAGER), Stream.of(Role.values())
+                .filter(r -> r.has(Permission.MISSION_MANAGE)).collect(Collectors.toSet()),
+                "seul le gestionnaire de flotte crée et autorise les missions");
         assertTrue(Role.CONTROLLER.has(Permission.ANOMALY_REVIEW));
         assertFalse(Role.CONTROLLER.has(Permission.FUEL_ORDER_CREATE), "contrôleur distinct du demandeur");
         assertEquals(Set.of(), Role.union(Set.of("INCONNU")), "code inconnu : refus par défaut");

@@ -58,7 +58,8 @@ class ProductionFlowIntegrationTest {
     @Container
     static PostgreSQLContainer<?> pg = new PostgreSQLContainer<>(
             DockerImageName.parse("postgis/postgis:16-3.4").asCompatibleSubstituteFor("postgres"))
-            .withInitScript("test-extensions.sql");
+            .withInitScript("test-extensions.sql")
+            .withCommand("postgres", "-c", "statement_timeout=30000", "-c", "lock_timeout=5000");
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry r) {
@@ -358,6 +359,54 @@ class ProductionFlowIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
 
         // ------------------------------------------------------------ comptes ↔ fiches conducteur
+        // Régression : le gestionnaire utilise un compte déjà créé, sans inventer une seconde identité.
+        JsonNode existingAccount = json(call(post("/api/v1/admin/users"), admin, """
+                {"login":"conducteur.existant","displayName":"Identité du compte","phone":"+237600000001",
+                 "email":"conducteur@example.test","orgUnitId":"%s","roles":[]}""".formatted(org)).andExpect(status().isCreated()));
+        String existingId = existingAccount.get("user").get("id").asText();
+        String linkBody = "{\"userId\":\"" + existingId + "\"}";
+        call(post("/api/v1/drivers/from-account"), mgr, linkBody).andExpect(status().isBadRequest()); // aucun rôle implicite
+        call(post("/api/v1/admin/users/" + existingId + "/grants"), admin, "{\"role\":\"DRIVER\"}").andExpect(status().isCreated());
+        assertTrue(json(call(get("/api/v1/drivers/accounts"), mgr, null)).toString().contains(existingId));
+        JsonNode linkedExisting = json(call(post("/api/v1/drivers/from-account"), mgr, linkBody).andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("Identité du compte"))
+                .andExpect(jsonPath("$.phone").value("+237600000001"))
+                .andExpect(jsonPath("$.staffNumber").value("conducteur.existant"))
+                .andExpect(jsonPath("$.userLogin").value("conducteur.existant")));
+        String linkedId = linkedExisting.get("id").asText();
+        call(post("/api/v1/drivers/from-account"), mgr, linkBody).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(linkedId));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM driver WHERE user_id = ?::uuid", Integer.class, existingId));
+        String existingToken = firstLogin("conducteur.existant", existingAccount.get("temporaryPassword").asText());
+        call(post("/api/v1/drivers/from-account"), existingToken, linkBody).andExpect(status().isForbidden());
+        String existingSheet = json(call(post("/api/v1/drivers"), mgr, """
+                {"staffNumber":"TEST-LINK-071","fullName":"Identité de la fiche","orgUnitId":"%s"}"""
+                .formatted(org)).andExpect(status().isCreated())).get("id").asText();
+        call(post("/api/v1/drivers/from-account"), mgr, "{\"userId\":\"" + existingId + "\",\"driverId\":\"" + existingSheet + "\"}")
+                .andExpect(status().isBadRequest());
+        String sheetAccount = json(call(post("/api/v1/admin/users"), admin, """
+                {"login":"compte.fiche","displayName":"Identité du compte fiche","orgUnitId":"%s","roles":[]}"""
+                .formatted(org)).andExpect(status().isCreated())).get("user").get("id").asText();
+        call(post("/api/v1/admin/users/" + sheetAccount + "/grants"), admin, "{\"role\":\"DRIVER\"}").andExpect(status().isCreated());
+        String sheetBody = "{\"userId\":\"" + sheetAccount + "\",\"driverId\":\"" + existingSheet + "\"}";
+        call(post("/api/v1/drivers/from-account"), mgr, sheetBody).andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(existingSheet)).andExpect(jsonPath("$.fullName").value("Identité de la fiche"));
+        jdbc.update("UPDATE app_user SET status='SUSPENDED' WHERE id=?::uuid", sheetAccount);
+        call(post("/api/v1/drivers/from-account"), mgr, sheetBody).andExpect(status().isBadRequest());
+        assertFalse(json(call(get("/api/v1/drivers/accounts"), mgr, null)).toString().contains(sheetAccount));
+        String outside = json(call(post("/api/v1/admin/org-units"), admin, "{\"code\":\"OUTSIDE\",\"name\":\"Autre périmètre\"}")
+                .andExpect(status().isCreated())).get("id").asText();
+        String outsideId = json(call(post("/api/v1/admin/users"), admin, """
+                {"login":"autre.conducteur","displayName":"Autre conducteur","orgUnitId":"%s","roles":[{"role":"DRIVER"}]}"""
+                .formatted(outside)).andExpect(status().isCreated())).get("user").get("id").asText();
+        assertFalse(json(call(get("/api/v1/drivers/accounts"), mgr, null)).toString().contains(outsideId));
+        call(post("/api/v1/drivers/from-account"), mgr, "{\"userId\":\"" + outsideId + "\"}").andExpect(status().isForbidden());
+        String accountMission = json(call(post("/api/v1/missions"), mgr, """
+                {"vehicleId":"%s","driverId":"%s","purpose":"Mission compte existant","plannedStart":"%s","plannedEnd":"%s"}"""
+                .formatted(veh, linkedId, start, start.plus(1, ChronoUnit.HOURS))).andExpect(status().isCreated())).get("id").asText();
+        call(post("/api/v1/missions/" + accountMission + "/authorize"), mgr, null).andExpect(status().isOk());
+        assertTrue(json(call(get("/api/v1/missions"), existingToken, null)).toString().contains(accountMission));
+        call(post("/api/v1/missions/" + accountMission + "/cancel"), chef, "{\"reason\":\"Fin du test de rattachement\"}").andExpect(status().isOk());
+
         // une fiche sans compte ne peut pas recevoir de mission (personne ne pourrait la démarrer)
         String orphan = json(call(post("/api/v1/drivers"), mgr, """
                 {"staffNumber":"MAT-3000","fullName":"Awa Sans Compte","orgUnitId":"%s"}""".formatted(org)).andExpect(status().isCreated()))

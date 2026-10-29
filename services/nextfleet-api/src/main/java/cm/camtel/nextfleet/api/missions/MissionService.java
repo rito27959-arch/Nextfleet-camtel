@@ -66,9 +66,12 @@ public class MissionService {
     private final GpsProperties gps;
     private final Clock clock;
     private final cm.camtel.nextfleet.api.live.TraccarClient traccar;
+    private final cm.camtel.nextfleet.api.drivers.DriverService drivers;
 
     public MissionService(NamedParameterJdbcTemplate jdbc, AccessService access, AuditService audit, GpsProperties gps, Clock clock,
-                          cm.camtel.nextfleet.api.live.TraccarClient traccar) {
+                          cm.camtel.nextfleet.api.live.TraccarClient traccar,
+                          cm.camtel.nextfleet.api.drivers.DriverService drivers) {
+        this.drivers = drivers;
         this.traccar = traccar;
         this.jdbc = jdbc;
         this.access = access;
@@ -106,6 +109,7 @@ public class MissionService {
         UUID org = jdbc.queryForObject("SELECT org_unit_id FROM vehicle WHERE id = :v AND archived_at IS NULL",
                 new MapSqlParameterSource("v", c.vehicleId()), UUID.class);
         access.require("mission:manage", org, "mission", "new");
+        drivers.requireAssignable(c.driverId());
         if (c.plannedEnd() == null || c.plannedStart() == null || !c.plannedEnd().isAfter(c.plannedStart())) {
             throw new IllegalArgumentException("La fin prévue doit suivre le début prévu.");
         }
@@ -142,14 +146,12 @@ public class MissionService {
         return row(id).view();
     }
 
-    /** Autorisation par un gestionnaire distinct du créateur (aucune auto-approbation). */
+    /** Autorisation explicite par un gestionnaire du périmètre, y compris le créateur ; décision auditée. */
     @Transactional
     public MissionView authorize(UUID id) {
         Row r = row(id);
         access.require("mission:manage", r.orgUnitId(), "mission", id.toString());
         AuthenticatedUser u = access.currentUser();
-        UUID creator = jdbc.queryForObject("SELECT created_by FROM mission WHERE id = :id", new MapSqlParameterSource("id", id), UUID.class);
-        if (u.userId().equals(creator)) throw new IllegalArgumentException("Une mission ne peut pas être autorisée par son créateur.");
         int n = jdbc.update("""
                 UPDATE mission SET status = 'AUTHORIZED', authorized_by = :me, authorized_at = now(), version = version + 1
                  WHERE id = :id AND status = 'DRAFT'""", new MapSqlParameterSource("id", id).addValue("me", u.userId()));

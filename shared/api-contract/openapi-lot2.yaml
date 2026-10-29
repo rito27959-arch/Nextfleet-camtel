@@ -54,11 +54,11 @@ paths:
   /api/v1/missions/{id}/authorize:
     post:
       tags: [Missions et GPS]
-      summary: 'Autorisation par un gestionnaire DISTINCT du créateur'
+      summary: 'Autorisation explicite par le gestionnaire de flotte du périmètre, y compris le créateur'
       parameters: [{ $ref: '#/components/parameters/Id' }]
       responses:
         '200': { description: Mission autorisée, content: { application/json: { schema: { $ref: '#/components/schemas/Mission' } } } }
-        '400': { description: 'Auto-approbation refusée' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '409': { description: 'Mission non en brouillon' }
   /api/v1/missions/{id}/track:
     get:
