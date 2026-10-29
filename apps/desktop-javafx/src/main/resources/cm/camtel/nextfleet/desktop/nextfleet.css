@@ -910,3 +910,117 @@
 .search-capsule .search-field { -fx-cursor: hand; }
 /* lignes de liste : respiration verticale iOS (deux lignes de texte jamais collées au bord) */
 .list-row { -fx-padding: 9 14; -fx-min-height: 50; }
+
+/* =====================================================================================================================
+ * DESIGN v3 — « NexFleet Pro » (0.8), voir docs/RECHERCHE_REFERENCE_MARCHE.md
+ * Base neutre et un seul accent (vert CAMTEL), texte à fort contraste, couleur réservée au SENS (statut, alerte) ;
+ * chiffres neutres et grands, légende colorée seulement si elle porte une information ; cartes blanches à filet fin et
+ * ombre à peine visible ; hiérarchie par la taille, la graisse et l'espace (Flighty, Things, Linear, Liquid Glass).
+ * Ces règles viennent en dernier et priment.
+ * ===================================================================================================================== */
+.root {
+    -nf-backdrop: #F4F5F7;
+    -nf-bg: #F4F5F7;
+    -nf-text: #0A1620;
+    -nf-muted: #56636D;
+    -nf-tertiary: #8D979F;
+    -nf-separator: rgba(10, 22, 32, 0.09);
+    -nf-border: rgba(10, 22, 32, 0.07);
+    -nf-select: rgba(10, 22, 32, 0.06);
+    -nf-glass: linear-gradient(to bottom, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.88));
+    -nf-glass-shadow: rgba(10, 22, 32, 0.08);
+    -nf-card-shadow: rgba(10, 22, 32, 0.05);
+}
+.root.dark {
+    -nf-backdrop: #0A0D10;
+    -nf-bg: #0A0D10;
+    -nf-surface: #14191E;
+    -nf-surface-2: #1B2127;
+    -nf-text: #F3F5F7;
+    -nf-muted: #A2ADB6;
+    -nf-tertiary: #6E7A84;
+    -nf-separator: rgba(255, 255, 255, 0.08);
+    -nf-border: rgba(255, 255, 255, 0.07);
+    -nf-select: rgba(255, 255, 255, 0.08);
+    -nf-card-shadow: transparent;
+}
+
+/* ---------- typographie : titres affirmés, texte lisible */
+.large-title, .h1 { -fx-font-family: "Inter Display"; -fx-font-size: 34px; -fx-font-weight: 800; }
+.title1 { -fx-font-size: 26px; -fx-font-weight: 800; }
+.title2 { -fx-font-size: 21px; -fx-font-weight: 800; }
+.title3 { -fx-font-size: 17px; -fx-font-weight: 700; }
+.headline, .h2 { -fx-font-size: 14.5px; -fx-font-weight: 700; }
+.body { -fx-font-size: 14.5px; }
+.footnote { -fx-font-size: 12.5px; }
+.row-title { -fx-font-size: 14.5px; -fx-font-weight: 600; }
+.section-header, .overline { -fx-font-size: 11.5px; -fx-font-weight: 700; -fx-text-fill: -nf-tertiary; }
+
+/* ---------- surfaces */
+.card, .summary-tile, .inset-group {
+    -fx-background-color: -nf-surface;
+    -fx-background-radius: 18;
+    -fx-border-color: -nf-border;
+    -fx-border-radius: 18;
+    -fx-effect: dropshadow(gaussian, -nf-card-shadow, 16, 0, 0, 3);
+}
+.card:hover { -fx-effect: dropshadow(gaussian, rgba(10, 22, 32, 0.08), 22, 0, 0, 6); }
+.root.dark .card:hover { -fx-effect: null; }
+
+/* chiffres neutres (la couleur va à la légende, et seulement si elle signifie quelque chose) */
+.summary-tile { -fx-padding: 18 20; }
+.summary-tile .summary-value { -fx-font-size: 32px; -fx-font-weight: 800; -fx-text-fill: -nf-text; }
+.summary-tile .category-label { -fx-text-fill: -nf-muted; -fx-font-weight: 600; }
+.summary-expire .summary-value, .summary-soon .summary-value, .summary-ok .summary-value { -fx-text-fill: -nf-text; }
+.summary-expire .category-label { -fx-text-fill: -nf-red-text; }
+.summary-soon .category-label { -fx-text-fill: -nf-orange-text; }
+.summary-ok .category-label { -fx-text-fill: -nf-muted; }
+.kpi-value { -fx-font-size: 34px; -fx-font-weight: 800; }
+
+/* ---------- barre latérale : sélection neutre, groupes lisibles */
+.sidebar { -fx-pref-width: 240; -fx-min-width: 240; -fx-effect: dropshadow(gaussian, -nf-glass-shadow, 24, 0, 0, 6); }
+.sidebar .section-title { -fx-text-fill: -nf-tertiary; -fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 6 12 4 12; }
+.nav-item { -fx-min-height: 36; -fx-pref-height: 36; -fx-background-radius: 12; }
+.nav-indicator { -fx-background-color: -nf-select; -fx-background-radius: 12; }
+.nav-item:selected, .nav-item:selected .label { -fx-text-fill: -nf-text; -fx-font-weight: 700; }
+.nav-item:selected .icon { -fx-stroke: -nf-accent-text; }
+
+/* ---------- listes */
+.list-row { -fx-padding: 10 16; -fx-min-height: 54; }
+.list-row.clickable:hover { -fx-background-color: -nf-select; }
+.table-view .table-row-cell { -fx-cell-size: 56; }
+.table-view .column-header .label { -fx-text-fill: -nf-tertiary; -fx-font-size: 11.5px; -fx-font-weight: 700; }
+
+/* ---------- file « À traiter » */
+.queue-card { -fx-padding: 6 6 10 6; }
+.queue-head { -fx-padding: 14 16 8 16; -fx-spacing: 10; -fx-alignment: center-left; }
+.queue-row { -fx-padding: 12 14; -fx-spacing: 14; -fx-alignment: center-left; -fx-background-radius: 14; -fx-cursor: hand; }
+.queue-row:hover { -fx-background-color: -nf-select; }
+.queue-rank { -fx-min-width: 4; -fx-max-width: 4; -fx-min-height: 34; -fx-background-radius: 2; }
+.rank-critical { -fx-background-color: -nf-red; }
+.rank-high { -fx-background-color: -nf-orange; }
+.rank-normal { -fx-background-color: -nf-blue; }
+.queue-title { -fx-font-size: 14.5px; -fx-font-weight: 700; }
+.queue-why { -fx-font-size: 12.5px; -fx-text-fill: -nf-muted; }
+.queue-when { -fx-font-size: 12px; -fx-font-weight: 700; }
+.queue-action { -fx-min-height: 32; -fx-pref-height: 32; -fx-padding: 0 14; -fx-font-size: 13px; -fx-font-weight: 600;
+                -fx-background-color: -nf-select; -fx-text-fill: -nf-text; }
+.queue-action:hover { -fx-background-color: -nf-fill-strong; }
+.queue-empty { -fx-padding: 28 16; -fx-spacing: 6; -fx-alignment: center; }
+
+/* ---------- santé véhicule */
+.health-track { -fx-stroke: -nf-fill-strong; -fx-fill: transparent; }
+.health-good { -fx-stroke: -nf-green; -fx-fill: transparent; }
+.health-warn { -fx-stroke: -nf-orange; -fx-fill: transparent; }
+.health-bad { -fx-stroke: -nf-red; -fx-fill: transparent; }
+.health-value { -fx-font-family: "Inter Display"; -fx-font-weight: 800; }
+
+/* ---------- fiche véhicule 360° */
+.v360-hero { -fx-padding: 24 26; -fx-spacing: 22; -fx-alignment: center-left; }
+.v360-plate { -fx-font-family: "Inter Display"; -fx-font-size: 40px; -fx-font-weight: 800; }
+.v360-stat { -fx-spacing: 2; -fx-min-width: 130; }
+.v360-stat-value { -fx-font-family: "Inter Display"; -fx-font-size: 22px; -fx-font-weight: 800; }
+.v360-stat-label { -fx-font-size: 12px; -fx-text-fill: -nf-muted; -fx-font-weight: 600; }
+.timeline-dot { -fx-min-width: 30; -fx-min-height: 30; -fx-max-width: 30; -fx-max-height: 30; -fx-background-radius: 999; -fx-alignment: center; }
+.timeline-line { -fx-min-width: 2; -fx-max-width: 2; -fx-background-color: -nf-separator; }
+.back-link { -fx-background-color: transparent; -fx-text-fill: -nf-accent-text; -fx-font-weight: 600; -fx-padding: 0 8 0 0; -fx-cursor: hand; }

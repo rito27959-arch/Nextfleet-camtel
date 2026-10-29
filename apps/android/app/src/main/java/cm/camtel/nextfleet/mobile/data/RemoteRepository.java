@@ -406,6 +406,34 @@ public final class RemoteRepository implements Repository {
     }
 
     @Override
+    public List<Models.DueRef> vehicleDueDates(String vehicleId) {
+        try {
+            JSONArray a = new JSONArray(call("GET", "/api/v1/vehicles/" + vehicleId + "/due-dates", null, token()));
+            List<Models.DueRef> out = new ArrayList<>();
+            for (int i = 0; i < a.length(); i++) {
+                JSONObject d = a.getJSONObject(i);
+                String kind = d.optString("kind", "");
+                out.add(new Models.DueRef(kind, dueLabel(kind), java.time.LocalDate.parse(d.getString("dueOn")),
+                        d.optLong("daysLeft", 0), d.optString("level", "A_JOUR")));
+            }
+            return out;
+        } catch (JSONException | java.time.format.DateTimeParseException e) {
+            throw unreadable();
+        }
+    }
+
+    static String dueLabel(String kind) {
+        switch (kind) {
+            case "ASSURANCE": return "Assurance";
+            case "VIGNETTE": return "Vignette";
+            case "CONTROLE_TECHNIQUE": return "Contrôle technique";
+            case "CARTE_GRISE": return "Carte grise";
+            case "VIDANGE": return "Vidange";
+            default: return "Document";
+        }
+    }
+
+    @Override
     public List<Models.VehicleRef> vehicles() {
         try {
             JSONObject page = new JSONObject(call("GET", "/api/v1/vehicles?size=200", null, token()));

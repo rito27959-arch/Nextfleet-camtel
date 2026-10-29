@@ -115,6 +115,11 @@ public interface Repository {
         return () -> { };
     }
 
+    /** Échéances des documents d'un véhicule (papiers à présenter lors d'un contrôle). */
+    default java.util.List<Models.DueRef> vehicleDueDates(String vehicleId) {
+        throw demoOnly("Les papiers du véhicule");
+    }
+
     default java.util.List<Models.VehicleRef> vehicles() {
         throw demoOnly("La liste des véhicules");
     }

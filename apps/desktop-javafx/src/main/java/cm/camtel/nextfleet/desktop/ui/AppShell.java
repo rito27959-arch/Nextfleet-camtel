@@ -103,7 +103,7 @@ public final class AppShell extends StackPane {
                 scene.getAccelerators().put(new KeyCodeCombination(KeyCode.F, KeyCombination.SHORTCUT_DOWN), palette::open);
                 scene.getAccelerators().put(new KeyCodeCombination(KeyCode.R, KeyCombination.SHORTCUT_DOWN), this::refresh);
                 scene.getAccelerators().put(new KeyCodeCombination(KeyCode.COMMA, KeyCombination.SHORTCUT_DOWN), () -> show(Section.SETTINGS));
-                List<Section> order = sections(false);
+                List<Section> order = groupedSections().values().stream().flatMap(List::stream).toList();
                 KeyCode[] keys = {KeyCode.DIGIT1, KeyCode.DIGIT2, KeyCode.DIGIT3, KeyCode.DIGIT4, KeyCode.DIGIT5,
                         KeyCode.DIGIT6, KeyCode.DIGIT7, KeyCode.DIGIT8, KeyCode.DIGIT9};
                 for (int i = 0; i < Math.min(order.size(), keys.length); i++) {
@@ -163,6 +163,24 @@ public final class AppShell extends StackPane {
     public static List<Section> sectionsFor(Session session, boolean upcomingOnes) {
         return java.util.Arrays.stream(Section.values())
                 .filter(s -> s != Section.SETTINGS && visibleFor(s, session) && upcoming(s) == upcomingOnes).toList();
+    }
+
+    /** Groupes de la barre latérale, dans l'ordre d'affichage (et des raccourcis Ctrl+1…9). */
+    static final Map<String, List<Section>> GROUPS = new LinkedHashMap<>();
+    static {
+        GROUPS.put("OPÉRATIONS", List.of(Section.OVERVIEW, Section.MY_MISSIONS, Section.TRACKING, Section.MISSIONS, Section.MESSAGES, Section.ASSISTANT));
+        GROUPS.put("PARC", List.of(Section.VEHICLES, Section.DRIVERS, Section.DUE, Section.MAINTENANCE, Section.WORKSHOP, Section.FUEL, Section.CATALOGUE));
+        GROUPS.put("PILOTAGE", List.of(Section.COSTS, Section.REPORTS, Section.USERS, Section.AUDIT));
+    }
+
+    /** Sections visibles pour ce profil, regroupées ; les groupes vides disparaissent. */
+    Map<String, List<Section>> groupedSections() {
+        Map<String, List<Section>> out = new LinkedHashMap<>();
+        for (Map.Entry<String, List<Section>> g : GROUPS.entrySet()) {
+            List<Section> v = g.getValue().stream().filter(s -> visible(s) && !upcoming(s)).toList();
+            if (!v.isEmpty()) out.put(g.getKey(), v);
+        }
+        return out;
     }
 
     public Section home() {
@@ -292,8 +310,14 @@ public final class AppShell extends StackPane {
         brand.setAlignment(Pos.CENTER_LEFT);
         brand.setStyle("-fx-padding: 4 8 8 8;");
 
-        VBox items = new VBox(4);
-        for (Section s : sections(false)) items.getChildren().add(navButton(s));
+        // navigation regroupée par intention (Opérations · Parc · Pilotage) plutôt qu'une liste à plat
+        VBox items = new VBox(2);
+        for (Map.Entry<String, List<Section>> g : groupedSections().entrySet()) {
+            Label title = Ui.label(g.getKey(), "section-title");
+            if (!items.getChildren().isEmpty()) title.setStyle("-fx-padding: 14 12 4 12;");
+            items.getChildren().add(title);
+            for (Section s : g.getValue()) items.getChildren().add(navButton(s));
+        }
         List<Section> later = sections(true);
         if (!later.isEmpty()) {
             Label soon = Ui.label("À VENIR", "section-title");
@@ -312,7 +336,7 @@ public final class AppShell extends StackPane {
         StackPane navStack = new StackPane(indicatorLayer, items);
         navStack.setAlignment(Pos.TOP_LEFT);
 
-        VBox box = new VBox(brand, Ui.label("VOTRE ESPACE", "section-title"), navStack, Ui.spacer(), navButton(Section.SETTINGS));
+        VBox box = new VBox(brand, navStack, Ui.spacer(), navButton(Section.SETTINGS));
         box.getStyleClass().add("sidebar");
         StackPane mark = Ui.symbolTile(Icons.GAUGE, "tile-mint");
         cm.camtel.nextfleet.domain.security.Role role = session.primaryRole();
@@ -513,9 +537,7 @@ public final class AppShell extends StackPane {
         closeSidePanelNow();
         nav.get(Section.VEHICLES).setSelected(true);
         currentSection = Section.VEHICLES;
-        VehiclesView vv = new VehiclesView(gateway, session, v.registration(), this);
-        setContent(vv);
-        vv.openVehicle(v);
+        setContent(new Vehicle360View(this, v));
     }
 
     public void openDriver(String query) {

@@ -283,4 +283,20 @@ public final class Models {
             this.hint = hint;
         }
     }
+
+    /** Échéance d'un document du véhicule (assurance, vignette, contrôle technique, carte grise…). */
+    public static final class DueRef {
+        public final String kind, label;
+        public final java.time.LocalDate dueOn;
+        public final long daysLeft;
+        public final String level;   // EXPIRE, A_ECHEANCE, A_JOUR
+
+        public DueRef(String kind, String label, java.time.LocalDate dueOn, long daysLeft, String level) {
+            this.kind = kind;
+            this.label = label;
+            this.dueOn = dueOn;
+            this.daysLeft = daysLeft;
+            this.level = level;
+        }
+    }
 }

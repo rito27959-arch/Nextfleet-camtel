@@ -31,7 +31,11 @@ public final class VehiclesView extends BorderPane {
     private final Session session;
     private final TextField search = new TextField();
     private final ToggleGroup filters = new ToggleGroup();
-    private final TableView<Vehicle> table = VehicleTable.create(false);
+    /** Scores de santé (échéances à 30 jours + statut), calculés dès que les échéances sont reçues. */
+    private final java.util.Map<java.util.UUID, Health.Score> health = new java.util.concurrent.ConcurrentHashMap<>();
+    private java.util.List<cm.camtel.nextfleet.desktop.data.Models.DueItem> dues;
+    private final TableView<Vehicle> table = VehicleTable.create(false, v -> dues == null ? null
+            : health.computeIfAbsent(v.id(), id -> Health.of(v, dues, 0)));
     private final VBox body = new VBox(12);
     private final Label pageInfo = Ui.label("", "muted", "t-12");
     private final Button prev = new Button("Précédent");
@@ -58,10 +62,18 @@ public final class VehiclesView extends BorderPane {
         next.getStyleClass().add("btn-secondary");
         prev.setOnAction(e -> { page--; load(); });
         next.setOnAction(e -> { page++; load(); });
+        // une ligne ouvre la fiche 360° pleine page (navigation « push ») ; sans coquille, la feuille latérale
         table.getSelectionModel().selectedItemProperty().addListener((o, a, v) -> {
-            if (v != null) openSheet(v);
+            if (v == null) return;
+            if (shell != null) javafx.application.Platform.runLater(() -> shell.openVehicle(v));
+            else openSheet(v);
         });
         if (initialQuery != null) search.setText(initialQuery);
+        Ui.async(() -> gateway.dueDates(30), list -> {
+            dues = list;
+            health.clear();
+            table.refresh();
+        }, err -> { });
         debounce.setOnFinished(e -> { page = 0; load(); });
         search.textProperty().addListener((o, a, b) -> debounce.playFromStart());
         load();

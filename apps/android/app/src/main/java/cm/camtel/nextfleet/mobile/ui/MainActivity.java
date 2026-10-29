@@ -57,7 +57,9 @@ public final class MainActivity extends Activity {
         if (s.can(Permission.MISSION_MANAGE) || s.can(Permission.GPS_READ)) pages.add(new MapPage(this));
         if (s.can(Permission.MISSION_DRIVE)) pages.add(new TrackPage(this));
         if (s.can(Permission.CHAT_USE)) pages.add(new MessagesPage(this));
-        pages.add(new CataloguePage(this));
+        // conducteur : quatre onglets essentiels (le véhicule en 3D reste accessible depuis la carte de mission)
+        boolean driverOnly = s.can(Permission.MISSION_DRIVE) && !s.can(Permission.MISSION_MANAGE);
+        if (!driverOnly) pages.add(new CataloguePage(this));
         pages.add(new ProfilePage(this));
 
         // iOS 26 : contenu plein écran sur fond doux, barre d'onglets en verre teinté qui flotte au-dessus

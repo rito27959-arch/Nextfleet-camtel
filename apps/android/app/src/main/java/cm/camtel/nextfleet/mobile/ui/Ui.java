@@ -35,7 +35,7 @@ import java.util.function.Supplier;
 public final class Ui {
 
     public static final int NAVY = 0xFF102631, BRAND = 0xFF009B87, ACCENT = 0xFF008575, ACCENT_TEXT = 0xFF007A6A;
-    public static final int BG = 0xFFF2F4F7, SURFACE = 0xFFFFFFFF, TEXT = 0xFF102434, MUTED = 0xFF616E78, TERTIARY = 0xFF9AA3AB;
+    public static final int BG = 0xFFF2F4F7, SURFACE = 0xFFFFFFFF, TEXT = 0xFF0A1620, MUTED = 0xFF56636D, TERTIARY = 0xFF8D979F;
     public static final int FILL = 0x1F767680, SEPARATOR = 0x1F102434, RED = 0xFFE9152D, ORANGE = 0xFFC55300, GREEN = 0xFF008932;
     public static final int BLUE = 0xFF1E6EF4;
     /** Sélection teintée (menthe à 13 %) et ombre des panneaux de verre. */
@@ -92,6 +92,12 @@ public final class Ui {
         t.setTypeface(tf);
         t.setIncludeFontPadding(false);
         t.setLineSpacing(0, 1.12f);
+        return t;
+    }
+
+    /** Chiffres à chasse fixe (heures, compteurs) : alignés et immobiles quand ils changent. */
+    public static TextView tabular(TextView t) {
+        t.setFontFeatureSettings("tnum");
         return t;
     }
 
@@ -156,7 +162,7 @@ public final class Ui {
     /** Fond doux des écrans (dégradé très léger, comme les fonds d'iOS 26) : le verre se lit dessus. */
     public static GradientDrawable backdrop() {
         GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{0xFFE9F0F3, 0xFFF3F5F8, 0xFFEEF5F2});
+                new int[]{0xFFF4F5F7, 0xFFF4F5F7, 0xFFF1F3F5});   // v3 : base neutre, la couleur va au sens
         return g;
     }
 

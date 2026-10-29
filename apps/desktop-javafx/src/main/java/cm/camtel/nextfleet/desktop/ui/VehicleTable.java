@@ -22,15 +22,20 @@ final class VehicleTable {
     private VehicleTable() { }
 
     static TableView<Vehicle> create(boolean compact) {
+        return create(compact, v -> null);
+    }
+
+    /** health : score de santé du véhicule (null tant qu'il n'est pas connu : l'anneau est alors remplacé par un repère neutre). */
+    static TableView<Vehicle> create(boolean compact, Function<Vehicle, Health.Score> health) {
         TableView<Vehicle> t = new TableView<>();
         t.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         t.setPlaceholder(Ui.label("Aucun véhicule à afficher.", "muted"));
-        t.getColumns().add(column("Véhicule", 1.4, VehicleTable::vehicleCell));
+        t.getColumns().add(column("Véhicule", 1.4, v -> vehicleCell(v, health.apply(v))));
         t.getColumns().add(column("Conducteur", 1.0, v -> v.driverName() == null
                 ? Ui.label("Non affecté", "muted", "t-12") : Ui.label(v.driverName(), "t-12")));
         t.getColumns().add(column("Statut", 1.0, v -> Ui.statusPill(v.status())));
         t.getColumns().add(column("Carburant", 1.2, v -> Ui.fuelBar(v.fuelLevelPercent())));
-        t.getColumns().add(column("Dernière position (déclarée)", 1.3, v -> {
+        t.getColumns().add(column("Affectation", 1.3, v -> {
             if (v.lastKnownPlace() == null) return Ui.label("Non renseignée", "muted", "t-12");
             Label l = new Label(v.lastKnownPlace(), Icons.stroke(Icons.MAP_PIN, 14, "-nf-muted"));
             l.getStyleClass().add("t-12");
@@ -46,13 +51,24 @@ final class VehicleTable {
         return t;
     }
 
-    private static Node vehicleCell(Vehicle v) {
-        StackPane icon = new StackPane(Icons.stroke(Icons.CAR, 18, "-nf-muted"));
-        icon.setStyle("-fx-background-color: -nf-surface-2; -fx-background-radius: 10; -fx-min-width: 40; -fx-min-height: 30;");
-        Label reg = Ui.label(v.registration(), "subhead", "w-600");
+    /** Plaque en gras, modèle dessous, et l'anneau de santé à gauche (information utile plutôt qu'un pictogramme répété). */
+    private static Node vehicleCell(Vehicle v, Health.Score score) {
+        Node lead;
+        if (score != null) {
+            Node[] ring = new Node[1];
+            Motion.quietly(() -> ring[0] = Health.ring(score, 13, 3.5, 10));   // dans une liste : anneau figé, pas d'animation au défilement
+            lead = ring[0];
+            javafx.scene.control.Tooltip.install(lead, new javafx.scene.control.Tooltip("Santé " + score.value() + " / 100 — " + score.label()
+                    + (score.reasons().isEmpty() ? "" : "\n" + String.join("\n", score.reasons()))));
+        } else {
+            StackPane icon = new StackPane(Icons.stroke(Icons.CAR, 16, "-nf-muted"));
+            icon.setStyle("-fx-background-color: -nf-select; -fx-background-radius: 999; -fx-min-width: 30; -fx-min-height: 30; -fx-max-width: 30; -fx-max-height: 30;");
+            lead = icon;
+        }
+        Label reg = Ui.label(v.registration(), "row-title");
         reg.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
         VBox text = new VBox(1, reg, Ui.label(v.label(), "muted", "footnote"));
-        HBox box = new HBox(10, icon, text);
+        HBox box = new HBox(12, lead, text);
         box.setAlignment(Pos.CENTER_LEFT);
         return box;
     }
