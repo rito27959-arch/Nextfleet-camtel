@@ -264,8 +264,19 @@ class ProductionFlowIntegrationTest {
                   {"pointCode":"FREINS","state":"DEFAUT","critical":true,"comment":"Pédale molle"},
                   {"pointCode":"ECLAIRAGE","state":"OK","critical":false}]}""".formatted(veh))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.result").value("NON_CONFORME"));
-        assertEquals(1, json(call(get("/api/v1/maintenance-orders?vehicleId=" + veh + "&open=true"), shop, null)).size(),
-                "le défaut critique ouvre une demande d'intervention");
+        JsonNode opened = json(call(get("/api/v1/maintenance-orders?vehicleId=" + veh + "&open=true"), shop, null));
+        assertEquals(1, opened.size(), "le défaut critique ouvre une demande d'intervention");
+        assertEquals("FREINAGE", opened.get(0).get("categoryCode").asText());
+        assertTrue(opened.get(0).get("title").asText().contains("Pédale molle"), "le commentaire du conducteur part à l'atelier");
+        // second contrôle : le même défaut n'ouvre pas de doublon, un nouveau défaut ouvre sa propre demande
+        call(post("/api/v1/inspections"), driver, """
+                {"vehicleId":"%s","kind":"APRES_MISSION","odometerKm":12680,"items":[
+                  {"pointCode":"FREINS","state":"DEFAUT","critical":true,"comment":"Toujours molle"},
+                  {"pointCode":"PNEUMATIQUES","state":"DEFAUT","critical":false,"comment":"Pneu arrière gauche usé"}]}""".formatted(veh))
+                .andExpect(status().isCreated());
+        JsonNode after = json(call(get("/api/v1/maintenance-orders?vehicleId=" + veh + "&open=true"), shop, null));
+        assertEquals(2, after.size(), "un défaut déjà ouvert n'est pas dupliqué");
+        assertTrue(after.toString().contains("PNEUMATIQUE"));
         call(post("/api/v1/tire-events"), shop, """
                 {"vehicleId":"%s","kind":"MONTAGE","size":"265/65 R17","brand":"Michelin","position":"AVG","condition":"NEUF"}""".formatted(veh))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$[0].position").value("AVG"));

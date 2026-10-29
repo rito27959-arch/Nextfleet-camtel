@@ -12,6 +12,11 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
     </style>
+    <!-- Lancement : fond bleu nuit et logo, remplacé par Theme.NexFleet dès que l'écran de connexion est prêt -->
+    <style name="Theme.NexFleet.Launch" parent="Theme.NexFleet">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
     <style name="Theme.NexFleet.Dialog" parent="android:Theme.Material.Light.Dialog.Alert">
         <item name="android:colorAccent">@color/nf_accent</item>
         <item name="android:fontFamily">@font/inter_regular</item>

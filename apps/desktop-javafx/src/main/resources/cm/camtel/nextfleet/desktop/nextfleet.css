@@ -1024,3 +1024,14 @@
 .timeline-dot { -fx-min-width: 30; -fx-min-height: 30; -fx-max-width: 30; -fx-max-height: 30; -fx-background-radius: 999; -fx-alignment: center; }
 .timeline-line { -fx-min-width: 2; -fx-max-width: 2; -fx-background-color: -nf-separator; }
 .back-link { -fx-background-color: transparent; -fx-text-fill: -nf-accent-text; -fx-font-weight: 600; -fx-padding: 0 8 0 0; -fx-cursor: hand; }
+
+/* ---------- relecture de trajet */
+.replay-bar { -fx-padding: 8 16 8 8; -fx-background-radius: 999; }
+.replay-play { -fx-background-color: -nf-accent; -fx-background-radius: 999; -fx-min-width: 34; -fx-min-height: 34; -fx-max-width: 34; -fx-max-height: 34; -fx-padding: 0; }
+.replay-title { -fx-font-size: 13px; -fx-font-weight: 700; }
+.replay-time { -fx-font-size: 13px; -fx-font-weight: 700; -fx-text-fill: -nf-text; }
+.scrub-track { -fx-background-color: -nf-fill-strong; -fx-background-radius: 999; }
+.scrub-fill { -fx-background-color: -nf-accent; -fx-background-radius: 999; }
+.scrub-thumb { -fx-fill: white; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 6, 0, 0, 1); }
+.marker-replay { -fx-fill: -nf-accent; -fx-stroke: white; -fx-stroke-width: 3; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 8, 0, 0, 2); }
+.track-replay { -fx-stroke: -nf-accent; -fx-stroke-width: 6; -fx-stroke-line-cap: round; -fx-stroke-line-join: round; -fx-fill: transparent; }

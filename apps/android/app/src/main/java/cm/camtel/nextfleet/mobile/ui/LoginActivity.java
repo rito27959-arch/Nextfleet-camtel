@@ -37,7 +37,13 @@ public final class LoginActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle state) {
+        setTheme(cm.camtel.nextfleet.mobile.R.style.Theme_NexFleet);   // fin de l'écran de lancement
         super.onCreate(state);
+        if (android.os.Build.VERSION.SDK_INT >= 31 && Motion.enabled()) {
+            // sortie de l'écran de lancement : le logo grandit et s'efface pendant que la connexion apparaît
+            getSplashScreen().setOnExitAnimationListener(view -> view.animate().alpha(0f).scaleX(1.18f).scaleY(1.18f)
+                    .setDuration(320).setInterpolator(Motion.EASE_OUT).withEndAction(view::remove).start());
+        }
         // Recette visuelle automatisée (CI, APK de débogage UNIQUEMENT) : connexion de démonstration par intention.
         String auto = isDebuggable() ? getIntent().getStringExtra("captureDemoLogin") : null;
         if (auto != null && Models.demoLogins().contains(auto)) {

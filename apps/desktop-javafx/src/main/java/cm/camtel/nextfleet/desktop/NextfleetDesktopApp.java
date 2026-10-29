@@ -62,7 +62,13 @@ public class NextfleetDesktopApp extends Application {
         stage.setMinHeight(700);
         stage.setScene(scene);
         restoreWindow(stage);
-        showLogin(null);
+        if (shots == null) {
+            // écran de lancement animé, puis fondu vers la connexion
+            scene.setRoot(cm.camtel.nextfleet.desktop.ui.Splash.create(() -> showLogin(null)));
+            applyTheme();
+        } else {
+            showLogin(null);
+        }
         stage.show();
 
         if (shots != null) {

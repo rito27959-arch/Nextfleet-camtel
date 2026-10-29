@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Écran de lancement (Android 8 à 11) : fond bleu nuit et logo centré -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/nf_splash" />
+    <item android:width="96dp" android:height="96dp" android:gravity="center" android:drawable="@drawable/nf_logo" />
+</layer-list>

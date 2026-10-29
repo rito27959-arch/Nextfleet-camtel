@@ -8,6 +8,7 @@ import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
@@ -41,6 +42,18 @@ final class TrackMap extends StackPane {
     private boolean live;
     private boolean animateNext = true;
     private Animation pulse;
+    /** Points projetés de la trace (pixels), pour la relecture. */
+    private List<double[]> projected = List.of();
+    private final javafx.beans.property.DoubleProperty replay = new javafx.beans.property.SimpleDoubleProperty(-1);
+    private Timeline replayAnim;
+    private final HBox replayBar = new HBox(12);
+    private final Button playButton = new Button();
+    private final Region scrubTrack = new Region();
+    private final Region scrubFill = new Region();
+    private final Circle scrubThumb = new Circle(7);
+    private final Label replayTime = Ui.label("", "replay-time");
+    private final Circle replayDot = new Circle(9);
+    private final Polyline replayTrail = new Polyline();
 
     TrackMap() {
         getStyleClass().add("map-card");
@@ -69,7 +82,58 @@ final class TrackMap extends StackPane {
         StackPane.setAlignment(note, Pos.BOTTOM_RIGHT);
         StackPane.setMargin(note, new Insets(0, 16, 14, 0));
 
-        getChildren().addAll(canvas, scale, north, status, note);
+        // relecture du trajet (missions terminées) : lecture/pause, curseur temporel, heure et vitesse à l'instant
+        playButton.getStyleClass().add("replay-play");
+        playButton.setGraphic(Icons.stroke(Icons.PLAY, 14, "white"));
+        playButton.setAccessibleText("Relire le trajet");
+        playButton.setOnAction(e -> toggleReplay());
+        // curseur sur mesure : piste fine, remplissage accent, pouce blanc ; clic ou glissé pour se placer
+        double sw = 260;
+        scrubTrack.getStyleClass().add("scrub-track");
+        scrubTrack.setPrefSize(sw, 4);
+        scrubTrack.setMaxSize(sw, 4);
+        scrubFill.getStyleClass().add("scrub-fill");
+        scrubFill.setMaxHeight(4);
+        scrubFill.setPrefHeight(4);
+        scrubThumb.getStyleClass().add("scrub-thumb");
+        scrubThumb.setManaged(false);
+        Pane scrub = new Pane(scrubTrack, scrubFill, scrubThumb);
+        scrub.setPrefSize(sw, 18);
+        scrub.setMinSize(sw, 18);
+        scrub.setMaxSize(sw, 18);
+        scrubTrack.relocate(0, 7);
+        scrubFill.relocate(0, 7);
+        scrubThumb.setCenterY(9);
+        javafx.event.EventHandler<javafx.scene.input.MouseEvent> seekAt = e -> {
+            if (replayAnim != null) replayAnim.pause();
+            playButton.setGraphic(Icons.stroke(Icons.PLAY, 14, "white"));
+            replay.set(Math.max(0, Math.min(1, e.getX() / sw)));
+        };
+        scrub.setOnMousePressed(seekAt);
+        scrub.setOnMouseDragged(seekAt);
+        scrub.setCursor(javafx.scene.Cursor.HAND);
+        replay.addListener((o, a, b) -> {
+            double t = Math.max(0, b.doubleValue());
+            scrubFill.setPrefWidth(sw * t);
+            scrubFill.resize(sw * t, 4);
+            scrubThumb.setCenterX(sw * t);
+            placeReplay(b.doubleValue());
+        });
+        replayTime.setMinWidth(150);
+        Label title = Ui.label("Relecture", "replay-title");
+        replayBar.getChildren().addAll(playButton, title, scrub, replayTime);
+        replayBar.setAlignment(Pos.CENTER_LEFT);
+        replayBar.getStyleClass().addAll("glass", "replay-bar");
+        replayBar.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+        StackPane.setAlignment(replayBar, Pos.BOTTOM_CENTER);
+        StackPane.setMargin(replayBar, new Insets(0, 0, 44, 0));
+        replayBar.setVisible(false);
+        replayDot.getStyleClass().add("marker-replay");
+        replayTrail.getStyleClass().add("track-replay");
+        replayDot.setVisible(false);
+        replayTrail.setVisible(false);
+
+        getChildren().addAll(canvas, scale, north, status, note, replayBar);
         widthProperty().addListener((o, a, b) -> redraw(false));
         heightProperty().addListener((o, a, b) -> redraw(false));
         setAccessibleText("Carte du trajet de la mission");
@@ -80,6 +144,9 @@ final class TrackMap extends StackPane {
         this.fixes = List.copyOf(fixes);
         this.stops = List.copyOf(stops);
         this.live = live;
+        boolean canReplay = !live && fixes.size() >= 2;
+        replayBar.setVisible(canReplay);
+        if (!canReplay) stopReplay();
         status.setText(statusText);
         status.setGraphic(live ? liveDot() : null);
         status.setGraphicTextGap(6);
@@ -126,9 +193,10 @@ final class TrackMap extends StackPane {
         minLon -= (spanX / k - (maxLon - minLon)) / 2;
         maxLat += (spanY - (maxLat - minLat)) / 2;
         double pad = 64;
-        double scale = Math.min((w - 2 * pad) / spanX, (h - 2 * pad) / spanY);
+        double bottom = replayBar.isVisible() ? 110 : pad;   // la barre de relecture ne masque pas la trace
+        double scale = Math.min((w - 2 * pad) / spanX, (h - pad - bottom) / spanY);
         double offX = (w - spanX * scale) / 2;
-        double offY = (h - spanY * scale) / 2;
+        double offY = pad + (h - pad - bottom - spanY * scale) / 2;
         final double fMinLon = minLon, fMaxLat = maxLat;
         java.util.function.BiFunction<Double, Double, double[]> project = (lat, lon) ->
                 new double[]{offX + (lon - fMinLon) * k * scale, offY + (fMaxLat - lat) * scale};
@@ -150,6 +218,9 @@ final class TrackMap extends StackPane {
         halo.getPoints().setAll(pts);
         line.getPoints().setAll(pts);
         canvas.getChildren().addAll(halo, line);
+        List<double[]> proj = new ArrayList<>();
+        for (int i = 0; i + 1 < pts.size(); i += 2) proj.add(new double[]{pts.get(i), pts.get(i + 1)});
+        projected = proj;
         if (animate && !Motion.isReduced() && length > 0) {
             for (Polyline pl : List.of(halo, line)) {
                 pl.getStrokeDashArray().setAll(length, length);
@@ -190,6 +261,9 @@ final class TrackMap extends StackPane {
             canvas.getChildren().add(end);
         }
 
+        canvas.getChildren().addAll(replayTrail, replayDot);
+        placeReplay(replay.get());
+
         // échelle : 1, 2, 5, 10, 20 km… autour de 110 px
         double metersPerPx = 1 / scale * 111_320;
         double target = 110 * metersPerPx;
@@ -221,5 +295,76 @@ final class TrackMap extends StackPane {
         HBox h = new HBox(6, c, Ui.label(text, "footnote", "muted"));
         h.setAlignment(Pos.CENTER_LEFT);
         return h;
+    }
+
+    // ------------------------------------------------------------------ relecture du trajet
+
+    /** Place la relecture à une fraction donnée (curseur, parcours de captures). */
+    void seek(double t) {
+        replay.set(Math.max(0, Math.min(1, t)));
+    }
+
+    private void toggleReplay() {
+        if (replayAnim != null && replayAnim.getStatus() == Animation.Status.RUNNING) {
+            replayAnim.pause();
+            playButton.setGraphic(Icons.stroke(Icons.PLAY, 14, "white"));
+            return;
+        }
+        double from = replay.get() < 0 || replay.get() >= 0.999 ? 0 : replay.get();
+        // durée de relecture proportionnelle à la mission, bornée entre 8 et 24 s
+        long missionSec = java.time.Duration.between(fixes.get(0).recordedAt(), fixes.get(fixes.size() - 1).recordedAt()).getSeconds();
+        double total = Math.max(8, Math.min(24, missionSec / 240.0));
+        replay.set(from);
+        replayAnim = new Timeline(new KeyFrame(Duration.seconds(total * (1 - from)), new KeyValue(replay, 1, javafx.animation.Interpolator.LINEAR)));
+        replayAnim.setOnFinished(e -> playButton.setGraphic(Icons.stroke(Icons.PLAY, 14, "white")));
+        replayAnim.play();
+        playButton.setGraphic(Icons.stroke(Icons.STOP, 13, "white"));
+    }
+
+    private void stopReplay() {
+        if (replayAnim != null) replayAnim.stop();
+        replay.set(-1);
+        playButton.setGraphic(Icons.stroke(Icons.PLAY, 14, "white"));
+    }
+
+    /** Place le repère de relecture à la fraction t du TEMPS de la mission (pas de la distance : les arrêts se voient). */
+    private void placeReplay(double t) {
+        if (t < 0 || projected.size() < 2 || fixes.size() != projected.size()) {
+            replayDot.setVisible(false);
+            replayTrail.setVisible(false);
+            if (t < 0) replayTime.setText("Glissez ou lancez la lecture");
+            return;
+        }
+        long t0 = fixes.get(0).recordedAt().toEpochMilli();
+        long t1 = fixes.get(fixes.size() - 1).recordedAt().toEpochMilli();
+        long at = t0 + Math.round((t1 - t0) * Math.min(1, t));
+        int i = 0;
+        while (i + 1 < fixes.size() && fixes.get(i + 1).recordedAt().toEpochMilli() <= at) i++;
+        double x, y;
+        GpsFix cur = fixes.get(i);
+        if (i + 1 < fixes.size()) {
+            long a = cur.recordedAt().toEpochMilli(), b = fixes.get(i + 1).recordedAt().toEpochMilli();
+            double f = b == a ? 0 : (double) (at - a) / (b - a);
+            x = projected.get(i)[0] + (projected.get(i + 1)[0] - projected.get(i)[0]) * f;
+            y = projected.get(i)[1] + (projected.get(i + 1)[1] - projected.get(i)[1]) * f;
+        } else {
+            x = projected.get(i)[0];
+            y = projected.get(i)[1];
+        }
+        List<Double> trail = new ArrayList<>();
+        for (int k = 0; k <= i; k++) {
+            trail.add(projected.get(k)[0]);
+            trail.add(projected.get(k)[1]);
+        }
+        trail.add(x);
+        trail.add(y);
+        replayTrail.getPoints().setAll(trail);
+        replayDot.setCenterX(x);
+        replayDot.setCenterY(y);
+        replayDot.setVisible(true);
+        replayTrail.setVisible(true);
+        String hm = java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(java.time.Instant.ofEpochMilli(at).atZone(java.time.ZoneId.of("Africa/Douala")));
+        Double sp = cur.speedMps();
+        replayTime.setText(hm + (sp == null ? "" : " · " + Math.round(sp * 3.6) + " km/h"));
     }
 }

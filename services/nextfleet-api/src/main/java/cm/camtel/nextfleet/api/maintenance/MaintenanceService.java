@@ -359,16 +359,43 @@ public class MaintenanceService {
                     new MapSqlParameterSource("i", id).addValue("p", it.pointCode()).addValue("s", it.state())
                             .addValue("c", it.critical()).addValue("cm", blank(it.comment())));
         }
-        if (critical) {
-            // un défaut critique ouvre automatiquement une demande d'intervention (pas de véhicule dangereux sans suite)
+        // contrôle défectueux → demande d'intervention : chaque défaut ouvre SA demande, classée dans la bonne catégorie,
+        // sauf si le même défaut est déjà ouvert sur ce véhicule (pas de doublon) ; l'atelier reçoit le commentaire du conducteur
+        Map<String, String> labels = new java.util.HashMap<>();
+        for (InspectionPoint p : points()) labels.put(p.code(), p.label());
+        int opened = 0;
+        for (InspectionItem it : c.items()) {
+            if (!"DEFAUT".equals(it.state())) continue;
+            String prefix = "Défaut au contrôle : " + labels.getOrDefault(it.pointCode(), it.pointCode());
+            Integer dup = jdbc.queryForObject("""
+                    SELECT count(*) FROM maintenance_order WHERE vehicle_id = :v AND title LIKE :p
+                       AND status IN ('DEMANDE','QUALIFIEE','PLANIFIEE','EN_COURS')""",
+                    new MapSqlParameterSource("v", c.vehicleId()).addValue("p", prefix.replace("%", "\\%") + "%"), Integer.class);
+            if (dup != null && dup > 0) continue;
+            String title = prefix + (it.critical() ? " (critique)" : "") + " — " + it.comment().strip();
             jdbc.update("""
-                    INSERT INTO maintenance_order(vehicle_id, category_code, title, requested_by)
-                    VALUES (:v, 'AUTRE', :t, :me)""",
-                    new MapSqlParameterSource("v", c.vehicleId()).addValue("t", "Défaut critique relevé au contrôle du "
-                            + java.time.LocalDate.now(java.time.ZoneId.of("Africa/Douala"))).addValue("me", me.userId()));
+                    INSERT INTO maintenance_order(vehicle_id, category_code, title, requested_by) VALUES (:v, :cat, :t, :me)""",
+                    new MapSqlParameterSource("v", c.vehicleId()).addValue("cat", categoryForPoint(it.pointCode()))
+                            .addValue("t", title.length() > 200 ? title.substring(0, 199) + "…" : title).addValue("me", me.userId()));
+            opened++;
         }
-        audit.record(me.userId(), "CREATE", "inspection", id.toString(), null, null, Map.of("result", result, "items", c.items().size()));
+        audit.record(me.userId(), "CREATE", "inspection", id.toString(), null, null,
+                Map.of("result", result, "items", c.items().size(), "demandesOuvertes", opened));
         return inspections(c.vehicleId()).stream().filter(i -> i.id().equals(id)).findFirst().orElseThrow();
+    }
+
+    /** Catégorie d'atelier correspondant au point de contrôle en défaut. */
+    static String categoryForPoint(String point) {
+        return switch (point) {
+            case "FREINS" -> "FREINAGE";
+            case "PNEUMATIQUES", "SECOURS" -> "PNEUMATIQUE";
+            case "BATTERIE" -> "BATTERIE";
+            case "ECLAIRAGE", "CLIMATISATION" -> "ELECTRICITE";
+            case "CARROSSERIE" -> "TOLERIE";
+            case "NIVEAUX" -> "MOTEUR";
+            case "DOCUMENTS" -> "ADMINISTRATIF";
+            default -> "AUTRE";
+        };
     }
 
     // ---------------------------------------------------------------- pneumatiques

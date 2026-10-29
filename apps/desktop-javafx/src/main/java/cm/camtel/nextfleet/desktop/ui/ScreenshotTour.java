@@ -48,6 +48,8 @@ public final class ScreenshotTour {
         add(() -> shot("21-missions-carte-en-direct"));
         add(() -> find(MissionsView.class).selectReference("MIS-2026-012"));
         add(() -> shot("21b-mission-terminee"));
+        add(() -> { var n = app.scene().getRoot().lookup(".map-card"); if (n instanceof TrackMap t) t.seek(0.55); });
+        add(() -> shot("21e-relecture-trajet"));
         add(() -> find(MissionsView.class).selectReference("MIS-2026-014"));
         add(app::toggleTheme);
         add(() -> shot("21c-missions-sombre"));
@@ -182,6 +184,12 @@ public final class ScreenshotTour {
         add(() -> shot("32-rapports"));
         add(() -> shell().show(AppShell.Section.MAINTENANCE));
         add(() -> shot("33-entretiens-gestionnaire"));
+        add(() -> app.scene().setRoot(Splash.create(() -> { })));
+        add(() -> { });
+        add(() -> { });
+        add(() -> shot("00-ecran-de-lancement"));
+        add(() -> app.showLogin(null));
+        add(() -> login("gestionnaire"));
         add(() -> shell().openSearch(""));
         add(() -> shot("34-recherche-universelle"));
         add(() -> shell().openSearch("lt"));
