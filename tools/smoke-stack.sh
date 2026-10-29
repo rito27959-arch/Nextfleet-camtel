@@ -22,6 +22,9 @@ ENV
 DC="docker compose -f compose.yaml -f compose.ci.yaml"
 $DC up -d db api gps-gateway traccar
 fail() { echo "ÉCHEC : $*"; $DC logs --tail 80 api gps-gateway traccar || true; exit 1; }
+# toute commande qui échoue (même dans une affectation $(...)) dit où et avec quel code, journaux à l'appui
+set -E
+trap 'code=$?; echo "ÉCHEC ligne $LINENO (code $code) : $BASH_COMMAND"; $DC logs --tail 60 api || true; exit $code' ERR
 for i in $(seq 1 60); do curl -fs http://127.0.0.1:8080/actuator/health >/dev/null && break; sleep 3; done
 curl -fs http://127.0.0.1:8080/actuator/health | grep -q UP || fail "API non démarrée"
 curl -fs http://127.0.0.1:8090/health | grep -q UP || fail "passerelle non démarrée"
