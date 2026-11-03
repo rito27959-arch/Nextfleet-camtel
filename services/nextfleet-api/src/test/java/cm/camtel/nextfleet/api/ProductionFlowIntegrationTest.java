@@ -364,8 +364,8 @@ class ProductionFlowIntegrationTest {
             var res = call(get("/api/v1/reports/" + code + ".pdf?from=" + today.minusDays(30) + "&to=" + today + "&direction=DRCT"), aud, null)
                     .andExpect(status().isOk()).andExpect(header().string("Content-Type", containsString("application/pdf")))
                     .andExpect(header().string("Content-Disposition", containsString(".pdf"))).andReturn().getResponse();
-            String pdf = new String(res.getContentAsByteArray(), StandardCharsets.ISO_8859_1);
-            assertTrue(pdf.startsWith("%PDF-1.4") && pdf.strip().endsWith("%%EOF") && pdf.contains("/Type /Page"), code);
+            String doc = new String(res.getContentAsByteArray(), StandardCharsets.ISO_8859_1);
+            assertTrue(doc.startsWith("%PDF-1.4") && doc.strip().endsWith("%%EOF") && doc.contains("/Type /Page"), code);
         }
         String empty = new String(call(get("/api/v1/reports/vidanges.pdf?direction=DG"), aud, null).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsByteArray(), StandardCharsets.ISO_8859_1);
