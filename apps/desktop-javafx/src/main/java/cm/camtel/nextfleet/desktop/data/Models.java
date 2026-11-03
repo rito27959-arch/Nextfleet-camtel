@@ -51,9 +51,16 @@ public final class Models {
     public record Vehicle(UUID id, String registration, String make, String model, Integer modelYear, String energy,
                           VehicleStatus status, String driverName, Integer fuelLevelPercent, String lastKnownPlace,
                           BigDecimal odometerKm, BigDecimal tankCapacityLiters, LocalDate nextMaintenance,
-                          String category, long version) {
+                          String category, long version, String direction, String siteLabel) {
         public String label() {
             return make + " " + model;
+        }
+
+        /** « DRCT · CTT Yaoundé » : direction et affectation, ce qui est connu. */
+        public String placement() {
+            String d = direction == null || direction.isBlank() ? null : direction;
+            String s = siteLabel == null || siteLabel.isBlank() ? null : siteLabel;
+            return d != null && s != null ? d + " · " + s : d != null ? d : s != null ? s : lastKnownPlace;
         }
     }
 
@@ -122,5 +129,10 @@ public final class Models {
     public record Page<T>(List<T> items, int page, int size, long total) { }
 
     public record VehicleDraft(String registration, String vin, String make, String model, Integer modelYear,
-                               String energy, BigDecimal tankCapacityLiters, String category) { }
+                               String energy, BigDecimal tankCapacityLiters, String category, String direction, String siteLabel) {
+        public VehicleDraft(String registration, String vin, String make, String model, Integer modelYear,
+                            String energy, BigDecimal tankCapacityLiters, String category) {
+            this(registration, vin, make, model, modelYear, energy, tankCapacityLiters, category, null, null);
+        }
+    }
 }

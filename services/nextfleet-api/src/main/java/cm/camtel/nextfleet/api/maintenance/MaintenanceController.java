@@ -64,6 +64,11 @@ public class MaintenanceController {
         return service.oilChanges(vehicleId);
     }
 
+    @GetMapping("/api/v1/oil-changes/status")
+    public List<MaintenanceService.OilStatus> oilStatus(@RequestParam(required = false) String direction) {
+        return service.oilStatus(direction);
+    }
+
     @PostMapping("/api/v1/oil-changes")
     @ResponseStatus(HttpStatus.CREATED)
     public MaintenanceService.OilChangeView addOilChange(@RequestBody OilChangeCreate c) {

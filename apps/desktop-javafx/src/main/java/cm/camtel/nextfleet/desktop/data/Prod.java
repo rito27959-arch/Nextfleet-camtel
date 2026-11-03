@@ -131,7 +131,28 @@ public final class Prod {
 
     public record OilChange(UUID id, UUID vehicleId, String registration, LocalDate doneOn, BigDecimal odometerKm, String oilLabel,
                             List<String> filters, Integer intervalKm, Integer intervalMonths, BigDecimal nextDueKm,
-                            LocalDate nextDueOn, BigDecimal costXaf, String garageLabel, String author) { }
+                            LocalDate nextDueOn, BigDecimal costXaf, String garageLabel, String author, String direction) { }
+
+    /** État de vidange calculé par le serveur ; ordre d'urgence : en retard, à prévoir, jamais, sans intervalle, à jour. */
+    public enum OilState {
+        EN_RETARD("En retard", "danger"), A_PREVOIR("À prévoir", "warning"), AUCUNE("Aucune vidange", "neutral"),
+        SANS_INTERVALLE("Intervalle non renseigné", "neutral"), A_JOUR("À jour", "ok");
+
+        public final String label;
+        public final String tone;
+
+        OilState(String label, String tone) {
+            this.label = label;
+            this.tone = tone;
+        }
+    }
+
+    public record OilStatus(UUID vehicleId, String registration, String model, String direction, String siteLabel,
+                            BigDecimal currentKm, LocalDate lastDoneOn, BigDecimal lastKm, String oilLabel,
+                            BigDecimal nextDueKm, LocalDate nextDueOn, BigDecimal remainingKm, Long daysLeft, OilState state) { }
+
+    /** Correction de l'affectation d'un véhicule (direction, site, statut) ; le motif est tracé dans l'historique. */
+    public record VehicleEdit(String direction, String siteLabel, cm.camtel.nextfleet.desktop.data.Models.VehicleStatus status, String reason) { }
 
     public record OilChangeDraft(UUID vehicleId, LocalDate doneOn, BigDecimal odometerKm, String oilLabel, BigDecimal oilLiters,
                                  boolean oilFilter, boolean airFilter, boolean fuelFilter, Integer intervalKm, Integer intervalMonths,
@@ -196,7 +217,7 @@ public final class Prod {
 
     public record ImportResult(int read, int inserted, int duplicates, List<String> errors) { }
 
-    public record ReportInfo(String code, String title, String description, boolean period) { }
+    public record ReportInfo(String code, String title, String description, boolean period, boolean byDirection) { }
 
     // ---------------------------------------------------------------- messagerie
 

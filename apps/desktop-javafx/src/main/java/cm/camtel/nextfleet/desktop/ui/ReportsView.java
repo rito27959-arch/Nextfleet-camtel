@@ -26,6 +26,7 @@ final class ReportsView extends ScrollPane {
     private final VBox col;
     private final DatePicker from = FormSheet.date(Views.today().withDayOfMonth(1));
     private final DatePicker to = FormSheet.date(Views.today());
+    private final javafx.scene.control.ComboBox<String> directionBox = new javafx.scene.control.ComboBox<>();
 
     ReportsView(AppShell shell) {
         this.shell = shell;
@@ -34,12 +35,18 @@ final class ReportsView extends ScrollPane {
     }
 
     private void load() {
+        Ui.async(() -> shell.gateway().directions(), l -> {
+            String keep = directionBox.getValue();
+            directionBox.getItems().setAll(l);
+            directionBox.getItems().add(0, "Toutes les directions");
+            directionBox.setValue(keep == null || !directionBox.getItems().contains(keep) ? "Toutes les directions" : keep);
+        }, err -> { });
         Ui.load("reports", () -> shell.gateway().reports(), this::render, err -> col.getChildren().setAll(header(), Ui.errorBanner(err, this::load)),
                 () -> col.getChildren().setAll(header(), Ui.skeleton(-1, 300)));
     }
 
     private Node header() {
-        return Views.header("Rapports", "Exports CSV de votre périmètre, prêts pour Excel. Chaque export est tracé dans le journal d'audit.");
+        return Views.header("Rapports", "Documents PDF à imprimer ou envoyer, ou fichiers CSV pour Excel, par direction. Chaque export est tracé dans le journal d'audit.");
     }
 
     private void render(List<Prod.ReportInfo> reports) {
@@ -47,6 +54,12 @@ final class ReportsView extends ScrollPane {
                 Ui.label("au", "footnote", "muted"), to);
         period.setAlignment(Pos.CENTER_LEFT);
         period.getStyleClass().add("list-row");
+        directionBox.setMinWidth(210);
+        directionBox.setAccessibleText("Direction à exporter");
+        if (directionBox.getValue() == null) directionBox.setValue("Toutes les directions");
+        HBox dirRow = new HBox(10, Ui.label("Direction", "row-title"), Ui.spacer(), directionBox);
+        dirRow.setAlignment(Pos.CENTER_LEFT);
+        dirRow.getStyleClass().add("list-row");
         List<Node> quick = new ArrayList<>();
         LocalDate t = Views.today();
         for (String[] q : new String[][]{{"Ce mois", "M"}, {"Mois dernier", "P"}, {"Trimestre", "Q"}, {"Année", "Y"}}) {
@@ -66,10 +79,11 @@ final class ReportsView extends ScrollPane {
         chips.getChildren().addAll(quick);
         List<Node> rows = new ArrayList<>();
         for (Prod.ReportInfo r : reports) {
-            Button export = new Button("Exporter", Icons.stroke(Icons.DOWNLOAD, 14, "-nf-accent"));
-            export.getStyleClass().add("btn-tinted");
-            export.setOnAction(e -> export(r, export));
-            Label d = Ui.label(r.description() + (r.period() ? "" : " Instantané à la date du jour."), "footnote", "muted");
+            Button[] self = new Button[1];
+            self[0] = Exports.menuButton("Exporter", format -> export(r, self[0], format));
+            Button export = self[0];
+            Label d = Ui.label(r.description() + (r.period() ? "" : " Instantané à la date du jour.")
+                    + (r.byDirection() ? "" : " Non filtrable par direction."), "footnote", "muted");
             d.setWrapText(true);
             VBox text = new VBox(2, Ui.label(r.title(), "row-title"), d);
             HBox.setHgrow(text, Priority.ALWAYS);
@@ -80,40 +94,21 @@ final class ReportsView extends ScrollPane {
             row.getProperties().put("hasIcon", true);
             rows.add(row);
         }
-        col.getChildren().setAll(header(), Ui.insetGroup("Période des rapports datés", List.of(period), null), chips,
+        col.getChildren().setAll(header(), Ui.insetGroup("Période et direction", List.of(period, dirRow), "La période ne s'applique qu'aux rapports datés."), chips,
                 rows.isEmpty() ? Ui.statePanel(Icons.REPORT, "Aucun rapport disponible", "Votre profil ne permet pas l'export de rapports.")
-                        : Ui.insetGroup("Rapports disponibles", rows, "Format CSV : séparateur « ; », dates au fuseau de Douala, montants en FCFA."));
+                        : Ui.insetGroup("Rapports disponibles", rows, "PDF : A4 paysage avec totaux des montants et des litres. CSV : séparateur « ; », UTF-8, ouverture directe dans Excel. Dates au fuseau de Douala, montants en FCFA."));
         Motion.stagger(col.getChildren());
     }
 
-    private void export(Prod.ReportInfo r, Button b) {
+    private void export(Prod.ReportInfo r, Button b, String format) {
         LocalDate f = from.getValue() == null ? Views.today().withDayOfMonth(1) : from.getValue();
         LocalDate t = to.getValue() == null ? Views.today() : to.getValue();
         if (t.isBefore(f)) {
             shell.toasts().info("Période invalide", "La fin de période précède le début.");
             return;
         }
-        FileChooser fc = new FileChooser();
-        fc.setTitle("Enregistrer le rapport");
-        fc.setInitialFileName("nexfleet-" + r.code() + "-" + f + (r.period() ? "_" + t : "") + ".csv");
-        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV", "*.csv"));
-        java.io.File dest = fc.showSaveDialog(getScene().getWindow());
-        if (dest == null) return;
-        b.setDisable(true);
-        b.setText("Export…");
-        Ui.async(() -> shell.gateway().exportReport(r.code(), f, t), bytes -> {
-            b.setDisable(false);
-            b.setText("Exporter");
-            try {
-                java.nio.file.Files.write(dest.toPath(), bytes);
-                shell.toasts().success("Rapport enregistré", dest.getName());
-            } catch (java.io.IOException e) {
-                shell.toasts().info("Enregistrement impossible", e.getMessage());
-            }
-        }, err -> {
-            b.setDisable(false);
-            b.setText("Exporter");
-            shell.toasts().info("Export refusé", err.getMessage());
-        });
+        String v = directionBox.getValue();
+        String dir = v == null || v.startsWith("Toutes") || !r.byDirection() ? null : v;
+        Exports.report(shell, this, b, r.code(), f, t, dir, null, dir, format);
     }
 }

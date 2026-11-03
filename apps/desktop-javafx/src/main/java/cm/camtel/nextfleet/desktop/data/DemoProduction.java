@@ -41,6 +41,54 @@ final class DemoProduction {
         seed();
     }
 
+    private void oil(Vehicle v, int daysAgo, double kmBefore, String label, List<String> filters, Integer ik, Integer im, double cost) {
+        LocalDate on = LocalDate.now(clock.withZone(DLA)).minusDays(daysAgo);
+        BigDecimal km = v.odometerKm() == null ? d(0) : d(v.odometerKm().doubleValue() - kmBefore);
+        oils.add(new Prod.OilChange(UUID.randomUUID(), v.id(), v.registration(), on, km, label, filters, ik, im,
+                ik == null ? null : km.add(BigDecimal.valueOf(ik)), im == null ? null : on.plusMonths(im), BigDecimal.valueOf(cost),
+                "Atelier central (fictif)", "Maintenance (fictif)", v.direction()));
+    }
+
+    /** Même règle que le serveur : en retard, à prévoir (≤ 1 000 km ou ≤ 30 jours), jamais, sans intervalle, à jour. */
+    List<Prod.OilStatus> oilStatus(String direction) {
+        LocalDate today = LocalDate.now(clock.withZone(DLA));
+        List<Prod.OilStatus> out = new ArrayList<>();
+        for (Vehicle v : vehicles) {
+            if (v.status() == Models.VehicleStatus.ARCHIVED) continue;
+            if (direction != null && !direction.equals(v.direction())) continue;
+            Prod.OilChange last = oils.stream().filter(o -> o.vehicleId().equals(v.id()))
+                    .max(java.util.Comparator.comparing(Prod.OilChange::doneOn)).orElse(null);
+            BigDecimal cur = v.odometerKm();
+            BigDecimal rest = last == null || last.nextDueKm() == null || cur == null ? null : last.nextDueKm().subtract(cur);
+            Long days = last == null || last.nextDueOn() == null ? null : java.time.temporal.ChronoUnit.DAYS.between(today, last.nextDueOn());
+            Prod.OilState st;
+            if (last == null) st = Prod.OilState.AUCUNE;
+            else if ((rest != null && rest.signum() < 0) || (days != null && days < 0)) st = Prod.OilState.EN_RETARD;
+            else if ((rest != null && rest.compareTo(BigDecimal.valueOf(1000)) <= 0) || (days != null && days <= 30)) st = Prod.OilState.A_PREVOIR;
+            else if (last.nextDueKm() == null && last.nextDueOn() == null) st = Prod.OilState.SANS_INTERVALLE;
+            else st = Prod.OilState.A_JOUR;
+            out.add(new Prod.OilStatus(v.id(), v.registration(), v.label(), v.direction(), v.siteLabel(), cur,
+                    last == null ? null : last.doneOn(), last == null ? null : last.odometerKm(), last == null ? null : last.oilLabel(),
+                    last == null ? null : last.nextDueKm(), last == null ? null : last.nextDueOn(), rest, days, st));
+        }
+        out.sort(java.util.Comparator.comparingInt((Prod.OilStatus o) -> o.state().ordinal())
+                .thenComparing(o -> o.remainingKm() == null ? BigDecimal.valueOf(Long.MAX_VALUE) : o.remainingKm()));
+        return out;
+    }
+
+    Prod.OilChange addOil(Prod.OilChangeDraft d, String author) {
+        Vehicle v = vehicles.stream().filter(x -> x.id().equals(d.vehicleId())).findFirst().orElseThrow();
+        List<String> f = new ArrayList<>();
+        if (d.oilFilter()) f.add("Filtre à huile");
+        if (d.fuelFilter()) f.add("Filtre à carburant");
+        if (d.airFilter()) f.add("Filtre à air");
+        Prod.OilChange o = new Prod.OilChange(UUID.randomUUID(), v.id(), v.registration(), d.doneOn(), d.odometerKm(), d.oilLabel(), f,
+                d.intervalKm(), d.intervalMonths(), d.intervalKm() == null ? null : d.odometerKm().add(BigDecimal.valueOf(d.intervalKm())),
+                d.intervalMonths() == null ? null : d.doneOn().plusMonths(d.intervalMonths()), d.costXaf(), d.garageLabel(), author, v.direction());
+        oils.add(0, o);
+        return o;
+    }
+
     private Vehicle v(int i) {
         return vehicles.get(Math.min(i, vehicles.size() - 1));
     }
@@ -65,12 +113,14 @@ final class DemoProduction {
         orders.add(work(v(4), "FREINAGE", "Freinage", "Plaquettes avant usées", Prod.WorkStatus.CLOTUREE, "Atelier central (fictif)",
                 d(97400), BigDecimal.valueOf(85000), "Plaquettes et disques avant remplacés", 260, "Aline Mvondo (fictif)"));
         LocalDate today = LocalDate.now(clock.withZone(DLA));
-        oils.add(new Prod.OilChange(UUID.randomUUID(), v(0).id(), v(0).registration(), today.minusDays(40), d(58200), "15W40",
-                List.of("Filtre à huile", "Filtre à air"), 5000, 6, d(63200), today.minusDays(40).plusMonths(6), BigDecimal.valueOf(45000),
-                "Atelier central (fictif)", "Maintenance (fictif)"));
-        oils.add(new Prod.OilChange(UUID.randomUUID(), v(2).id(), v(2).registration(), today.minusDays(150), d(112400), "10W40",
-                List.of("Filtre à huile"), 7500, 6, d(119900), today.minusDays(150).plusMonths(6), BigDecimal.valueOf(52000),
-                "Atelier central (fictif)", "Maintenance (fictif)"));
+        // vidanges cohérentes avec le compteur de chaque véhicule : à prévoir, en retard (date, km), à jour, sans intervalle
+        oil(v(0), 220, 9300, "15W40", List.of("Filtre à huile"), 5000, 6, 42000);
+        oil(v(0), 40, 4300, "15W40", List.of("Filtre à huile", "Filtre à air"), 5000, 6, 45000);
+        oil(v(2), 200, 6400, "10W40", List.of("Filtre à huile"), 7500, 6, 52000);
+        oil(v(3), 20, 1300, "15W40", List.of("Filtre à huile", "Filtre à carburant"), 5000, 6, 47500);
+        oil(v(5), 60, 2100, "5W30", List.of("Filtre à huile", "Filtre à air", "Liquide de refroidissement"), 10000, 12, 68000);
+        oil(v(6), 10, 700, "15W40", List.of(), null, null, 39000);
+        oil(v(7), 90, 6500, "15W40", List.of("Filtre à huile"), 5000, 6, 45000);
         Prod.Supplier st = suppliers.get(0);
         fuelOrders.add(new Prod.FuelOrder(UUID.randomUUID(), "BON-" + today.toString().replace("-", "") + "-0003", v(1).id(), v(1).registration(),
                 st.name(), "Félix Kamga (fictif)", null, BigDecimal.valueOf(60), BigDecimal.valueOf(50400), BigDecimal.ZERO, BigDecimal.ZERO,
@@ -189,31 +239,127 @@ final class DemoProduction {
     }
 
     static final List<Prod.ReportInfo> REPORTS = List.of(
-            new Prod.ReportInfo("vehicules", "Parc automobile", "Véhicules actifs : identité, statut, entité, conducteur attitré, kilométrage.", false),
-            new Prod.ReportInfo("conducteurs", "Conducteurs", "Conducteurs actifs, permis et CNI avec leurs échéances.", false),
-            new Prod.ReportInfo("pleins", "Pleins de carburant", "Pleins de la période : bon, station, litres, prix, compteur, reçu.", true),
-            new Prod.ReportInfo("bons", "Bons de carburant", "Bons émis sur la période : demandeur, valideur, autorisé et consommé.", true),
-            new Prod.ReportInfo("interventions", "Interventions d'atelier", "Ordres de la période : catégorie, statut, immobilisation, coût, visa.", true),
-            new Prod.ReportInfo("missions", "Missions", "Missions de la période : objet, trajet prévu, conducteur, dates réelles.", true),
-            new Prod.ReportInfo("couts-vehicules", "Coûts par véhicule", "Carburant, interventions clôturées et vidanges hors ordre, par véhicule.", true),
-            new Prod.ReportInfo("echeances", "Échéances", "Documents véhicules, permis et CNI expirés ou à échéance sous 90 jours.", false),
-            new Prod.ReportInfo("anomalies", "Écarts à vérifier", "Écarts détectés sur la période et leur statut d'instruction.", true));
+            new Prod.ReportInfo("vehicules", "Parc automobile", "Véhicules actifs : identité, statut, direction, affectation, conducteur attitré, kilométrage.", false, true),
+            new Prod.ReportInfo("conducteurs", "Conducteurs", "Conducteurs actifs, permis et CNI avec leurs échéances.", false, false),
+            new Prod.ReportInfo("pleins", "Pleins de carburant", "Pleins de la période : bon, station, litres, prix, compteur, reçu.", true, true),
+            new Prod.ReportInfo("bons", "Bons de carburant", "Bons émis sur la période : demandeur, valideur, autorisé et consommé.", true, true),
+            new Prod.ReportInfo("interventions", "Interventions d'atelier", "Ordres de la période : catégorie, statut, immobilisation, coût, visa.", true, true),
+            new Prod.ReportInfo("vidanges", "Vidanges", "Vidanges de la période : compteur, huile, éléments remplacés, prochaine échéance, coût et garage.", true, true),
+            new Prod.ReportInfo("etat-vidanges", "État des vidanges", "Pour chaque véhicule : dernière vidange, prochaine échéance (km et date), kilomètres restants et état.", false, true),
+            new Prod.ReportInfo("missions", "Missions", "Missions de la période : objet, trajet prévu, conducteur, dates réelles.", true, true),
+            new Prod.ReportInfo("couts-vehicules", "Coûts par véhicule", "Carburant, interventions clôturées et vidanges hors ordre, par véhicule.", true, true),
+            new Prod.ReportInfo("echeances", "Échéances", "Documents véhicules, permis et CNI expirés ou à échéance sous 90 jours.", false, true),
+            new Prod.ReportInfo("anomalies", "Écarts à vérifier", "Écarts détectés sur la période et leur statut d'instruction.", true, true));
 
     byte[] report(String code) {
-        StringBuilder sb = new StringBuilder("﻿");
-        if ("pleins".equals(code)) {
-            sb.append("Date;Véhicule;Station;Litres;Montant (XAF);Reçu\r\n");
-            for (Prod.FuelFill f : fills) {
-                sb.append(f.filledAt().atZone(DLA).toLocalDate()).append(';').append(f.registration()).append(';').append(f.supplierName()).append(';')
-                        .append(f.liters().toPlainString().replace('.', ',')).append(';').append(f.amountXaf().toPlainString()).append(';')
-                        .append(f.receiptReference()).append("\r\n");
+        return report(code, null, null, null, null, "csv", "Utilisateur de démonstration");
+    }
+
+    /** Rapport fictif en CSV ou en PDF (même mise en page que le serveur), filtré sur une direction si demandée. */
+    byte[] report(String code, LocalDate from, LocalDate to, String direction, UUID vehicleId, String format, String author) {
+        LocalDate today = LocalDate.now(clock.withZone(DLA));
+        LocalDate f = from == null ? today.withDayOfMonth(1) : from, t = to == null ? today : to;
+        java.util.function.Predicate<String> inDir = d -> direction == null || direction.equals(d);
+        Vehicle only = vehicleId == null ? null : vehicles.stream().filter(v -> v.id().equals(vehicleId)).findFirst().orElse(null);
+        java.util.function.Predicate<String> inVeh = reg -> only == null || only.registration().equals(reg);
+        java.util.function.Function<UUID, Vehicle> byId = id -> vehicles.stream().filter(v -> v.id().equals(id)).findFirst().orElse(null);
+        List<String> labels;
+        List<Object[]> rows = new ArrayList<>();
+        switch (code) {
+            case "pleins" -> {
+                labels = List.of("Date", "Véhicule", "Direction", "Station", "Litres", "Montant (XAF)", "Reçu");
+                for (Prod.FuelFill x : fills) {
+                    Vehicle v = byId.apply(x.vehicleId());
+                    LocalDate on = x.filledAt().atZone(DLA).toLocalDate();
+                    if (v == null || !inDir.test(v.direction()) || !inVeh.test(v.registration()) || on.isBefore(f) || on.isAfter(t)) continue;
+                    rows.add(new Object[]{on, x.registration(), v.direction(), x.supplierName(), x.liters(), x.amountXaf(), x.receiptReference()});
+                }
             }
-        } else {
-            sb.append("Immatriculation;Marque;Modèle;Statut\r\n");
-            for (Vehicle v : vehicles) sb.append(v.registration()).append(';').append(v.make()).append(';').append(v.model()).append(';')
-                    .append(v.status().label).append("\r\n");
+            case "vidanges" -> {
+                labels = List.of("Date", "Véhicule", "Direction", "Compteur (km)", "Huile", "Éléments remplacés", "Prochaine (km)", "Prochaine (date)",
+                        "Coût (XAF)", "Garage");
+                for (Prod.OilChange o : oils.stream().sorted(java.util.Comparator.comparing(Prod.OilChange::doneOn)).toList()) {
+                    if (!inDir.test(o.direction()) || !inVeh.test(o.registration()) || o.doneOn().isBefore(f) || o.doneOn().isAfter(t)) continue;
+                    rows.add(new Object[]{o.doneOn(), o.registration(), o.direction(), o.odometerKm(), o.oilLabel(), String.join(", ", o.filters()).toLowerCase(),
+                            o.nextDueKm(), o.nextDueOn(), o.costXaf(), o.garageLabel()});
+                }
+            }
+            case "etat-vidanges" -> {
+                labels = List.of("Véhicule", "Modèle", "Direction", "Affectation", "Compteur actuel (km)", "Dernière vidange", "Prochaine (km)",
+                        "Reste (km)", "Prochaine (date)", "État");
+                for (Prod.OilStatus o : oilStatus(direction)) if (inVeh.test(o.registration())) rows.add(new Object[]{o.registration(), o.model(), o.direction(), o.siteLabel(),
+                        o.currentKm(), o.lastDoneOn(), o.nextDueKm(), o.remainingKm(), o.nextDueOn(), o.state().label});
+            }
+            default -> {
+                labels = List.of("Immatriculation", "Marque", "Modèle", "Statut", "Direction", "Affectation", "Kilométrage");
+                for (Vehicle v : vehicles) {
+                    if (v.status() == Models.VehicleStatus.ARCHIVED || !inDir.test(v.direction()) || !inVeh.test(v.registration())) continue;
+                    rows.add(new Object[]{v.registration(), v.make(), v.model(), v.status().label, v.direction(), v.siteLabel(), v.odometerKm()});
+                }
+            }
+        }
+        java.time.format.DateTimeFormatter day = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        if ("pdf".equals(format)) {
+            List<cm.camtel.nextfleet.domain.report.PdfReport.Column> cols = new ArrayList<>();
+            BigDecimal[] sums = new BigDecimal[labels.size()];
+            for (int c = 0; c < labels.size(); c++) {
+                String l = labels.get(c);
+                final int col = c;
+                boolean num = rows.stream().anyMatch(r -> r[col] instanceof BigDecimal);
+                boolean total = num && ((l.contains("(XAF)") && !l.startsWith("Prix")) || l.startsWith("Litres"));
+                if (total) sums[c] = BigDecimal.ZERO;
+                cols.add(new cm.camtel.nextfleet.domain.report.PdfReport.Column(l, num, total));
+            }
+            List<List<String>> lines = new ArrayList<>();
+            for (Object[] r : rows) {
+                List<String> line = new ArrayList<>();
+                for (int c = 0; c < r.length; c++) {
+                    Object v = r[c];
+                    if (sums[c] != null && v instanceof BigDecimal b) sums[c] = sums[c].add(b);
+                    line.add(v == null ? "" : v instanceof LocalDate d ? day.format(d) : v instanceof BigDecimal b ? pdfNumber(b) : v.toString());
+                }
+                lines.add(line);
+            }
+            List<String> totals = new ArrayList<>();
+            for (BigDecimal b : sums) totals.add(b == null ? null : pdfNumber(b));
+            Prod.ReportInfo info = REPORTS.stream().filter(r -> r.code().equals(code)).findFirst().orElse(REPORTS.get(0));
+            java.time.ZonedDateTime now = java.time.ZonedDateTime.now(clock.withZone(DLA));
+            List<String> ctx = List.of((info.period() ? "Période : du " + day.format(f) + " au " + day.format(t) : "Situation au " + day.format(today))
+                            + "   ·   " + (only != null ? "Véhicule : " + only.registration() : direction == null ? "Toutes les directions" : "Direction : " + direction)
+                            + "   ·   " + rows.size()
+                            + (rows.size() > 1 ? " lignes" : " ligne"),
+                    "Édité le " + day.format(now) + " à " + java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(now) + " par " + author
+                            + " — DONNÉES FICTIVES (mode démonstration)");
+            return cm.camtel.nextfleet.domain.report.PdfReport.render(new cm.camtel.nextfleet.domain.report.PdfReport.Meta(info.title(), info.description(),
+                    ctx, "NexFleet — mode démonstration : données fictives, aucune valeur réelle."), cols, lines, totals);
+        }
+        StringBuilder sb = new StringBuilder("\uFEFF").append(String.join(";", labels)).append("\r\n");
+        for (Object[] r : rows) {
+            for (int c = 0; c < r.length; c++) {
+                Object v = r[c];
+                sb.append(c > 0 ? ";" : "").append(v == null ? "" : v instanceof LocalDate d ? day.format(d)
+                        : v instanceof BigDecimal b ? b.stripTrailingZeros().toPlainString().replace('.', ',') : v.toString().replace(';', ','));
+            }
+            sb.append("\r\n");
         }
         sb.append("Données fictives (mode démonstration)\r\n");
         return sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private static String pdfNumber(BigDecimal b) {
+        String plain = b.setScale(Math.min(Math.max(b.stripTrailingZeros().scale(), 0), 2), RoundingMode.HALF_UP).toPlainString();
+        boolean neg = plain.startsWith("-");
+        if (neg) plain = plain.substring(1);
+        int dot = plain.indexOf('.');
+        String ip = dot < 0 ? plain : plain.substring(0, dot), dp = dot < 0 ? "" : "," + plain.substring(dot + 1);
+        if (ip.length() > 4) {
+            StringBuilder g = new StringBuilder();
+            for (int i = 0; i < ip.length(); i++) {
+                if (i > 0 && (ip.length() - i) % 3 == 0) g.append('\u00A0');
+                g.append(ip.charAt(i));
+            }
+            ip = g.toString();
+        }
+        return (neg ? "-" : "") + ip + dp;
     }
 }

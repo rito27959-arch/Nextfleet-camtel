@@ -1,6 +1,6 @@
-# État réel d'avancement — version 0.8.0 (refonte « NexFleet Pro »)
+# État réel d'avancement — version 0.9.0 (directions, vidanges, exports PDF)
 
-**29 octobre 2026.** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
+**3 novembre 2026.** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
 Aucune autorisation CAMTEL, aucun avis DSIR ou DS et aucune mise en production ne sont revendiqués.
 
 ## Ce qui fonctionne réellement (preuves exécutées)
@@ -25,6 +25,13 @@ résultats sont lisibles dans l'onglet Actions (annotations « bilan »).
 | Contrats OpenAPI | CI | `openapi.yaml` et `openapi-lot2.yaml` (0.3.0, alignés sur l'implémentation) valides |
 | **Refonte « Liquid Glass teinté » (iOS 26)** | CI + `docs/RECHERCHE_DESIGN_IOS26.md` | Bureau et Android redessinés écran par écran (verre teinté sur la navigation seulement, capsules, rayons concentriques, typographie iOS, alertes iOS 26, réglage « Réduire la transparence »). Contrastes du verre au pire cas vérifiés par `tools/check_contrast.py` ; captures bureau dans `docs/design-reference/captures-v2-ios26/` ; captures Android prises sur émulateur (Pixel 7, API 34) par la CI, branche `captures-android` |
 | Captures | `tools/screenshots.sh` | Lot 2 : 22 captures + 2 GIF, dont `23-catalogue-3d.png` (rendu 3D JavaFX réel) |
+
+### Directions, vidanges et exports PDF (0.9.0)
+
+- **Direction et site** de chaque véhicule (colonne `vehicle.direction` déjà remplie par la reprise de `parc.db`) : lus, créés, corrigés avec motif (`PATCH /api/v1/vehicles/{id}`), liste `GET /api/v1/vehicles/directions`, filtre `?direction=` ; recherche aussi sur direction et site. Test d'intégration.
+- **État des vidanges** `GET /api/v1/oil-changes/status` : en retard, à prévoir (≤ 1 000 km ou ≤ 30 j), à jour, aucune, intervalle non renseigné. Écran bureau « Vidanges » (filtre par direction et par état, barre d'usure de l'intervalle, historique, saisie). Vérifié par le parcours de captures (35-*).
+- **Exports PDF** de tous les rapports (`/api/v1/reports/{code}.pdf`), sans bibliothèque externe (`PdfReport`, noyau métier) : A4 paysage, en-tête période / direction / auteur, totaux des montants et des litres, pagination. Filtres `direction` et `vehicleId`, format journalisé dans l'audit. Tests unitaires (structure, table xref, accents, coupure) et d'intégration (11 rapports).
+- Non vérifié : rendu des PDF dans Adobe Reader sur un poste CAMTEL (vérifié avec poppler/qpdf ici).
 
 ### Refonte « NexFleet Pro » (0.8.0)
 

@@ -153,13 +153,40 @@ public final class HttpFleetGateway implements FleetGateway {
 
     @Override
     public Page<Vehicle> vehicles(String query, VehicleStatus status, int page, int size) {
+        return vehicles(query, status, null, page, size);
+    }
+
+    @Override
+    public Page<Vehicle> vehicles(String query, VehicleStatus status, String direction, int page, int size) {
         StringBuilder path = new StringBuilder("/api/v1/vehicles?page=").append(page).append("&size=").append(size);
         if (query != null && !query.isBlank()) path.append("&q=").append(URLEncoder.encode(query.strip(), StandardCharsets.UTF_8));
         if (status != null) path.append("&status=").append(status.name());
+        if (direction != null && !direction.isBlank()) path.append("&direction=").append(URLEncoder.encode(direction.strip(), StandardCharsets.UTF_8));
         JsonNode r = send("GET", path.toString(), null, true);
         List<Vehicle> items = new ArrayList<>();
         r.path("items").forEach(n -> items.add(toVehicle(n)));
         return new Page<>(items, r.path("page").asInt(), r.path("size").asInt(), r.path("total").asLong());
+    }
+
+    @Override
+    public List<String> directions() {
+        List<String> out = new ArrayList<>();
+        send("GET", "/api/v1/vehicles/directions", null, true).forEach(n -> out.add(n.asText()));
+        return out;
+    }
+
+    @Override
+    public Vehicle editVehicle(Vehicle v, Prod.VehicleEdit e) {
+        ObjectNode b = json.createObjectNode().put("reason", e.reason());
+        if (e.direction() != null && !e.direction().isBlank()) b.put("direction", e.direction().strip());
+        if (e.siteLabel() != null && !e.siteLabel().isBlank()) b.put("siteLabel", e.siteLabel().strip());
+        if (e.status() != null && e.status() != v.status()) b.put("status", e.status().name());
+        extraHeader.set(new String[]{"If-Match", "\"" + v.version() + "\""});
+        try {
+            return toVehicle(send("PATCH", "/api/v1/vehicles/" + v.id(), b, true));
+        } finally {
+            extraHeader.remove();
+        }
     }
 
     @Override
@@ -188,6 +215,8 @@ public final class HttpFleetGateway implements FleetGateway {
         if (d.tankCapacityLiters() != null) b.put("tankCapacityLiters", d.tankCapacityLiters());
         if (d.category() != null) b.put("category", d.category());
         if (odometerKm != null) b.put("odometerKm", odometerKm);
+        if (d.direction() != null && !d.direction().isBlank()) b.put("direction", d.direction().strip());
+        if (d.siteLabel() != null && !d.siteLabel().isBlank()) b.put("siteLabel", d.siteLabel().strip());
         return toVehicle(send("POST", "/api/v1/vehicles", b, true));
     }
 
@@ -775,6 +804,25 @@ public final class HttpFleetGateway implements FleetGateway {
     }
 
     @Override
+    public List<Prod.OilStatus> oilStatus(String direction) {
+        String q = direction == null || direction.isBlank() ? "" : "?direction=" + URLEncoder.encode(direction.strip(), StandardCharsets.UTF_8);
+        List<Prod.OilStatus> out = new ArrayList<>();
+        send("GET", "/api/v1/oil-changes/status" + q, null, true).forEach(n -> {
+            Prod.OilState st;
+            try {
+                st = Prod.OilState.valueOf(n.path("state").asText());
+            } catch (IllegalArgumentException e) {
+                st = Prod.OilState.SANS_INTERVALLE;
+            }
+            out.add(new Prod.OilStatus(uuid(n, "vehicleId"), n.path("registration").asText(), n.path("model").asText(""),
+                    n.path("direction").asText(null), n.path("siteLabel").asText(null), dec(n, "currentKm"), date(n, "lastDoneOn"),
+                    dec(n, "lastKm"), n.path("oilLabel").asText(null), dec(n, "nextDueKm"), date(n, "nextDueOn"), dec(n, "remainingKm"),
+                    n.hasNonNull("daysLeft") ? n.get("daysLeft").asLong() : null, st));
+        });
+        return out;
+    }
+
+    @Override
     public Prod.OilChange addOilChange(Prod.OilChangeDraft d) {
         ObjectNode b = json.createObjectNode().put("vehicleId", d.vehicleId().toString()).put("doneOn", d.doneOn().toString())
                 .put("odometerKm", d.odometerKm()).put("oilFilter", d.oilFilter()).put("airFilter", d.airFilter()).put("fuelFilter", d.fuelFilter());
@@ -793,7 +841,7 @@ public final class HttpFleetGateway implements FleetGateway {
         return new Prod.OilChange(uuid(n, "id"), uuid(n, "vehicleId"), n.path("registration").asText(), date(n, "doneOn"), dec(n, "odometerKm"),
                 n.path("oilLabel").asText(null), f, n.hasNonNull("intervalKm") ? n.get("intervalKm").asInt() : null,
                 n.hasNonNull("intervalMonths") ? n.get("intervalMonths").asInt() : null, dec(n, "nextDueKm"), date(n, "nextDueOn"),
-                dec(n, "costXaf"), n.path("garageLabel").asText(null), n.path("author").asText(""));
+                dec(n, "costXaf"), n.path("garageLabel").asText(null), n.path("author").asText(""), n.path("direction").asText(null));
     }
 
     // ------------------------------------------------------------------ production : carburant
@@ -914,15 +962,23 @@ public final class HttpFleetGateway implements FleetGateway {
     public List<Prod.ReportInfo> reports() {
         List<Prod.ReportInfo> out = new ArrayList<>();
         send("GET", "/api/v1/reports", null, true).forEach(n -> out.add(new Prod.ReportInfo(n.path("code").asText(), n.path("title").asText(),
-                n.path("description").asText(), n.path("period").asBoolean())));
+                n.path("description").asText(), n.path("period").asBoolean(), n.path("byDirection").asBoolean())));
         return out;
     }
 
     @Override
     public byte[] exportReport(String code, java.time.LocalDate from, java.time.LocalDate to) {
-        String q = "?from=" + from + "&to=" + to;
-        return raw("GET", "/api/v1/reports/" + URLEncoder.encode(code, StandardCharsets.UTF_8) + ".csv" + q,
-                HttpRequest.BodyPublishers.noBody(), null, "text/csv").body();
+        return exportReport(code, from, to, null, null, "csv");
+    }
+
+    @Override
+    public byte[] exportReport(String code, java.time.LocalDate from, java.time.LocalDate to, String direction, UUID vehicleId, String format) {
+        boolean pdf = "pdf".equals(format);
+        String q = "?from=" + from + "&to=" + to
+                + (direction == null || direction.isBlank() ? "" : "&direction=" + URLEncoder.encode(direction.strip(), StandardCharsets.UTF_8))
+                + (vehicleId == null ? "" : "&vehicleId=" + vehicleId);
+        return raw("GET", "/api/v1/reports/" + URLEncoder.encode(code, StandardCharsets.UTF_8) + (pdf ? ".pdf" : ".csv") + q,
+                HttpRequest.BodyPublishers.noBody(), null, pdf ? "application/pdf" : "text/csv").body();
     }
 
     // ------------------------------------------------------------------ production : comptes
@@ -1137,7 +1193,8 @@ public final class HttpFleetGateway implements FleetGateway {
                 status, n.path("driverName").asText(null), null, n.path("siteLabel").asText(n.path("orgUnitName").asText(null)),
                 dec(n, "odometerKm"),
                 n.hasNonNull("tankCapacityLiters") ? new BigDecimal(n.get("tankCapacityLiters").asText()) : null,
-                date(n, "nextDueOn"), n.path("category").asText(n.path("vehicleType").asText(null)), n.path("version").asLong());
+                date(n, "nextDueOn"), n.path("category").asText(n.path("vehicleType").asText(null)), n.path("version").asLong(),
+                n.path("direction").asText(null), n.path("siteLabel").asText(null));
     }
 
     private JsonNode send(String method, String path, JsonNode body, boolean auth) {

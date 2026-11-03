@@ -1035,3 +1035,16 @@
 .scrub-thumb { -fx-fill: white; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 6, 0, 0, 1); }
 .marker-replay { -fx-fill: -nf-accent; -fx-stroke: white; -fx-stroke-width: 3; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 8, 0, 0, 2); }
 .track-replay { -fx-stroke: -nf-accent; -fx-stroke-width: 6; -fx-stroke-line-cap: round; -fx-stroke-line-join: round; -fx-fill: transparent; }
+
+/* ---- v0.9 : vidanges, filtres par direction ---- */
+.tabular { -fx-font-family: "Inter"; }
+.clickable-tile { -fx-cursor: hand; -fx-border-color: transparent; -fx-border-width: 1.5; -fx-border-radius: 16; }
+.clickable-tile:hover { -fx-border-color: -nf-border; }
+.clickable-tile.tile-selected { -fx-border-color: -nf-accent; }
+.clickable-row { -fx-cursor: hand; }
+.clickable-row:hover { -fx-background-color: -nf-fill; }
+.oil-track { -fx-background-color: -nf-fill; -fx-background-radius: 3; }
+.oil-fill { -fx-background-radius: 3; -fx-background-color: -nf-green; }
+.oil-fill.oil-warning { -fx-background-color: -nf-orange; }
+.oil-fill.oil-danger { -fx-background-color: -nf-red; }
+.oil-fill.oil-neutral { -fx-background-color: -nf-muted; }

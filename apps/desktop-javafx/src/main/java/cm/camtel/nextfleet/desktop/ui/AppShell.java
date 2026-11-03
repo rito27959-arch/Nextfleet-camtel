@@ -43,7 +43,7 @@ public final class AppShell extends StackPane {
     public enum Section {
         MY_MISSIONS("Mes missions", Icons.ROUTE), WORKSHOP("Atelier", Icons.WRENCH), USERS("Comptes et rôles", Icons.USERS),
         OVERVIEW("Vue d'ensemble", Icons.HOME), TRACKING("Suivi GPS", Icons.LOCATION), MISSIONS("Missions", Icons.ROUTE), MESSAGES("Messages", Icons.BUBBLE),
-        ASSISTANT("Assistant", Icons.SPARK), VEHICLES("Véhicules", Icons.CAR), DUE("Échéances", Icons.CALENDAR),
+        ASSISTANT("Assistant", Icons.SPARK), VEHICLES("Véhicules", Icons.CAR), DUE("Échéances", Icons.CALENDAR), OIL("Vidanges", Icons.DROP),
         DRIVERS("Conducteurs", Icons.USER), CATALOGUE("Catalogue 3D", Icons.CUBE), AUDIT("Journal d'audit", Icons.LIST), MAINTENANCE("Entretiens", Icons.WRENCH),
         FUEL("Carburant", Icons.FUEL), COSTS("Coûts", Icons.CHART), REPORTS("Rapports", Icons.REPORT),
         SETTINGS("Réglages", Icons.GEAR);
@@ -139,6 +139,7 @@ public final class AppShell extends StackPane {
             case MESSAGES -> session.can(CHAT_USE);
             case ASSISTANT -> session.can(ASSISTANT_USE);
             case VEHICLES, DUE -> session.can(VEHICLE_READ);
+            case OIL -> session.can(VEHICLE_READ) || session.can(MAINTENANCE_WRITE);
             case DRIVERS -> session.can(DRIVER_READ);
             case CATALOGUE -> session.can(VEHICLE_READ) || session.can(MAINTENANCE_WRITE);
             case AUDIT -> session.can(AUDIT_READ);
@@ -169,7 +170,7 @@ public final class AppShell extends StackPane {
     static final Map<String, List<Section>> GROUPS = new LinkedHashMap<>();
     static {
         GROUPS.put("OPÉRATIONS", List.of(Section.OVERVIEW, Section.MY_MISSIONS, Section.TRACKING, Section.MISSIONS, Section.MESSAGES, Section.ASSISTANT));
-        GROUPS.put("PARC", List.of(Section.VEHICLES, Section.DRIVERS, Section.DUE, Section.MAINTENANCE, Section.WORKSHOP, Section.FUEL, Section.CATALOGUE));
+        GROUPS.put("PARC", List.of(Section.VEHICLES, Section.DRIVERS, Section.DUE, Section.OIL, Section.MAINTENANCE, Section.WORKSHOP, Section.FUEL, Section.CATALOGUE));
         GROUPS.put("PILOTAGE", List.of(Section.COSTS, Section.REPORTS, Section.USERS, Section.AUDIT));
     }
 
@@ -506,6 +507,7 @@ public final class AppShell extends StackPane {
             case OVERVIEW -> new DashboardView(gateway, session, this);
             case VEHICLES -> new VehiclesView(gateway, session, null, this);
             case DUE -> new DueDatesView(gateway, this);
+            case OIL -> new OilView(this);
             case DRIVERS -> new DriversView(gateway, this);
             case CATALOGUE -> new CatalogueView(this);
             case SETTINGS -> new SettingsView(gateway, session, this);

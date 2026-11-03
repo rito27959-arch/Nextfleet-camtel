@@ -27,12 +27,12 @@ public class VehicleService {
                               BigDecimal tankCapacityLiters, boolean tankCapacityVerified, String status,
                               UUID orgUnitId, String modelAssetStatus, Instant archivedAt, long version,
                               String category, String orgUnitName, String driverName, BigDecimal odometerKm,
-                              java.time.LocalDate nextDueOn, String siteLabel) { }
+                              java.time.LocalDate nextDueOn, String siteLabel, String direction) { }
 
     private static final String COLUMNS = """
             id, registration, registration_normalized, vin, make, model, model_year, vehicle_type, energy,
             tank_capacity_l, tank_capacity_verified, status, org_unit_id, model_asset_status, archived_at, version,
-            category, site_label,
+            category, site_label, direction,
             (SELECT o.name FROM organisation_unit o WHERE o.id = vehicle.org_unit_id) AS org_unit_name,
             (SELECT d.full_name FROM vehicle_assignment a JOIN driver d ON d.id = a.driver_id
               WHERE a.vehicle_id = vehicle.id AND a.period @> now() LIMIT 1) AS driver_name,
@@ -47,7 +47,7 @@ public class VehicleService {
             rs.getObject("org_unit_id", UUID.class), rs.getString("model_asset_status"),
             rs.getTimestamp("archived_at") == null ? null : rs.getTimestamp("archived_at").toInstant(),
             rs.getLong("version"), rs.getString("category"), rs.getString("org_unit_name"), rs.getString("driver_name"),
-            rs.getBigDecimal("odometer_km"), rs.getObject("next_due_on", java.time.LocalDate.class), rs.getString("site_label"));
+            rs.getBigDecimal("odometer_km"), rs.getObject("next_due_on", java.time.LocalDate.class), rs.getString("site_label"), rs.getString("direction"));
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AccessService access;
@@ -62,6 +62,22 @@ public class VehicleService {
     /** Liste filtrée au périmètre de l'utilisateur : un véhicule hors périmètre n'apparaît jamais. */
     @Transactional(readOnly = true)
     public Page<VehicleView> search(String q, String status, boolean includeArchived, int page, int size) {
+        return search(q, status, null, includeArchived, page, size);
+    }
+
+    /** Directions du périmètre (« DRCT », « DG »…), triées, pour les filtres et la saisie. */
+    @Transactional(readOnly = true)
+    public List<String> directions() {
+        List<UUID> scope = access.scopeFor("vehicle:read");
+        if (scope.isEmpty()) return List.of();
+        return jdbc.queryForList("""
+                SELECT DISTINCT direction FROM vehicle
+                 WHERE org_unit_id IN (:scope) AND archived_at IS NULL AND direction IS NOT NULL AND btrim(direction) <> ''
+                 ORDER BY direction """, new MapSqlParameterSource("scope", scope), String.class);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<VehicleView> search(String q, String status, String direction, boolean includeArchived, int page, int size) {
         List<UUID> scope = access.scopeFor("vehicle:read");
         if (scope.isEmpty()) return new Page<>(List.of(), page, size, 0);
         String term = q == null || q.isBlank() ? null : q.strip();
@@ -70,13 +86,16 @@ public class VehicleService {
                 .addValue("q", term == null ? null : "%" + term.toLowerCase() + "%")
                 .addValue("qn", term == null ? null : "%" + term.replaceAll("[^A-Za-z0-9]", "").toUpperCase() + "%")
                 .addValue("archived", includeArchived)
+                .addValue("dir", direction == null || direction.isBlank() ? null : direction.strip())
                 .addValue("limit", size).addValue("offset", (long) page * size);
         String where = """
                  WHERE org_unit_id IN (:scope)
                    AND (CAST(:status AS text) IS NULL OR status = :status)
                    AND (:archived OR archived_at IS NULL)
+                   AND (CAST(:dir AS text) IS NULL OR direction = CAST(:dir AS text))
                    AND (CAST(:q AS text) IS NULL OR registration_normalized LIKE :qn
-                        OR lower(make) LIKE :q OR lower(model) LIKE :q)""";
+                        OR lower(make) LIKE :q OR lower(model) LIKE :q
+                        OR lower(coalesce(direction, '')) LIKE :q OR lower(coalesce(site_label, '')) LIKE :q)""";
         long total = jdbc.queryForObject("SELECT count(*) FROM vehicle " + where, p, Long.class);
         List<VehicleView> items = jdbc.query("SELECT " + COLUMNS + " FROM vehicle " + where
                 + " ORDER BY registration_normalized LIMIT :limit OFFSET :offset", p, MAPPER);
@@ -96,14 +115,14 @@ public class VehicleService {
         RegistrationNumber reg = RegistrationNumber.of(c.registration());   // validation et normalisation
         UUID id = jdbc.queryForObject("""
                 INSERT INTO vehicle(registration, vin, make, model, model_year, vehicle_type, energy,
-                                    tank_capacity_l, tank_capacity_verified, org_unit_id, category, site_label)
-                VALUES (:reg, :vin, :make, :model, :year, :type, :energy, :tank, :tankv, :org, :cat, :site) RETURNING id""",
+                                    tank_capacity_l, tank_capacity_verified, org_unit_id, category, site_label, direction)
+                VALUES (:reg, :vin, :make, :model, :year, :type, :energy, :tank, :tankv, :org, :cat, :site, :dir) RETURNING id""",
                 new MapSqlParameterSource().addValue("reg", reg.raw()).addValue("vin", blankToNull(c.vin()))
                         .addValue("make", c.make().strip()).addValue("model", c.model().strip())
                         .addValue("year", c.modelYear()).addValue("type", c.vehicleType()).addValue("energy", c.energy())
                         .addValue("tank", c.tankCapacityLiters()).addValue("tankv", c.tankCapacityVerified())
                         .addValue("org", c.orgUnitId()).addValue("cat", blankToNull(c.category()))
-                        .addValue("site", blankToNull(c.siteLabel())), UUID.class);
+                        .addValue("site", blankToNull(c.siteLabel())).addValue("dir", blankToNull(c.direction())), UUID.class);
         if (c.odometerKm() != null) {
             jdbc.update("""
                     INSERT INTO vehicle_odometer(vehicle_id, read_at, value_km, source, author_id, justification)
@@ -126,6 +145,7 @@ public class VehicleService {
                        tank_capacity_l = COALESCE(:tank, tank_capacity_l),
                        tank_capacity_verified = COALESCE(:tankv, tank_capacity_verified),
                        category = COALESCE(:cat, category), site_label = COALESCE(:site, site_label),
+                       direction = COALESCE(:dir, direction),
                        energy = COALESCE(:energy, energy), vin = COALESCE(:vin, vin),
                        version = version + 1, updated_at = now()
                  WHERE id = :id AND version = :v""",
@@ -133,6 +153,7 @@ public class VehicleService {
                         .addValue("year", p.modelYear()).addValue("status", p.status())
                         .addValue("tank", p.tankCapacityLiters()).addValue("tankv", p.tankCapacityVerified())
                         .addValue("cat", blankToNull(p.category())).addValue("site", blankToNull(p.siteLabel()))
+                        .addValue("dir", blankToNull(p.direction()))
                         .addValue("energy", blankToNull(p.energy())).addValue("vin", blankToNull(p.vin()))
                         .addValue("id", id).addValue("v", expectedVersion));
         if (n == 0) throw new StaleVersionException("version " + expectedVersion);

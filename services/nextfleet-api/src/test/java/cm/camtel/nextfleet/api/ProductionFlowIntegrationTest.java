@@ -39,6 +39,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -175,11 +176,11 @@ class ProductionFlowIntegrationTest {
         assertTrue(json(call(get("/api/v1/org-units?permission=vehicle:write"), mgr, null)).toString().contains(org));
         JsonNode v = json(call(post("/api/v1/vehicles"), mgr, """
                 {"registration":"LT 1234 CE","make":"Toyota","model":"Hilux","modelYear":2022,"energy":"DIESEL","tankCapacityLiters":80,
-                 "tankCapacityVerified":true,"orgUnitId":"%s","category":"Pick-up","siteLabel":"Siège régional","odometerKm":12000}""".formatted(org))
+                 "tankCapacityVerified":true,"orgUnitId":"%s","category":"Pick-up","siteLabel":"Siège régional","odometerKm":12000,"direction":"DRCT"}""".formatted(org))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.category").value("Pick-up")));
         String veh = v.get("id").asText();
         call(get("/api/v1/vehicles/" + veh), mgr, null).andExpect(jsonPath("$.odometerKm").value(12000.0))
-                .andExpect(jsonPath("$.orgUnitName").value("Direction régionale du Centre"));
+                .andExpect(jsonPath("$.orgUnitName").value("Direction régionale du Centre")).andExpect(jsonPath("$.direction").value("DRCT"));
         call(post("/api/v1/vehicles"), shop, """
                 {"registration":"LT 9999 CE","make":"X","model":"Y","orgUnitId":"%s"}""".formatted(org)).andExpect(status().isForbidden());
 
@@ -337,6 +338,50 @@ class ProductionFlowIntegrationTest {
         String parc = call(get("/api/v1/reports/vehicules.csv"), mgr, null).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         assertTrue(parc.contains("Félix Kamga") && parc.contains("12600"), parc);
         call(get("/api/v1/reports/vehicules.csv"), driver, null).andExpect(status().isForbidden());
+        assertTrue(parc.contains("DRCT") && parc.contains("Disponible"), "direction et statut en clair : " + parc);
+
+        // ------------------------------------------------------------ directions, état des vidanges, exports PDF
+        call(get("/api/v1/vehicles/directions"), mgr, null).andExpect(status().isOk()).andExpect(jsonPath("$[0]").value("DRCT"));
+        call(get("/api/v1/vehicles?direction=DRCT"), mgr, null).andExpect(jsonPath("$.total").value(1));
+        call(get("/api/v1/vehicles?direction=DG"), mgr, null).andExpect(jsonPath("$.total").value(0));
+        call(get("/api/v1/vehicles?q=drct"), mgr, null).andExpect(jsonPath("$.total").value(1));
+        JsonNode oil = json(call(get("/api/v1/oil-changes/status"), shop, null).andExpect(status().isOk()));
+        assertEquals(1, oil.size());
+        assertEquals("LT 1234 CE", oil.get(0).get("registration").asText());
+        assertEquals("DRCT", oil.get(0).get("direction").asText());
+        assertEquals(17600.0, oil.get(0).get("nextDueKm").asDouble(), 0.01);
+        assertEquals("A_JOUR", oil.get(0).get("state").asText(), oil.toString());
+        assertEquals(0, json(call(get("/api/v1/oil-changes/status?direction=DG"), shop, null)).size());
+        call(get("/api/v1/oil-changes"), shop, null).andExpect(jsonPath("$[0].direction").value("DRCT"));
+        String vid = call(get("/api/v1/reports/vidanges.csv?from=" + today.minusDays(7) + "&to=" + today), aud, null)
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertTrue(vid.contains("LT 1234 CE") && vid.contains("15W40") && vid.contains("filtre à huile") && vid.contains("DRCT")
+                && vid.contains("45000"), vid);
+        String etat = call(get("/api/v1/reports/etat-vidanges.csv"), aud, null).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertTrue(etat.contains("17600") && etat.contains("À jour"), etat);
+        for (String code : new String[]{"vehicules", "conducteurs", "pleins", "bons", "interventions", "vidanges", "etat-vidanges", "missions",
+                "couts-vehicules", "echeances", "anomalies"}) {
+            var res = call(get("/api/v1/reports/" + code + ".pdf?from=" + today.minusDays(30) + "&to=" + today + "&direction=DRCT"), aud, null)
+                    .andExpect(status().isOk()).andExpect(header().string("Content-Type", containsString("application/pdf")))
+                    .andExpect(header().string("Content-Disposition", containsString(".pdf"))).andReturn().getResponse();
+            String pdf = new String(res.getContentAsByteArray(), StandardCharsets.ISO_8859_1);
+            assertTrue(pdf.startsWith("%PDF-1.4") && pdf.strip().endsWith("%%EOF") && pdf.contains("/Type /Page"), code);
+        }
+        String empty = new String(call(get("/api/v1/reports/vidanges.pdf?direction=DG"), aud, null).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray(), StandardCharsets.ISO_8859_1);
+        assertTrue(empty.startsWith("%PDF") && empty.contains("/Count 1"), "un rapport vide tient sur une page avec son en-tête");
+        call(get("/api/v1/reports/vidanges.pdf"), driver, null).andExpect(status().isForbidden());
+        String one = call(get("/api/v1/reports/vidanges.csv?from=" + today.minusDays(7) + "&to=" + today + "&vehicleId=" + veh), aud, null)
+                .andExpect(status().isOk()).andExpect(header().string("Content-Disposition", containsString("lt-1234-ce")))
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertTrue(one.contains("LT 1234 CE"), one);
+        call(get("/api/v1/reports/vidanges.pdf?vehicleId=" + UUID.randomUUID()), aud, null).andExpect(status().isNotFound());
+        assertTrue(jdbc.queryForObject("SELECT count(*) FROM audit_event WHERE action = 'EXPORT' AND new_value::text LIKE '%\"pdf\"%'", Long.class) >= 11);
+        JsonNode cur = json(call(get("/api/v1/vehicles/" + veh), mgr, null));
+        call(patch("/api/v1/vehicles/" + veh).header("If-Match", "\"" + cur.get("version").asLong() + "\""), mgr, """
+                {"direction":"DRLT","siteLabel":"CTT Douala","reason":"Réaffectation à la direction du Littoral"}""")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.direction").value("DRLT")).andExpect(jsonPath("$.siteLabel").value("CTT Douala"));
+        call(get("/api/v1/vehicles/directions"), mgr, null).andExpect(jsonPath("$[0]").value("DRLT"));
 
         // ------------------------------------------------------------ messagerie
         JsonNode contacts = json(call(get("/api/v1/conversations/contacts"), mgr, null).andExpect(status().isOk()));

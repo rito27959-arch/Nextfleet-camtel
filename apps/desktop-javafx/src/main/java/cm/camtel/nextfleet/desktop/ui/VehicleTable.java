@@ -35,9 +35,9 @@ final class VehicleTable {
                 ? Ui.label("Non affecté", "muted", "t-12") : Ui.label(v.driverName(), "t-12")));
         t.getColumns().add(column("Statut", 1.0, v -> Ui.statusPill(v.status())));
         t.getColumns().add(column("Carburant", 1.2, v -> Ui.fuelBar(v.fuelLevelPercent())));
-        t.getColumns().add(column("Affectation", 1.3, v -> {
-            if (v.lastKnownPlace() == null) return Ui.label("Non renseignée", "muted", "t-12");
-            Label l = new Label(v.lastKnownPlace(), Icons.stroke(Icons.MAP_PIN, 14, "-nf-muted"));
+        t.getColumns().add(column("Direction · site", 1.3, v -> {
+            if (v.placement() == null) return Ui.label("Non renseignée", "muted", "t-12");
+            Label l = new Label(v.placement(), Icons.stroke(Icons.BUILDING, 14, "-nf-muted"));
             l.getStyleClass().add("t-12");
             l.setGraphicTextGap(8);
             return l;

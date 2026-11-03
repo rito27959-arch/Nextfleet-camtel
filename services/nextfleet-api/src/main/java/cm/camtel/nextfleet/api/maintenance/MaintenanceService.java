@@ -50,7 +50,15 @@ public class MaintenanceService {
     public record OilChangeView(UUID id, UUID vehicleId, String registration, LocalDate doneOn, BigDecimal odometerKm,
                                 String oilLabel, BigDecimal oilLiters, List<String> filters, Integer intervalKm,
                                 Integer intervalMonths, BigDecimal nextDueKm, LocalDate nextDueOn, BigDecimal costXaf,
-                                String garageLabel, UUID maintenanceOrderId, String author) { }
+                                String garageLabel, UUID maintenanceOrderId, String author, String direction) { }
+
+    /**
+     * État de vidange d'un véhicule. {@code state} : EN_RETARD (kilométrage ou date dépassés), A_PREVOIR (moins de
+     * 1 000 km ou 30 jours), A_JOUR, AUCUNE (aucune vidange enregistrée), SANS_INTERVALLE (ni km ni durée renseignés).
+     */
+    public record OilStatus(UUID vehicleId, String registration, String model, String direction, String siteLabel,
+                            BigDecimal currentKm, LocalDate lastDoneOn, BigDecimal lastKm, String oilLabel,
+                            BigDecimal nextDueKm, LocalDate nextDueOn, BigDecimal remainingKm, Long daysLeft, String state) { }
 
     public record OilChangeCreate(UUID vehicleId, UUID maintenanceOrderId, LocalDate doneOn, BigDecimal odometerKm,
                                   String oilLabel, BigDecimal oilLiters, boolean oilFilter, boolean fuelFilter, boolean airFilter,
@@ -240,7 +248,7 @@ public class MaintenanceService {
                        oc.oil_filter, oc.fuel_filter, oc.air_filter, oc.transmission_oil, oc.coolant, oc.washer_fluid,
                        oc.interval_km, oc.interval_months, oc.next_due_km,
                        CASE WHEN oc.interval_months IS NULL THEN NULL ELSE (oc.done_on + make_interval(months => oc.interval_months))::date END,
-                       oc.cost_xaf, oc.garage_label, oc.maintenance_order_id, a.display_name
+                       oc.cost_xaf, oc.garage_label, oc.maintenance_order_id, a.display_name, v.direction
                   FROM oil_change oc JOIN vehicle v ON v.id = oc.vehicle_id JOIN app_user a ON a.id = oc.author_id
                  WHERE v.org_unit_id IN (:s) AND (CAST(:v AS uuid) IS NULL OR oc.vehicle_id = :v)
                  ORDER BY oc.done_on DESC, oc.created_at DESC LIMIT 500""",
@@ -256,8 +264,46 @@ public class MaintenanceService {
                             rs.getObject(4, LocalDate.class), rs.getBigDecimal(5), rs.getString(6), rs.getBigDecimal(7), f,
                             (Integer) rs.getObject(14), rs.getObject(15) == null ? null : ((Number) rs.getObject(15)).intValue(),
                             rs.getBigDecimal(16), rs.getObject(17, LocalDate.class), rs.getBigDecimal(18), rs.getString(19),
-                            rs.getObject(20, UUID.class), rs.getString(21));
+                            rs.getObject(20, UUID.class), rs.getString(21), rs.getString(22));
                 });
+    }
+
+    /** État des vidanges de tous les véhicules actifs du périmètre (option : une direction), le plus urgent d'abord. */
+    @Transactional(readOnly = true)
+    public List<OilStatus> oilStatus(String direction) {
+        List<UUID> scope = readScope();
+        if (scope.isEmpty()) return List.of();
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Africa/Douala"));
+        List<OilStatus> out = jdbc.query("""
+                SELECT v.id, v.registration, v.make || ' ' || v.model, v.direction, v.site_label, km.value_km,
+                       oc.id, oc.done_on, oc.odometer_km, oc.oil_label, oc.next_due_km,
+                       CASE WHEN oc.interval_months IS NULL THEN NULL ELSE (oc.done_on + make_interval(months => oc.interval_months))::date END
+                  FROM vehicle v
+                  LEFT JOIN LATERAL (SELECT value_km FROM vehicle_odometer WHERE vehicle_id = v.id ORDER BY read_at DESC LIMIT 1) km ON true
+                  LEFT JOIN LATERAL (SELECT * FROM oil_change WHERE vehicle_id = v.id ORDER BY done_on DESC, created_at DESC LIMIT 1) oc ON true
+                 WHERE v.org_unit_id IN (:s) AND v.archived_at IS NULL
+                   AND (CAST(:dir AS text) IS NULL OR v.direction = CAST(:dir AS text))
+                 ORDER BY v.registration_normalized """,
+                new MapSqlParameterSource("s", scope).addValue("dir", direction == null || direction.isBlank() ? null : direction.strip()),
+                (rs, i) -> {
+                    BigDecimal current = rs.getBigDecimal(6);
+                    boolean any = rs.getObject(7) != null;
+                    BigDecimal nextKm = rs.getBigDecimal(11);
+                    LocalDate nextOn = rs.getObject(12, LocalDate.class);
+                    BigDecimal remaining = nextKm != null && current != null ? nextKm.subtract(current) : null;
+                    Long days = nextOn == null ? null : java.time.temporal.ChronoUnit.DAYS.between(today, nextOn);
+                    String state;
+                    if (!any) state = "AUCUNE";
+                    else if ((remaining != null && remaining.signum() < 0) || (days != null && days < 0)) state = "EN_RETARD";
+                    else if ((remaining != null && remaining.compareTo(BigDecimal.valueOf(1000)) <= 0) || (days != null && days <= 30)) state = "A_PREVOIR";
+                    else if (nextKm == null && nextOn == null) state = "SANS_INTERVALLE";
+                    else state = "A_JOUR";
+                    return new OilStatus(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5),
+                            current, rs.getObject(8, LocalDate.class), rs.getBigDecimal(9), rs.getString(10), nextKm, nextOn, remaining, days, state);
+                });
+        List<String> order = List.of("EN_RETARD", "A_PREVOIR", "AUCUNE", "SANS_INTERVALLE", "A_JOUR");
+        return out.stream().sorted(java.util.Comparator.comparingInt((OilStatus o) -> order.indexOf(o.state()))
+                .thenComparing(o -> o.remainingKm() == null ? BigDecimal.valueOf(Long.MAX_VALUE) : o.remainingKm())).toList();
     }
 
     @Transactional(noRollbackFor = AccessDeniedException.class)

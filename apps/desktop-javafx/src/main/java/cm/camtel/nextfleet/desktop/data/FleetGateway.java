@@ -59,6 +59,22 @@ public interface FleetGateway {
     /** Archivage métier d'un véhicule (RG-04) avec motif ; l'historique reste consultable. */
     Vehicle archiveVehicle(UUID id, long expectedVersion, String reason);
 
+    /** Liste filtrée sur une direction (« DRCT »…) ; {@code null} : toutes. */
+    default Page<Vehicle> vehicles(String query, VehicleStatus status, String direction, int page, int size) {
+        if (direction == null || direction.isBlank()) return vehicles(query, status, page, size);
+        throw notYet("Le filtre par direction");
+    }
+
+    /** Directions où les véhicules du périmètre sont en service. */
+    default java.util.List<String> directions() {
+        return java.util.List.of();
+    }
+
+    /** Correction de la direction, du site ou du statut (vehicle:write), avec motif. */
+    default Vehicle editVehicle(Vehicle v, Prod.VehicleEdit edit) {
+        throw notYet("La correction d'un véhicule");
+    }
+
     /** Échéances d'un véhicule donné. */
     java.util.List<Models.DueItem> vehicleDueDates(UUID vehicleId);
 
@@ -274,6 +290,11 @@ public interface FleetGateway {
         throw notYet("Les vidanges");
     }
 
+    /** État des vidanges de chaque véhicule actif (option : une direction), le plus urgent d'abord. */
+    default java.util.List<Prod.OilStatus> oilStatus(String direction) {
+        throw notYet("L'état des vidanges");
+    }
+
     default Prod.OilChange addOilChange(Prod.OilChangeDraft draft) {
         throw notYet("La saisie de vidange");
     }
@@ -329,6 +350,12 @@ public interface FleetGateway {
 
     default byte[] exportReport(String code, java.time.LocalDate from, java.time.LocalDate to) {
         throw notYet("L'export de rapports");
+    }
+
+    /** Export au format « csv » ou « pdf », filtré sur une direction ou un véhicule s'ils sont donnés. */
+    default byte[] exportReport(String code, java.time.LocalDate from, java.time.LocalDate to, String direction, UUID vehicleId, String format) {
+        if ("csv".equals(format) && (direction == null || direction.isBlank()) && vehicleId == null) return exportReport(code, from, to);
+        throw notYet("L'export PDF et par direction");
     }
 
     // ------------------------------------------------------------------ production : comptes

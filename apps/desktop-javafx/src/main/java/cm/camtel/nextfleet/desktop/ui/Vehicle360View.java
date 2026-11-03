@@ -128,7 +128,7 @@ final class Vehicle360View extends ScrollPane {
                 stat(v.odometerKm() == null ? "—" : Views.km(v.odometerKm()), "Kilométrage"),
                 stat(next == null ? "—" : Views.day(next), "Prochaine échéance"),
                 stat(v.driverName() == null ? "Non affecté" : v.driverName(), "Conducteur"),
-                stat(v.lastKnownPlace() == null ? "—" : v.lastKnownPlace(), "Affectation"),
+                stat(v.placement() == null ? "—" : v.placement(), "Direction · site"),
                 stat(spend.signum() == 0 ? "—" : Ui.compactXaf(spend) + " FCFA", "Dépenses"));
 
         HBox actions = new HBox(10);
@@ -136,13 +136,33 @@ final class Vehicle360View extends ScrollPane {
         detail.getStyleClass().add("btn-secondary");
         detail.setOnAction(e -> openSheet());
         actions.getChildren().add(detail);
+        if (can(Permission.VEHICLE_WRITE)) {
+            Button place = new Button("Direction et site", Icons.stroke(Icons.BUILDING, 15, "-nf-text"));
+            place.getStyleClass().add("btn-secondary");
+            place.setOnAction(e -> placementSheet());
+            actions.getChildren().add(place);
+        }
+        if (can(Permission.REPORT_EXPORT)) {
+            Button[] self = new Button[1];
+            self[0] = Exports.menuButton("Exporter", format -> {
+                LocalDate t = LocalDate.now();
+                Exports.report(shell, self[0], self[0], "vidanges", t.minusYears(5), t, null, v.id(), v.registration(), format);
+            });
+            self[0].setTooltip(new javafx.scene.control.Tooltip("Vidanges de ce véhicule (5 ans) en PDF ou CSV"));
+            actions.getChildren().add(self[0]);
+        }
         if (shell.visible(AppShell.Section.MAINTENANCE) || shell.visible(AppShell.Section.WORKSHOP)) {
             Button work = Views.filled("Demander une intervention", Icons.WRENCH, () ->
                     shell.show(shell.visible(AppShell.Section.MAINTENANCE) ? AppShell.Section.MAINTENANCE : AppShell.Section.WORKSHOP));
             actions.getChildren().add(work);
         }
-        actions.setAlignment(Pos.TOP_RIGHT);
-        HBox top = new HBox(24, id, Ui.spacer(), actions, ringBox);
+        actions.setAlignment(Pos.CENTER_LEFT);
+        javafx.scene.layout.FlowPane actionFlow = new javafx.scene.layout.FlowPane(10, 10);
+        actionFlow.getChildren().setAll(actions.getChildren());
+        id.getChildren().add(actionFlow);
+        VBox.setMargin(actionFlow, new javafx.geometry.Insets(14, 0, 0, 0));
+        HBox.setHgrow(id, Priority.ALWAYS);
+        HBox top = new HBox(24, id, ringBox);
         top.setAlignment(Pos.CENTER_LEFT);
         VBox card = new VBox(22, top, Ui.divider(), stats);
         card.getStyleClass().addAll("card", "v360-hero");
@@ -155,6 +175,42 @@ final class Vehicle360View extends ScrollPane {
         VBox b = new VBox(2, v, Ui.label(label, "v360-stat-label"));
         b.getStyleClass().add("v360-stat");
         return b;
+    }
+
+    /** Correction de la direction et du site d'affectation (vehicle:write), avec motif tracé dans l'historique. */
+    private void placementSheet() {
+        javafx.scene.control.ComboBox<String> dir = new javafx.scene.control.ComboBox<>();
+        dir.setEditable(true);
+        dir.setMaxWidth(Double.MAX_VALUE);
+        dir.getEditor().setText(v.direction() == null ? "" : v.direction());
+        dir.setPromptText("Ex. DRCT");
+        Ui.async(() -> shell.gateway().directions(), l -> {
+            String keep = dir.getEditor().getText();
+            dir.getItems().setAll(l);
+            dir.getEditor().setText(keep);
+        }, err -> { });
+        javafx.scene.control.TextField site = FormSheet.text("Ex. CTT Yaoundé");
+        site.setText(v.siteLabel() == null ? "" : v.siteLabel());
+        javafx.scene.control.TextField reason = FormSheet.text("Ex. Réaffectation à la direction du Littoral");
+        FormSheet f = new FormSheet("Direction et site", "Enregistrer", shell::closeSheet)
+                .intro("Direction où le véhicule est en service et site d'affectation. Le motif est conservé dans l'historique du véhicule.")
+                .row("Direction", dir, "Site d'affectation", site).field("Motif *", reason);
+        f.onSubmit(() -> {
+            String d = dir.getEditor().getText() == null ? "" : dir.getEditor().getText().strip().toUpperCase(java.util.Locale.ROOT);
+            String r = FormSheet.req(reason, "Motif");
+            if (r.length() < 5) throw new IllegalArgumentException("Motif : 5 caractères au moins.");
+            if (d.isEmpty() && site.getText().isBlank()) throw new IllegalArgumentException("Indiquez une direction ou un site.");
+            return shell.gateway().editVehicle(v, new Prod.VehicleEdit(d, site.getText(), null, r));
+        }, (Vehicle after) -> {
+            shell.closeSheet();
+            shell.toasts().success("Affectation mise à jour", after.registration() + " · " + after.placement());
+            shell.openVehicle(after);
+        });
+        shell.openSheet(f, 460);
+    }
+
+    void placementForTest() {
+        placementSheet();
     }
 
     private void openSheet() {

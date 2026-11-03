@@ -42,6 +42,8 @@ final class VehicleFormView extends ScrollPane {
             "", "Pick-up", "SUV", "4x4", "Berline", "Minibus", "Fourgon", "Camion", "Moto", "Autre"));
     private final TextField category = field("Ex. Pick-up");   // valeur transmise (liste fermée côté serveur)
     private final TextField odometer = field("Ex. 12500 (facultatif)");
+    private final ComboBox<String> directionBox = new ComboBox<>();
+    private final TextField site = field("Ex. CTT Yaoundé (facultatif)");
     private final ComboBox<cm.camtel.nextfleet.desktop.data.Prod.OrgUnit> org = new ComboBox<>();
     private final Map<String, Label> errorLabels = new LinkedHashMap<>();
     private final Map<String, Control> controls = new LinkedHashMap<>();
@@ -92,6 +94,7 @@ final class VehicleFormView extends ScrollPane {
                 group("vin", "Numéro de châssis (VIN)", vin),
                 group("odometer", "Kilométrage actuel", odometer),
                 group("org", "Entité d'affectation", org),
+                row(group("direction", "Direction", directionBox), group("site", "Site d'affectation", site)),
                 globalError);
 
         save.getStyleClass().addAll("btn-primary", "btn-large");
@@ -103,6 +106,11 @@ final class VehicleFormView extends ScrollPane {
         globalError.setWrapText(true);
 
         save.setOnAction(e -> submit(gateway, onCreated));
+        directionBox.setEditable(true);
+        directionBox.setMaxWidth(Double.MAX_VALUE);
+        directionBox.setPromptText("Ex. DRCT");
+        directionBox.setAccessibleText("Direction où le véhicule est en service");
+        Ui.async(gateway::directions, l -> directionBox.getItems().setAll(l), err -> { });
         categoryBox.setMaxWidth(Double.MAX_VALUE);
         categoryBox.valueProperty().addListener((o, a, b) -> category.setText(b == null ? "" : b));
         org.setMaxWidth(Double.MAX_VALUE);
@@ -147,8 +155,13 @@ final class VehicleFormView extends ScrollPane {
             return;
         }
         java.util.UUID orgId = org.getValue() == null ? null : org.getValue().id();
+        String dir = directionBox.getEditor().getText() == null ? "" : directionBox.getEditor().getText().strip().toUpperCase(java.util.Locale.ROOT);
+        String siteText = site.getText() == null ? "" : site.getText().strip();
+        var base = r.draft();
+        var draft = new cm.camtel.nextfleet.desktop.data.Models.VehicleDraft(base.registration(), base.vin(), base.make(), base.model(),
+                base.modelYear(), base.energy(), base.tankCapacityLiters(), base.category(), dir.isEmpty() ? null : dir, siteText.isEmpty() ? null : siteText);
         Ui.async(() -> gateway instanceof cm.camtel.nextfleet.desktop.data.HttpFleetGateway http
-                ? http.createVehicle(r.draft(), orgId, km) : gateway.createVehicle(r.draft()), v -> {
+                ? http.createVehicle(draft, orgId, km) : gateway.createVehicle(draft), v -> {
             save.setDisable(false);
             save.setText("Ajouter le véhicule");
             onCreated.accept(v);

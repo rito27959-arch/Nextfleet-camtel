@@ -42,7 +42,8 @@ public class VehicleController {
                                 @NotNull UUID orgUnitId,
                                 @Pattern(regexp = "Pick-up|SUV|4x4|Berline|Minibus|Fourgon|Camion|Moto|Autre") String category,
                                 @Size(max = 120) String siteLabel,
-                                @DecimalMin("0") BigDecimal odometerKm) { }
+                                @DecimalMin("0") BigDecimal odometerKm,
+                                @Size(max = 120) String direction) { }
 
     /** Correction partielle ; {@code reason} obligatoire pour l'historique (RG-01). */
     public record VehiclePatch(@Size(max = 60) String make, @Size(max = 60) String model,
@@ -53,7 +54,8 @@ public class VehicleController {
                                @Size(max = 120) String siteLabel,
                                @Pattern(regexp = "DIESEL|ESSENCE|HYBRIDE|ELECTRIQUE|GPL|AUTRE") String energy,
                                @Size(max = 32) String vin,
-                               @NotBlank @Size(min = 5, max = 500) String reason) { }
+                               @NotBlank @Size(min = 5, max = 500) String reason,
+                               @Size(max = 120) String direction) { }
 
     public record Page<T>(List<T> items, int page, int size, long total) { }
 
@@ -68,8 +70,15 @@ public class VehicleController {
                                   @RequestParam(required = false) String status,
                                   @RequestParam(defaultValue = "0") @Min(0) int page,
                                   @RequestParam(defaultValue = "25") @Min(1) @Max(200) int size,
-                                  @RequestParam(defaultValue = "false") boolean includeArchived) {
-        return service.search(q, status, includeArchived, page, size);
+                                  @RequestParam(defaultValue = "false") boolean includeArchived,
+                                  @RequestParam(required = false) @Size(max = 120) String direction) {
+        return service.search(q, status, direction, includeArchived, page, size);
+    }
+
+    /** Directions où les véhicules du périmètre sont en service (filtres, saisie). */
+    @GetMapping("/directions")
+    public List<String> directions() {
+        return service.directions();
     }
 
     @GetMapping("/{id}")

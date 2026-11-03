@@ -182,6 +182,32 @@ public final class ScreenshotTour {
         add(() -> shot("31-couts-budget"));
         add(() -> shell().show(AppShell.Section.REPORTS));
         add(() -> shot("32-rapports"));
+        add(() -> shell().show(AppShell.Section.OIL));
+        add(() -> { });
+        add(() -> shot("35-vidanges-etat"));
+        add(() -> find(OilView.class).lookupAll(".clickable-row").stream().findFirst()
+                .ifPresent(n -> n.fireEvent(new javafx.scene.input.MouseEvent(javafx.scene.input.MouseEvent.MOUSE_CLICKED, 0, 0, 0, 0,
+                        javafx.scene.input.MouseButton.PRIMARY, 1, false, false, false, false, true, false, false, true, false, false, null))));
+        add(() -> { });
+        add(() -> find(Vehicle360View.class).placementForTest());
+        add(() -> shot("35g-direction-et-site"));
+        add(() -> shell().closeSheet());
+        add(() -> shell().show(AppShell.Section.OIL));
+        add(() -> find(OilView.class).showHistoryForTest());
+        add(() -> shot("35b-vidanges-historique"));
+        add(app::toggleTheme);
+        add(() -> shot("35c-vidanges-sombre"));
+        add(app::toggleTheme);
+        add(() -> {
+            try {
+                java.time.LocalDate t = java.time.LocalDate.now();
+                Files.write(dir.resolve("35d-etat-vidanges.pdf"), app.gateway().exportReport("etat-vidanges", t, t, null, null, "pdf"));
+                Files.write(dir.resolve("35e-vidanges-drct.pdf"), app.gateway().exportReport("vidanges", t.minusYears(1), t, "DRCT", null, "pdf"));
+                Files.write(dir.resolve("35f-parc.pdf"), app.gateway().exportReport("vehicules", t, t, null, null, "pdf"));
+            } catch (IOException e) {
+                throw new IllegalStateException(e);
+            }
+        });
         add(() -> shell().show(AppShell.Section.MAINTENANCE));
         add(() -> shot("33-entretiens-gestionnaire"));
         add(() -> app.scene().setRoot(Splash.create(() -> { })));

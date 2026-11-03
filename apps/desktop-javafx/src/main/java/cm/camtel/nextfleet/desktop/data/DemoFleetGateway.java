@@ -117,8 +117,52 @@ public final class DemoFleetGateway implements FleetGateway {
                 current, series, alerts(today), recent, clock.instant());
     }
 
+    /** Direction et site fictifs (codes au format CAMTEL) selon la ville de rattachement du véhicule de démonstration. */
+    private static String[] demoPlacement(String city) {
+        return switch (city) {
+            case "Yaoundé" -> new String[]{"DRCT", "CTT Yaoundé"};
+            case "Douala" -> new String[]{"DRLT", "CTT Douala"};
+            case "Bafoussam" -> new String[]{"RRNOT", "CTT Bafoussam"};
+            case "Kribi", "Ebolowa" -> new String[]{"RRENT", "CTT " + city};
+            default -> new String[]{"DG", "Garage siège"};
+        };
+    }
+
     @Override
     public Page<Vehicle> vehicles(String query, VehicleStatus status, int page, int size) {
+        return vehicles(query, status, null, page, size);
+    }
+
+    @Override
+    public List<String> directions() {
+        pause();
+        require(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_READ);
+        return vehicles.stream().filter(v -> v.status() != VehicleStatus.ARCHIVED).map(Vehicle::direction)
+                .filter(d -> d != null && !d.isBlank()).distinct().sorted().toList();
+    }
+
+    @Override
+    public Vehicle editVehicle(Vehicle v, Prod.VehicleEdit e) {
+        pause();
+        Session s = require(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_WRITE);
+        Vehicle cur = vehicles.stream().filter(x -> x.id().equals(v.id())).findFirst()
+                .orElseThrow(() -> new GatewayException(GatewayException.Kind.NOT_FOUND, "Véhicule introuvable."));
+        if (cur.version() != v.version()) {
+            throw new GatewayException(GatewayException.Kind.CONFLICT, "Le véhicule a été modifié par un autre utilisateur. Rechargez-le avant de recommencer.");
+        }
+        if (e.reason() == null || e.reason().strip().length() < 5) throw new GatewayException(GatewayException.Kind.VALIDATION, "Indiquez le motif (5 caractères au moins).");
+        String dir = e.direction() == null || e.direction().isBlank() ? cur.direction() : e.direction().strip();
+        String site = e.siteLabel() == null || e.siteLabel().isBlank() ? cur.siteLabel() : e.siteLabel().strip();
+        Vehicle after = new Vehicle(cur.id(), cur.registration(), cur.make(), cur.model(), cur.modelYear(), cur.energy(),
+                e.status() == null ? cur.status() : e.status(), cur.driverName(), cur.fuelLevelPercent(), site, cur.odometerKm(),
+                cur.tankCapacityLiters(), cur.nextMaintenance(), cur.category(), cur.version() + 1, dir, site);
+        vehicles.replaceAll(x -> x.id().equals(cur.id()) ? after : x);
+        ops().record(s, "VEHICLE_UPDATED", cur.registration(), (dir == null ? "" : dir) + (site == null ? "" : " · " + site) + " — " + e.reason().strip());
+        return after;
+    }
+
+    @Override
+    public Page<Vehicle> vehicles(String query, VehicleStatus status, String direction, int page, int size) {
         pause();
         require(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_READ);
         String q = query == null ? "" : query.strip().toLowerCase(Locale.ROOT);
@@ -126,10 +170,12 @@ public final class DemoFleetGateway implements FleetGateway {
         List<Vehicle> filtered = vehicles.stream()
                 .filter(v -> status == VehicleStatus.ARCHIVED ? v.status() == VehicleStatus.ARCHIVED
                         : v.status() != VehicleStatus.ARCHIVED && (status == null || v.status() == status))
+                .filter(v -> direction == null || direction.isBlank() || direction.equals(v.direction()))
                 .filter(v -> q.isEmpty()
                         || (!qn.isEmpty() && RegistrationNumber.of(v.registration()).normalized().contains(qn))
                         || v.label().toLowerCase(Locale.ROOT).contains(q)
-                        || (v.driverName() != null && v.driverName().toLowerCase(Locale.ROOT).contains(q)))
+                        || (v.driverName() != null && v.driverName().toLowerCase(Locale.ROOT).contains(q))
+                        || (v.placement() != null && v.placement().toLowerCase(Locale.ROOT).contains(q)))
                 .sorted(Comparator.comparing(Vehicle::registration))
                 .toList();
         int from = Math.min(page * size, filtered.size());
@@ -158,7 +204,8 @@ public final class DemoFleetGateway implements FleetGateway {
             throw new GatewayException(GatewayException.Kind.CONFLICT, "Cette immatriculation existe déjà (y compris archivée).");
         }
         Vehicle v = new Vehicle(UUID.randomUUID(), reg.raw().toUpperCase(Locale.ROOT), d.make(), d.model(), d.modelYear(),
-                d.energy(), VehicleStatus.AVAILABLE, null, null, null, null, d.tankCapacityLiters(), null, d.category(), 0);
+                d.energy(), VehicleStatus.AVAILABLE, null, null, d.siteLabel(), null, d.tankCapacityLiters(), null, d.category(), 0,
+                d.direction(), d.siteLabel());
         vehicles.add(v);
         ops().record(s, "VEHICLE_CREATED", v.registration(), v.label());
         return v;
@@ -186,10 +233,11 @@ public final class DemoFleetGateway implements FleetGateway {
         for (Object[] r : rows) {
             UUID id = UUID.nameUUIDFromBytes(("demo-" + r[0]).getBytes(java.nio.charset.StandardCharsets.UTF_8));
             Integer daysToMaint = (Integer) r[10];
+            String[] place = demoPlacement((String) r[7]);
             vehicles.add(new Vehicle(id, (String) r[0], (String) r[1], (String) r[2], (Integer) r[3], "DIESEL",
                     (VehicleStatus) r[4], (String) r[5], (Integer) r[6], (String) r[7],
                     BigDecimal.valueOf((Integer) r[8]), BigDecimal.valueOf((Integer) r[9]),
-                    daysToMaint == null ? null : today.plusDays(daysToMaint), (String) r[11], 1));
+                    daysToMaint == null ? null : today.plusDays(daysToMaint), (String) r[11], 1, place[0], place[1]));
             seedFills(id, i++, BigDecimal.valueOf((Integer) r[8]));
         }
         String[][] people = {
@@ -369,7 +417,7 @@ public final class DemoFleetGateway implements FleetGateway {
         }
         Vehicle archived = new Vehicle(v.id(), v.registration(), v.make(), v.model(), v.modelYear(), v.energy(),
                 VehicleStatus.ARCHIVED, v.driverName(), v.fuelLevelPercent(), v.lastKnownPlace(), v.odometerKm(),
-                v.tankCapacityLiters(), v.nextMaintenance(), v.category(), v.version() + 1);
+                v.tankCapacityLiters(), v.nextMaintenance(), v.category(), v.version() + 1, v.direction(), v.siteLabel());
         vehicles.replaceAll(x -> x.id().equals(id) ? archived : x);
         ops().record(s, "VEHICLE_ARCHIVED", v.registration(), "Motif : " + reason);
         return archived;
@@ -606,6 +654,20 @@ public final class DemoFleetGateway implements FleetGateway {
     }
 
     @Override
+    public List<Prod.OilStatus> oilStatus(String direction) {
+        pause();
+        requireAny(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_READ, cm.camtel.nextfleet.domain.security.Permission.MAINTENANCE_WRITE);
+        return prod().oilStatus(direction == null || direction.isBlank() ? null : direction);
+    }
+
+    @Override
+    public Prod.OilChange addOilChange(Prod.OilChangeDraft d) {
+        pause();
+        Session s = require(cm.camtel.nextfleet.domain.security.Permission.MAINTENANCE_WRITE);
+        return prod().addOil(d, s.displayName());
+    }
+
+    @Override
     public List<Prod.Supplier> suppliers() {
         pause();
         return prod().suppliers;
@@ -651,9 +713,14 @@ public final class DemoFleetGateway implements FleetGateway {
 
     @Override
     public byte[] exportReport(String code, LocalDate from, LocalDate to) {
+        return exportReport(code, from, to, null, null, "csv");
+    }
+
+    @Override
+    public byte[] exportReport(String code, LocalDate from, LocalDate to, String direction, UUID vehicleId, String format) {
         pause();
-        require(cm.camtel.nextfleet.domain.security.Permission.REPORT_EXPORT);
-        return prod().report(code);
+        Session s = require(cm.camtel.nextfleet.domain.security.Permission.REPORT_EXPORT);
+        return prod().report(code, from, to, direction == null || direction.isBlank() ? null : direction, vehicleId, format, s.displayName());
     }
 
     private Session require(cm.camtel.nextfleet.domain.security.Permission p) {

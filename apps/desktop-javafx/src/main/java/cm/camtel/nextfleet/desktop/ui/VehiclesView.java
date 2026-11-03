@@ -42,6 +42,8 @@ public final class VehiclesView extends BorderPane {
     private final Button next = new Button("Suivant");
     private final PauseTransition debounce = new PauseTransition(Duration.millis(250));
     private VehicleStatus status;
+    private String direction;
+    private final javafx.scene.control.ComboBox<String> directionBox = new javafx.scene.control.ComboBox<>();
     private int page;
     private long total;
 
@@ -96,7 +98,7 @@ public final class VehiclesView extends BorderPane {
     }
 
     private Node toolbar() {
-        search.setPromptText("Plaque, modèle, conducteur…");
+        search.setPromptText("Plaque, modèle, direction…");
         search.getStyleClass().add("search-field");
         search.setPrefWidth(280);
         search.setMinWidth(220);
@@ -119,7 +121,27 @@ public final class VehiclesView extends BorderPane {
         chipScroll.setHbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.NEVER);
         chipScroll.setStyle("-fx-background-color: transparent; -fx-padding: 2;");
         HBox.setHgrow(chipScroll, javafx.scene.layout.Priority.ALWAYS);
-        HBox bar = new HBox(16, sbox, chipScroll);
+        directionBox.setPromptText("Toutes les directions");
+        directionBox.setAccessibleText("Filtrer par direction");
+        directionBox.setMinWidth(215);
+        directionBox.setVisible(false);
+        directionBox.setManaged(false);
+        directionBox.setOnAction(e -> {
+            String v = directionBox.getValue();
+            String next = v == null || v.startsWith("Toutes") ? null : v;
+            if (java.util.Objects.equals(next, direction)) return;
+            direction = next;
+            page = 0;
+            load();
+        });
+        Ui.async(gateway::directions, l -> {
+            if (l.isEmpty()) return;
+            directionBox.getItems().setAll(l);
+            directionBox.getItems().add(0, "Toutes les directions");
+            directionBox.setVisible(true);
+            directionBox.setManaged(true);
+        }, err -> { });
+        HBox bar = new HBox(16, sbox, directionBox, chipScroll);
         bar.setAlignment(Pos.CENTER_LEFT);
         return bar;
     }
@@ -143,8 +165,9 @@ public final class VehiclesView extends BorderPane {
     private void load() {
         String q = search.getText();
         VehicleStatus st = status;
+        String dir = direction;
         int p = page;
-        Ui.load("vehicles:" + q + ":" + st + ":" + p, () -> gateway.vehicles(q, st, p, PAGE_SIZE), this::render, this::fail, () -> {
+        Ui.load("vehicles:" + q + ":" + st + ":" + dir + ":" + p, () -> gateway.vehicles(q, st, dir, p, PAGE_SIZE), this::render, this::fail, () -> {
             VBox sk = new VBox(8);
             for (int i = 0; i < 6; i++) sk.getChildren().add(Ui.skeleton(-1, 40));
             sk.getStyleClass().add("card");
@@ -155,7 +178,7 @@ public final class VehiclesView extends BorderPane {
     private void render(Page<Vehicle> r) {
         total = r.total();
         if (r.items().isEmpty()) {
-            boolean filtered = !search.getText().isBlank() || status != null;
+            boolean filtered = !search.getText().isBlank() || status != null || direction != null;
             body.getChildren().setAll(Ui.statePanel(Icons.SEARCH,
                     filtered ? "Aucun véhicule ne correspond" : "Aucun véhicule dans votre périmètre",
                     filtered ? "Modifiez la recherche ou le filtre." : "Les véhicules de votre entité apparaîtront ici."));

@@ -16,7 +16,7 @@ import java.io.InputStream;
  * revérifiés à chaque fois) ; seul le transfert est économisé.
  *
  * Les réponses gardent « Cache-Control: no-store » (Spring Security) : aucun cache intermédiaire ne les conserve ;
- * les clients NexFleet gardent la dernière réponse en mémoire seulement. Exclus : WebSocket, fichiers, exports CSV.
+ * les clients NexFleet gardent la dernière réponse en mémoire seulement. Exclus : WebSocket, fichiers, exports CSV et PDF.
  */
 @Configuration
 public class EtagFilter {
@@ -28,7 +28,7 @@ public class EtagFilter {
             return !"GET".equals(request.getMethod())
                     || uri.startsWith("/api/v1/live")
                     || uri.endsWith("/content")
-                    || uri.endsWith(".csv");
+                    || uri.endsWith(".csv") || uri.endsWith(".pdf");
         }
 
         @Override
