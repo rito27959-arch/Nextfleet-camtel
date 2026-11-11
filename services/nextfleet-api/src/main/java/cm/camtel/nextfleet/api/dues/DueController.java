@@ -44,6 +44,21 @@ public class DueController {
         return service.documents(id);
     }
 
+    public record DocumentUpdate(@jakarta.validation.constraints.NotBlank String docType, String reference, LocalDate validFrom,
+                                 @jakarta.validation.constraints.NotNull LocalDate validUntil, UUID fileId,
+                                 @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(min = 5, max = 500) String reason) { }
+
+    @org.springframework.web.bind.annotation.PutMapping("/api/v1/vehicle-documents/{id}")
+    public DueService.DocumentView updateDocument(@PathVariable UUID id, @Valid @RequestBody DocumentUpdate d) {
+        return service.updateDocument(id, d.docType(), d.reference(), d.validFrom(), d.validUntil(), d.fileId(), d.reason());
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/api/v1/vehicle-documents/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteDocument(@PathVariable UUID id, @RequestParam String reason) {
+        service.deleteDocument(id, reason);
+    }
+
     @PostMapping("/api/v1/vehicles/{id}/documents")
     @ResponseStatus(HttpStatus.CREATED)
     public DueService.DocumentView addDocument(@PathVariable UUID id, @Valid @RequestBody DocumentCreate d) {

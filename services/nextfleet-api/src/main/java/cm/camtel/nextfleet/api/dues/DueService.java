@@ -154,6 +154,50 @@ public class DueService {
         return documents(vehicleId).stream().filter(d -> d.id().equals(id)).findFirst().orElseThrow();
     }
 
+    /** Corrige un document (type, référence, dates, pièce jointe) ; ancienne et nouvelle valeur au journal. */
+    @Transactional(noRollbackFor = AccessDeniedException.class)
+    public DocumentView updateDocument(UUID documentId, String docType, String reference, LocalDate validFrom, LocalDate validUntil,
+                                       UUID fileId, String reason) {
+        UUID vehicleId = documentVehicle(documentId);
+        UUID org = vehicleOrg(vehicleId);
+        access.require("vehicle:write", org, "vehicle", vehicleId.toString());
+        if (reason == null || reason.strip().length() < 5) throw new IllegalArgumentException("Indiquez le motif (5 caractères au moins).");
+        if (!List.of("ASSURANCE", "CONTROLE_TECHNIQUE", "VIGNETTE", "CARTE_GRISE", "AUTRE").contains(docType)) {
+            throw new IllegalArgumentException("Type de document inconnu.");
+        }
+        if (validUntil == null) throw new IllegalArgumentException("Date de fin de validité obligatoire.");
+        if (validFrom != null && validUntil.isBefore(validFrom)) throw new IllegalArgumentException("La fin de validité précède le début.");
+        DocumentView before = documents(vehicleId).stream().filter(d -> d.id().equals(documentId)).findFirst().orElseThrow();
+        if (fileId != null && !fileId.equals(before.fileId())) files.requireAttachable(fileId, "VEHICLE_DOCUMENT", org);
+        jdbc.update("""
+                UPDATE vehicle_document SET doc_type = :t, reference = :r, valid_from = :f, valid_until = :u, file_id = :file
+                 WHERE id = :id """,
+                new MapSqlParameterSource("id", documentId).addValue("t", docType)
+                        .addValue("r", reference == null || reference.isBlank() ? null : reference.strip())
+                        .addValue("f", validFrom).addValue("u", validUntil).addValue("file", fileId));
+        DocumentView after = documents(vehicleId).stream().filter(d -> d.id().equals(documentId)).findFirst().orElseThrow();
+        audit.record(access.currentUser().userId(), "UPDATE", "vehicle_document", documentId.toString(), reason.strip(), before, after);
+        return after;
+    }
+
+    /** Supprime un document saisi par erreur ; son contenu reste au journal d'audit. */
+    @Transactional(noRollbackFor = AccessDeniedException.class)
+    public void deleteDocument(UUID documentId, String reason) {
+        UUID vehicleId = documentVehicle(documentId);
+        access.require("vehicle:write", vehicleOrg(vehicleId), "vehicle", vehicleId.toString());
+        if (reason == null || reason.strip().length() < 5) throw new IllegalArgumentException("Indiquez le motif (5 caractères au moins).");
+        DocumentView before = documents(vehicleId).stream().filter(d -> d.id().equals(documentId)).findFirst().orElseThrow();
+        jdbc.update("DELETE FROM vehicle_document WHERE id = :id", new MapSqlParameterSource("id", documentId));
+        audit.record(access.currentUser().userId(), "DELETE", "vehicle_document", documentId.toString(), reason.strip(), before, null);
+    }
+
+    private UUID documentVehicle(UUID documentId) {
+        List<UUID> l = jdbc.queryForList("SELECT vehicle_id FROM vehicle_document WHERE id = :d",
+                new MapSqlParameterSource("d", documentId), UUID.class);
+        if (l.isEmpty()) throw new NotFoundException("Document introuvable.");
+        return l.get(0);
+    }
+
     private UUID vehicleOrg(UUID vehicleId) {
         List<UUID> l = jdbc.queryForList("SELECT org_unit_id FROM vehicle WHERE id = :v", new MapSqlParameterSource("v", vehicleId), UUID.class);
         if (l.isEmpty()) throw new NotFoundException("Véhicule introuvable.");

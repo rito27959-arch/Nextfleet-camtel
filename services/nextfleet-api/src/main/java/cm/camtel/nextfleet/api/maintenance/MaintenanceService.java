@@ -65,6 +65,15 @@ public class MaintenanceService {
                                   boolean transmissionOil, boolean coolant, boolean washerFluid, Integer intervalKm,
                                   Integer intervalMonths, BigDecimal costXaf, String garageLabel) { }
 
+    /** Correction complète d'une vidange (le formulaire renvoie toutes les valeurs) ; le motif est obligatoire. */
+    public record OilChangeUpdate(LocalDate doneOn, BigDecimal odometerKm, String oilLabel, BigDecimal oilLiters, boolean oilFilter,
+                                  boolean fuelFilter, boolean airFilter, boolean transmissionOil, boolean coolant, boolean washerFluid,
+                                  Integer intervalKm, Integer intervalMonths, BigDecimal costXaf, String garageLabel, String reason) { }
+
+    /** Correction d'une intervention non clôturée : objet, catégorie, garage, kilométrage. */
+    public record OrderUpdate(String title, String categoryCode, String garageLabel, UUID garageSupplierId, BigDecimal odometerKm,
+                              String reason) { }
+
     public record InspectionPoint(String code, int position, String label, String hint) { }
 
     public record InspectionItem(String pointCode, String state, boolean critical, String comment) { }
@@ -336,6 +345,100 @@ public class MaintenanceService {
                         .addValue("km", c.odometerKm()).addValue("me", me.userId()));
         audit.record(me.userId(), "CREATE", "oil_change", id.toString(), null, null, c);
         return oilChanges(c.vehicleId()).stream().filter(o -> o.id().equals(id)).findFirst().orElseThrow();
+    }
+
+    /**
+     * Corrige une vidange. Le relevé kilométrique créé avec elle (même instant de saisie, source MAINTENANCE) suit la
+     * correction, pour que le « kilométrage actuel » ne garde pas une valeur erronée. Ancienne et nouvelle valeur au journal.
+     */
+    @Transactional(noRollbackFor = AccessDeniedException.class)
+    public OilChangeView updateOilChange(UUID id, OilChangeUpdate u) {
+        AuthenticatedUser me = access.currentUser();
+        Map<String, Object> old = oilRow(id);
+        UUID vehicle = (UUID) old.get("vehicle_id");
+        access.require("maintenance:write", vehicleOrg(vehicle), "oil_change", id.toString());
+        reason(u.reason());
+        if (u.doneOn() == null || u.odometerKm() == null) throw new IllegalArgumentException("Date et kilométrage de la vidange obligatoires.");
+        if (u.doneOn().isAfter(LocalDate.now().plusDays(1))) throw new IllegalArgumentException("La date de vidange ne peut pas être future.");
+        if (old.get("maintenance_order_id") != null && u.costXaf() != null) {
+            throw new IllegalArgumentException("Vidange rattachée à un ordre d'intervention : le coût est porté par l'ordre (pas de double comptage).");
+        }
+        OilChangeView before = oilChanges(vehicle).stream().filter(o -> o.id().equals(id)).findFirst().orElseThrow();
+        jdbc.update("""
+                UPDATE oil_change SET done_on = :d, odometer_km = :km, oil_label = :ol, oil_liters = :oll, oil_filter = :of,
+                       fuel_filter = :ff, air_filter = :af, transmission_oil = :to, coolant = :co, washer_fluid = :wf,
+                       interval_km = :ik, interval_months = :im, cost_xaf = :cost, garage_label = :g
+                 WHERE id = :id """,
+                new MapSqlParameterSource("id", id).addValue("d", u.doneOn()).addValue("km", u.odometerKm())
+                        .addValue("ol", blank(u.oilLabel())).addValue("oll", u.oilLiters()).addValue("of", u.oilFilter())
+                        .addValue("ff", u.fuelFilter()).addValue("af", u.airFilter()).addValue("to", u.transmissionOil())
+                        .addValue("co", u.coolant()).addValue("wf", u.washerFluid()).addValue("ik", u.intervalKm())
+                        .addValue("im", u.intervalMonths()).addValue("cost", u.costXaf()).addValue("g", blank(u.garageLabel())));
+        jdbc.update("""
+                UPDATE vehicle_odometer SET value_km = :km, read_at = :at
+                 WHERE vehicle_id = :v AND source = 'MAINTENANCE' AND created_at = :created AND value_km = :oldkm """,
+                new MapSqlParameterSource("v", vehicle).addValue("km", u.odometerKm()).addValue("oldkm", old.get("odometer_km"))
+                        .addValue("created", old.get("created_at"))
+                        .addValue("at", Timestamp.from(u.doneOn().atTime(12, 0).atZone(java.time.ZoneId.of("Africa/Douala")).toInstant())));
+        OilChangeView after = oilChanges(vehicle).stream().filter(o -> o.id().equals(id)).findFirst().orElseThrow();
+        audit.record(me.userId(), "UPDATE", "oil_change", id.toString(), u.reason().strip(), before, after);
+        return after;
+    }
+
+    /** Supprime une vidange saisie par erreur, avec son relevé kilométrique ; le contenu supprimé reste au journal d'audit. */
+    @Transactional(noRollbackFor = AccessDeniedException.class)
+    public void deleteOilChange(UUID id, String why) {
+        AuthenticatedUser me = access.currentUser();
+        Map<String, Object> old = oilRow(id);
+        UUID vehicle = (UUID) old.get("vehicle_id");
+        access.require("maintenance:write", vehicleOrg(vehicle), "oil_change", id.toString());
+        reason(why);
+        OilChangeView before = oilChanges(vehicle).stream().filter(o -> o.id().equals(id)).findFirst().orElseThrow();
+        jdbc.update("DELETE FROM oil_change WHERE id = :id", new MapSqlParameterSource("id", id));
+        jdbc.update("""
+                DELETE FROM vehicle_odometer
+                 WHERE vehicle_id = :v AND source = 'MAINTENANCE' AND created_at = :created AND value_km = :km """,
+                new MapSqlParameterSource("v", vehicle).addValue("created", old.get("created_at")).addValue("km", old.get("odometer_km")));
+        audit.record(me.userId(), "DELETE", "oil_change", id.toString(), why.strip(), before, null);
+    }
+
+    private Map<String, Object> oilRow(UUID id) {
+        List<Map<String, Object>> l = jdbc.queryForList(
+                "SELECT vehicle_id, maintenance_order_id, odometer_km, created_at FROM oil_change WHERE id = :id",
+                new MapSqlParameterSource("id", id));
+        if (l.isEmpty()) throw new NotFoundException("Vidange introuvable.");
+        return l.get(0);
+    }
+
+    private static void reason(String r) {
+        if (r == null || r.strip().length() < 5) throw new IllegalArgumentException("Indiquez le motif (5 caractères au moins).");
+    }
+
+    /** Corrige une intervention tant qu'elle n'est ni clôturée ni annulée (les montants clôturés restent figés). */
+    @Transactional(noRollbackFor = AccessDeniedException.class)
+    public OrderView updateOrder(UUID id, long expectedVersion, OrderUpdate u) {
+        AuthenticatedUser me = access.currentUser();
+        Object[] found = findOrder(id);
+        OrderView before = (OrderView) found[0];
+        access.require("maintenance:write", (UUID) found[1], "maintenance_order", id.toString());
+        reason(u.reason());
+        if (Set.of("CLOTUREE", "ANNULEE").contains(before.status())) {
+            throw new IllegalArgumentException("Intervention " + label(before.status()).toLowerCase(java.util.Locale.FRANCE)
+                    + " : elle ne peut plus être modifiée.");
+        }
+        if (u.title() != null && u.title().strip().length() < 3) throw new IllegalArgumentException("Décrivez l'intervention (3 caractères au moins).");
+        if (u.categoryCode() != null) requireCategory(u.categoryCode());
+        int n = jdbc.update("""
+                UPDATE maintenance_order SET title = COALESCE(:t, title), category_code = COALESCE(:c, category_code),
+                       garage_label = :g, garage_supplier_id = :gs, odometer_km = COALESCE(:km, odometer_km), version = version + 1
+                 WHERE id = :id AND version = :v """,
+                new MapSqlParameterSource("id", id).addValue("v", expectedVersion)
+                        .addValue("t", u.title() == null ? null : u.title().strip()).addValue("c", u.categoryCode())
+                        .addValue("g", blank(u.garageLabel())).addValue("gs", u.garageSupplierId()).addValue("km", u.odometerKm()));
+        if (n == 0) throw new cm.camtel.nextfleet.api.common.ApiExceptionHandler.StaleVersionException("version " + expectedVersion);
+        OrderView after = (OrderView) findOrder(id)[0];
+        audit.record(me.userId(), "UPDATE", "maintenance_order", id.toString(), u.reason().strip(), before, after);
+        return after;
     }
 
     // ---------------------------------------------------------------- contrôles

@@ -143,6 +143,9 @@ final class WorkOrdersView extends ScrollPane {
         if (o.proofFileId() != null) {
             actions.add(Views.sheetAction("Ouvrir le justificatif", "btn-tinted", () -> Files.open(shell, o.proofFileId(), "justificatif")));
         }
+        if (workshop() && o.status().open()) {
+            actions.add(Views.sheetAction("Modifier", "btn-secondary", () -> Corrections.work(shell, o, categories, this::load)));
+        }
         if (workshop()) {
             for (WorkStatus next : o.status().next()) {
                 String text = switch (next) {
@@ -287,7 +290,8 @@ final class WorkOrdersView extends ScrollPane {
             if (o.nextDueOn() != null) next += (next.isEmpty() ? "prochaine le " : " ou le ") + Views.day(o.nextDueOn());
             String sub = Views.day(o.doneOn()) + " · " + Views.km(o.odometerKm()) + (o.oilLabel() != null ? " · " + o.oilLabel() : "")
                     + (o.costXaf() != null ? " · " + Views.xaf(o.costXaf()) : "");
-            rows.add(Views.row(Ui.symbolTile(Icons.GAUGE, "tile-mint"), o.registration() + (next.isEmpty() ? "" : " · " + next), sub, null, null));
+            rows.add(Views.row(Ui.symbolTile(Icons.GAUGE, "tile-mint"), o.registration() + (next.isEmpty() ? "" : " · " + next), sub, null,
+                    workshop() ? () -> Corrections.oil(shell, o, this::load) : null));
         }
         return Ui.insetGroup("Vidanges · " + oils.size(), rows, "Le coût d'une vidange rattachée à une intervention est compté une seule fois.");
     }

@@ -46,6 +46,9 @@ public final class Icons {
     public static final String LOCK = "M6 11 H18 V20 H6 Z M8.5 11 V8 A3.5 3.5 0 0 1 15.5 8 V11";
     public static final String MOON = "M19.5 14.5 A8 8 0 1 1 9.5 4.5 A6.5 6.5 0 0 0 19.5 14.5 Z";
     public static final String GAUGE = "M4.5 17 A8 8 0 1 1 19.5 17 M12 13 L15.5 9";
+    public static final String TRASH = "M4.5 6.5 H19.5 M9.5 6.5 V4.5 H14.5 V6.5 M6.5 6.5 L7.5 19.5 H16.5 L17.5 6.5 M10 10.5 V16 M14 10.5 V16";
+    public static final String PENCIL = "M15.5 4.5 L19.5 8.5 L8.5 19.5 H4.5 V15.5 Z M13 7 L17 11";
+    public static final String RESTORE = "M4.5 12 A7.5 7.5 0 1 0 7 6.4 M4.5 4.5 V8.5 H8.5";
     public static final String DROP = "M12 3.5 C12 3.5 6 10.3 6 14.5 A6 6 0 0 0 18 14.5 C18 10.3 12 3.5 12 3.5 Z M9.2 15 A2.8 2.8 0 0 0 12 17.8";
     public static final String BUILDING = "M5 20.5 V5 H14 V20.5 M14 9.5 H19 V20.5 M3.5 20.5 H20.5 M8 8.5 H11 M8 12 H11 M8 15.5 H11 M16.5 13 H16.6 M16.5 16.5 H16.6";
     public static final String PDF = "M7 3.5 H14 L18 7.5 V20.5 H7 Z M14 3.5 V7.5 H18 M9.5 13 H14.5 M9.5 16.5 H13";

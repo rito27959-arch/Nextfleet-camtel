@@ -1,6 +1,6 @@
-# État réel d'avancement — version 0.9.0 (directions, vidanges, exports PDF)
+# État réel d'avancement — version 0.10.0 (corrections et suppressions)
 
-**3 novembre 2026.** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
+**11 novembre 2026.** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
 Aucune autorisation CAMTEL, aucun avis DSIR ou DS et aucune mise en production ne sont revendiqués.
 
 ## Ce qui fonctionne réellement (preuves exécutées)
@@ -25,6 +25,12 @@ résultats sont lisibles dans l'onglet Actions (annotations « bilan »).
 | Contrats OpenAPI | CI | `openapi.yaml` et `openapi-lot2.yaml` (0.3.0, alignés sur l'implémentation) valides |
 | **Refonte « Liquid Glass teinté » (iOS 26)** | CI + `docs/RECHERCHE_DESIGN_IOS26.md` | Bureau et Android redessinés écran par écran (verre teinté sur la navigation seulement, capsules, rayons concentriques, typographie iOS, alertes iOS 26, réglage « Réduire la transparence »). Contrastes du verre au pire cas vérifiés par `tools/check_contrast.py` ; captures bureau dans `docs/design-reference/captures-v2-ios26/` ; captures Android prises sur émulateur (Pixel 7, API 34) par la CI, branche `captures-android` |
 | Captures | `tools/screenshots.sh` | Lot 2 : 22 captures + 2 GIF, dont `23-catalogue-3d.png` (rendu 3D JavaFX réel) |
+
+### Corrections et suppressions (0.10.0)
+
+- API : `PATCH /vehicles/{id}` accepte l'immatriculation (unicité vérifiée, 409 si doublon) ; `POST /vehicles/{id}/restore` ; `PUT` et `DELETE /oil-changes/{id}` (relevé kilométrique de la vidange corrigé ou supprimé avec elle) ; `PUT` et `DELETE /vehicle-documents/{id}` ; `PATCH /maintenance-orders/{id}` tant que l'intervention n'est ni clôturée ni annulée. Motif obligatoire, audit avant / après. Test d'intégration (droits, motifs, doublon, restauration, intervention clôturée refusée).
+- Bureau : bouton « Modifier » de la fiche véhicule (et « Archiver ce véhicule… »), filtre « Archivés » et « Restaurer », vidanges cliquables (écran Vidanges, atelier, historique du véhicule), documents modifiables, conducteurs modifiables et archivables, interventions ouvertes modifiables. Captures 35g et 35h.
+- Volontairement non supprimables : véhicule (archivage), plein de carburant (anti-fraude, déclencheur en base), journal d'audit.
 
 ### Directions, vidanges et exports PDF (0.9.0)
 

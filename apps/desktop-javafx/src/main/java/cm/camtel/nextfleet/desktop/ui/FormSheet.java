@@ -66,6 +66,23 @@ final class FormSheet extends ScrollPane {
         box.getChildren().addAll(bar, error);
     }
 
+    /** Bouton principal en rouge : action de suppression ou d'archivage. */
+    FormSheet destructive() {
+        primary.setStyle("-fx-font-weight: bold; -fx-text-fill: -nf-red-text;");
+        return this;
+    }
+
+    /** Lien d'action destructive en bas de la feuille (« Supprimer cette vidange… »). */
+    FormSheet dangerAction(String text, Runnable r) {
+        Button b = new Button(text, Icons.stroke(Icons.TRASH, 14, "-nf-red-text"));
+        b.getStyleClass().add("btn-destructive");
+        b.setMaxWidth(Double.MAX_VALUE);
+        b.setOnAction(e -> r.run());
+        VBox.setMargin(b, new javafx.geometry.Insets(10, 0, 0, 0));
+        box.getChildren().add(b);
+        return this;
+    }
+
     /** Texte d'introduction sous la barre. */
     FormSheet intro(String text) {
         Label l = Ui.label(text, "footnote", "muted");

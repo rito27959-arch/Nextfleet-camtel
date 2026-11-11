@@ -161,6 +161,7 @@ public final class HttpFleetGateway implements FleetGateway {
         StringBuilder path = new StringBuilder("/api/v1/vehicles?page=").append(page).append("&size=").append(size);
         if (query != null && !query.isBlank()) path.append("&q=").append(URLEncoder.encode(query.strip(), StandardCharsets.UTF_8));
         if (status != null) path.append("&status=").append(status.name());
+        if (status == VehicleStatus.ARCHIVED) path.append("&includeArchived=true");
         if (direction != null && !direction.isBlank()) path.append("&direction=").append(URLEncoder.encode(direction.strip(), StandardCharsets.UTF_8));
         JsonNode r = send("GET", path.toString(), null, true);
         List<Vehicle> items = new ArrayList<>();
@@ -184,6 +185,112 @@ public final class HttpFleetGateway implements FleetGateway {
         extraHeader.set(new String[]{"If-Match", "\"" + v.version() + "\""});
         try {
             return toVehicle(send("PATCH", "/api/v1/vehicles/" + v.id(), b, true));
+        } finally {
+            extraHeader.remove();
+        }
+    }
+
+    @Override
+    public Vehicle updateVehicle(Vehicle v, Prod.VehicleUpdate u) {
+        ObjectNode b = json.createObjectNode().put("reason", u.reason());
+        putIf(b, "registration", u.registration());
+        putIf(b, "vin", u.vin());
+        putIf(b, "make", u.make());
+        putIf(b, "model", u.model());
+        if (u.modelYear() != null) b.put("modelYear", u.modelYear());
+        putIf(b, "energy", u.energy());
+        putIf(b, "category", u.category());
+        if (u.tankCapacityLiters() != null) b.put("tankCapacityLiters", u.tankCapacityLiters());
+        putIf(b, "direction", u.direction());
+        putIf(b, "siteLabel", u.siteLabel());
+        if (u.status() != null && u.status() != v.status() && u.status() != VehicleStatus.ARCHIVED) b.put("status", u.status().name());
+        return withVersion(v.version(), () -> toVehicle(send("PATCH", "/api/v1/vehicles/" + v.id(), b, true)));
+    }
+
+    @Override
+    public Vehicle restoreVehicle(Vehicle v, String reason) {
+        return withVersion(v.version(), () -> toVehicle(send("POST", "/api/v1/vehicles/" + v.id() + "/restore?reason="
+                + URLEncoder.encode(reason, StandardCharsets.UTF_8), null, true)));
+    }
+
+    @Override
+    public Prod.OilChange updateOilChange(UUID id, Prod.OilChangeEdit d, String reason) {
+        ObjectNode b = json.createObjectNode().put("doneOn", d.doneOn().toString()).put("odometerKm", d.odometerKm())
+                .put("oilFilter", d.oilFilter()).put("airFilter", d.airFilter()).put("fuelFilter", d.fuelFilter())
+                .put("transmissionOil", d.transmissionOil()).put("coolant", d.coolant()).put("washerFluid", d.washerFluid()).put("reason", reason);
+        putIf(b, "oilLabel", d.oilLabel());
+        if (d.oilLiters() != null) b.put("oilLiters", d.oilLiters());
+        if (d.intervalKm() != null) b.put("intervalKm", d.intervalKm());
+        if (d.intervalMonths() != null) b.put("intervalMonths", d.intervalMonths());
+        if (d.costXaf() != null) b.put("costXaf", d.costXaf());
+        putIf(b, "garageLabel", d.garageLabel());
+        return toOil(send("PUT", "/api/v1/oil-changes/" + id, b, true));
+    }
+
+    @Override
+    public void deleteOilChange(UUID id, String reason) {
+        send("DELETE", "/api/v1/oil-changes/" + id + "?reason=" + URLEncoder.encode(reason, StandardCharsets.UTF_8), null, true);
+    }
+
+    @Override
+    public Prod.VehicleDocument updateVehicleDocument(UUID id, String docType, String reference, java.time.LocalDate validFrom,
+                                                      java.time.LocalDate validUntil, UUID fileId, String reason) {
+        ObjectNode b = json.createObjectNode().put("docType", docType).put("validUntil", validUntil.toString()).put("reason", reason);
+        putIf(b, "reference", reference);
+        if (validFrom != null) b.put("validFrom", validFrom.toString());
+        if (fileId != null) b.put("fileId", fileId.toString());
+        JsonNode n = send("PUT", "/api/v1/vehicle-documents/" + id, b, true);
+        return new Prod.VehicleDocument(uuid(n, "id"), n.path("docType").asText(), n.path("reference").asText(null), date(n, "validFrom"),
+                date(n, "validUntil"), uuid(n, "fileId"), n.path("fileName").asText(null));
+    }
+
+    @Override
+    public void deleteVehicleDocument(UUID id, String reason) {
+        send("DELETE", "/api/v1/vehicle-documents/" + id + "?reason=" + URLEncoder.encode(reason, StandardCharsets.UTF_8), null, true);
+    }
+
+    @Override
+    public Prod.DriverDetail driverDetail(UUID id) {
+        JsonNode n = send("GET", "/api/v1/drivers/" + id, null, true);
+        return new Prod.DriverDetail(uuid(n, "id"), n.path("staffNumber").asText(), n.path("fullName").asText(), n.path("phone").asText(null),
+                n.path("email").asText(null), n.path("idCardNumber").asText(null), date(n, "idCardExpiresOn"), n.path("version").asLong());
+    }
+
+    @Override
+    public Models.Driver updateDriver(Prod.DriverDetail current, Prod.DriverDraft d, String reason) {
+        ObjectNode b = json.createObjectNode().put("reason", reason);
+        putIf(b, "staffNumber", d.staffNumber());
+        putIf(b, "fullName", d.fullName());
+        putIf(b, "phone", d.phone());
+        putIf(b, "email", d.email());
+        putIf(b, "idCardNumber", d.idCardNumber());
+        if (d.idCardExpiresOn() != null) b.put("idCardExpiresOn", d.idCardExpiresOn().toString());
+        return withVersion(current.version(), () -> toDriver(send("PATCH", "/api/v1/drivers/" + current.id(), b, true)));
+    }
+
+    @Override
+    public void archiveDriver(Prod.DriverDetail current, String reason) {
+        ObjectNode b = json.createObjectNode().put("reason", reason);
+        withVersion(current.version(), () -> send("POST", "/api/v1/drivers/" + current.id() + "/archive", b, true));
+    }
+
+    @Override
+    public Prod.WorkOrder updateWork(Prod.WorkOrder w, String title, String categoryCode, String garageLabel, String reason) {
+        ObjectNode b = json.createObjectNode().put("reason", reason);
+        putIf(b, "title", title);
+        putIf(b, "categoryCode", categoryCode);
+        putIf(b, "garageLabel", garageLabel);
+        return withVersion(w.version(), () -> toWork(send("PATCH", "/api/v1/maintenance-orders/" + w.id(), b, true)));
+    }
+
+    private static void putIf(ObjectNode b, String field, String value) {
+        if (value != null && !value.isBlank()) b.put(field, value.strip());
+    }
+
+    private <T> T withVersion(long version, java.util.function.Supplier<T> call) {
+        extraHeader.set(new String[]{"If-Match", "\"" + version + "\""});
+        try {
+            return call.get();
         } finally {
             extraHeader.remove();
         }
@@ -841,7 +948,8 @@ public final class HttpFleetGateway implements FleetGateway {
         return new Prod.OilChange(uuid(n, "id"), uuid(n, "vehicleId"), n.path("registration").asText(), date(n, "doneOn"), dec(n, "odometerKm"),
                 n.path("oilLabel").asText(null), f, n.hasNonNull("intervalKm") ? n.get("intervalKm").asInt() : null,
                 n.hasNonNull("intervalMonths") ? n.get("intervalMonths").asInt() : null, dec(n, "nextDueKm"), date(n, "nextDueOn"),
-                dec(n, "costXaf"), n.path("garageLabel").asText(null), n.path("author").asText(""), n.path("direction").asText(null));
+                dec(n, "costXaf"), n.path("garageLabel").asText(null), n.path("author").asText(""), n.path("direction").asText(null),
+                dec(n, "oilLiters"));
     }
 
     // ------------------------------------------------------------------ production : carburant

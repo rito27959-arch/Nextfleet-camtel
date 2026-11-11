@@ -293,11 +293,14 @@ final class OilView extends ScrollPane {
                     o.filters().isEmpty() ? null : String.join(", ", o.filters()).toLowerCase(java.util.Locale.FRANCE), o.garageLabel());
             Label amount = Ui.label(o.costXaf() == null ? "—" : Views.xaf(o.costXaf()), "row-title");
             amount.getStyleClass().add("tabular");
+            boolean editable = can(Permission.MAINTENANCE_WRITE);
             HBox r = Views.row(Ui.symbolTile(Icons.DROP, "tile-mint"), o.registration() + (next.isEmpty() ? "" : "  ·  " + next), sub, amount,
-                    () -> openVehicle(o.vehicleId(), o.registration()));
+                    editable ? () -> Corrections.oil(shell, o, this::load) : () -> openVehicle(o.vehicleId(), o.registration()));
             rows.add(r);
         }
-        return Ui.insetGroup("Historique · " + list.size(), rows, "Le coût d'une vidange rattachée à une intervention est compté une seule fois.");
+        return Ui.insetGroup("Historique · " + list.size(), rows, (can(Permission.MAINTENANCE_WRITE)
+                ? "Touchez une vidange pour la corriger ou la supprimer. " : "")
+                + "Le coût d'une vidange rattachée à une intervention est compté une seule fois.");
     }
 
     private void openVehicle(java.util.UUID id, String registration) {

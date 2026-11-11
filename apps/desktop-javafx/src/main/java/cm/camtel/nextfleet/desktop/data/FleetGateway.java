@@ -70,6 +70,50 @@ public interface FleetGateway {
         return java.util.List.of();
     }
 
+    /** Correction complète d'un véhicule (vehicle:write), avec motif ; l'immatriculation reste unique. */
+    default Vehicle updateVehicle(Vehicle v, Prod.VehicleUpdate u) {
+        throw notYet("La correction d'un véhicule");
+    }
+
+    /** Remet en service un véhicule archivé (vehicle:archive), avec motif. */
+    default Vehicle restoreVehicle(Vehicle v, String reason) {
+        throw notYet("La restauration d'un véhicule");
+    }
+
+    default Prod.OilChange updateOilChange(UUID id, Prod.OilChangeEdit d, String reason) {
+        throw notYet("La correction d'une vidange");
+    }
+
+    default void deleteOilChange(UUID id, String reason) {
+        throw notYet("La suppression d'une vidange");
+    }
+
+    default Prod.VehicleDocument updateVehicleDocument(UUID id, String docType, String reference, java.time.LocalDate validFrom,
+                                                       java.time.LocalDate validUntil, UUID fileId, String reason) {
+        throw notYet("La correction d'un document");
+    }
+
+    default void deleteVehicleDocument(UUID id, String reason) {
+        throw notYet("La suppression d'un document");
+    }
+
+    default Prod.DriverDetail driverDetail(UUID id) {
+        throw notYet("La correction d'un conducteur");
+    }
+
+    default Models.Driver updateDriver(Prod.DriverDetail current, Prod.DriverDraft d, String reason) {
+        throw notYet("La correction d'un conducteur");
+    }
+
+    default void archiveDriver(Prod.DriverDetail current, String reason) {
+        throw notYet("L'archivage d'un conducteur");
+    }
+
+    /** Correction d'une intervention non clôturée : objet, catégorie, garage. */
+    default Prod.WorkOrder updateWork(Prod.WorkOrder w, String title, String categoryCode, String garageLabel, String reason) {
+        throw notYet("La correction d'une intervention");
+    }
+
     /** Correction de la direction, du site ou du statut (vehicle:write), avec motif. */
     default Vehicle editVehicle(Vehicle v, Prod.VehicleEdit edit) {
         throw notYet("La correction d'un véhicule");

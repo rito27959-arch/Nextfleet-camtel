@@ -183,6 +183,47 @@ final class DemoProduction {
         return n;
     }
 
+    Prod.WorkOrder update(Prod.WorkOrder w, String title, String categoryCode, String garage) {
+        Prod.WorkOrder o = orders.stream().filter(x -> x.id().equals(w.id())).findFirst()
+                .orElseThrow(() -> new FleetGateway.GatewayException(FleetGateway.GatewayException.Kind.NOT_FOUND, "Intervention introuvable."));
+        if (o.version() != w.version()) throw new FleetGateway.GatewayException(FleetGateway.GatewayException.Kind.CONFLICT, "Version obsolète : rechargez.");
+        if (!o.status().open()) {
+            throw new FleetGateway.GatewayException(FleetGateway.GatewayException.Kind.VALIDATION, "Intervention terminée : elle ne peut plus être modifiée.");
+        }
+        String code = categoryCode == null ? o.categoryCode() : categoryCode;
+        String label = categories.stream().filter(c -> c.code().equals(code)).map(Prod.Category::label).findFirst().orElse(o.categoryLabel());
+        Prod.WorkOrder n = new Prod.WorkOrder(o.id(), o.vehicleId(), o.registration(), o.vehicleLabel(), code, label,
+                title == null || title.isBlank() ? o.title() : title.strip(), o.status(), garage == null || garage.isBlank() ? null : garage.strip(),
+                o.immobilisedFrom(), o.immobilisedTo(), o.odometerKm(), o.costXaf(), o.workDone(), o.proofFileId(), o.technicalVisaBy(),
+                o.requestedBy(), o.createdAt(), o.version() + 1);
+        orders.replaceAll(x -> x.id().equals(o.id()) ? n : x);
+        return n;
+    }
+
+    Prod.OilChange updateOil(UUID id, Prod.OilChangeEdit d, String author) {
+        Prod.OilChange old = oils.stream().filter(o -> o.id().equals(id)).findFirst()
+                .orElseThrow(() -> new FleetGateway.GatewayException(FleetGateway.GatewayException.Kind.NOT_FOUND, "Vidange introuvable."));
+        List<String> f = new ArrayList<>();
+        if (d.oilFilter()) f.add("Filtre à huile");
+        if (d.fuelFilter()) f.add("Filtre à carburant");
+        if (d.airFilter()) f.add("Filtre à air");
+        if (d.transmissionOil()) f.add("Huile de boîte");
+        if (d.coolant()) f.add("Liquide de refroidissement");
+        if (d.washerFluid()) f.add("Lave-glace");
+        Prod.OilChange n = new Prod.OilChange(id, old.vehicleId(), old.registration(), d.doneOn(), d.odometerKm(), d.oilLabel(), f,
+                d.intervalKm(), d.intervalMonths(), d.intervalKm() == null ? null : d.odometerKm().add(BigDecimal.valueOf(d.intervalKm())),
+                d.intervalMonths() == null ? null : d.doneOn().plusMonths(d.intervalMonths()), d.costXaf(), d.garageLabel(), author, old.direction(),
+                d.oilLiters());
+        oils.replaceAll(o -> o.id().equals(id) ? n : o);
+        return n;
+    }
+
+    void deleteOil(UUID id) {
+        if (!oils.removeIf(o -> o.id().equals(id))) {
+            throw new FleetGateway.GatewayException(FleetGateway.GatewayException.Kind.NOT_FOUND, "Vidange introuvable.");
+        }
+    }
+
     Prod.CostSummary costs(int year) {
         BigDecimal[] fuel = new BigDecimal[13], work = new BigDecimal[13], oil = new BigDecimal[13], lit = new BigDecimal[13];
         for (int m = 1; m <= 12; m++) {

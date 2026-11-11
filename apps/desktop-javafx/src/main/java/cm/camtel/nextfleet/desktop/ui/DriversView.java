@@ -130,6 +130,14 @@ public final class DriversView extends ScrollPane {
                     : row(Icons.LOCK, "Compte NexFleet", "Aucun : ne peut pas recevoir de mission", Views.pill("Sans compte", "warning")));
         }
         VBox card = new VBox(14, top, Ui.divider(), rows);
+        if (shell != null && !gateway.isDemo() && shell.session().can(cm.camtel.nextfleet.domain.security.Permission.DRIVER_WRITE)) {
+            javafx.scene.control.Button edit = new javafx.scene.control.Button(null, Icons.stroke(Icons.PENCIL, 14, "-nf-muted"));
+            edit.getStyleClass().add("btn-plain");
+            edit.setAccessibleText("Modifier ou archiver " + d.fullName());
+            edit.setTooltip(new javafx.scene.control.Tooltip("Modifier ou archiver"));
+            edit.setOnAction(e -> Corrections.driver(shell, d, this::load));
+            top.getChildren().addAll(Ui.spacer(), edit);
+        }
         if (d.userLogin() == null && shell != null && !gateway.isDemo()
                 && shell.session().can(cm.camtel.nextfleet.domain.security.Permission.DRIVER_WRITE)) {
             card.getChildren().add(Views.tinted("Lier un compte", Icons.USER, () -> accountSheet(d)));

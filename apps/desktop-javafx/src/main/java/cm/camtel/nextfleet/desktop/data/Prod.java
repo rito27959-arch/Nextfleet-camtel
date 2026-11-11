@@ -54,6 +54,15 @@ public final class Prod {
     public record VehicleDocument(UUID id, String docType, String reference, LocalDate validFrom, LocalDate validUntil,
                                   UUID fileId, String fileName) { }
 
+    /** Correction complète d'un véhicule depuis sa fiche ; seuls les champs renseignés sont envoyés. */
+    public record VehicleUpdate(String registration, String vin, String make, String model, Integer modelYear, String energy,
+                                String category, BigDecimal tankCapacityLiters, String direction, String siteLabel,
+                                cm.camtel.nextfleet.desktop.data.Models.VehicleStatus status, String reason) { }
+
+    /** Conducteur tel que le serveur le renvoie pour une correction (avec sa version). */
+    public record DriverDetail(UUID id, String staffNumber, String fullName, String phone, String email, String idCardNumber,
+                               LocalDate idCardExpiresOn, long version) { }
+
     public record DriverDraft(String staffNumber, String fullName, String phone, String email, UUID orgUnitId,
                               String idCardNumber, LocalDate idCardExpiresOn, String licenseNumber, List<String> licenseCategories,
                               LocalDate licenseExpiresOn) { }
@@ -131,7 +140,19 @@ public final class Prod {
 
     public record OilChange(UUID id, UUID vehicleId, String registration, LocalDate doneOn, BigDecimal odometerKm, String oilLabel,
                             List<String> filters, Integer intervalKm, Integer intervalMonths, BigDecimal nextDueKm,
-                            LocalDate nextDueOn, BigDecimal costXaf, String garageLabel, String author, String direction) { }
+                            LocalDate nextDueOn, BigDecimal costXaf, String garageLabel, String author, String direction, BigDecimal oilLiters) {
+        public OilChange(UUID id, UUID vehicleId, String registration, LocalDate doneOn, BigDecimal odometerKm, String oilLabel,
+                         List<String> filters, Integer intervalKm, Integer intervalMonths, BigDecimal nextDueKm, LocalDate nextDueOn,
+                         BigDecimal costXaf, String garageLabel, String author, String direction) {
+            this(id, vehicleId, registration, doneOn, odometerKm, oilLabel, filters, intervalKm, intervalMonths, nextDueKm, nextDueOn,
+                    costXaf, garageLabel, author, direction, null);
+        }
+    }
+
+    /** Correction complète d'une vidange (tous les éléments remplacés). */
+    public record OilChangeEdit(LocalDate doneOn, BigDecimal odometerKm, String oilLabel, BigDecimal oilLiters, boolean oilFilter,
+                                boolean fuelFilter, boolean airFilter, boolean transmissionOil, boolean coolant, boolean washerFluid,
+                                Integer intervalKm, Integer intervalMonths, BigDecimal costXaf, String garageLabel) { }
 
     /** État de vidange calculé par le serveur ; ordre d'urgence : en retard, à prévoir, jamais, sans intervalle, à jour. */
     public enum OilState {

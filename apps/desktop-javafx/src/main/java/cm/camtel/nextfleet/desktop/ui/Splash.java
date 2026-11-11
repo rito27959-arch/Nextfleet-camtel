@@ -91,7 +91,7 @@ public final class Splash {
         javafx.geometry.Insets m = new javafx.geometry.Insets(0, 0, 72, 0);
         StackPane.setMargin(bar, m);
 
-        Label legal = new Label("Version 0.9.0");
+        Label legal = new Label("Version 0.10.0");
         legal.setStyle("-fx-text-fill: rgba(255,255,255,0.32); -fx-font-size: 11px;");
         StackPane.setAlignment(legal, Pos.BOTTOM_CENTER);
         StackPane.setMargin(legal, new javafx.geometry.Insets(0, 0, 36, 0));

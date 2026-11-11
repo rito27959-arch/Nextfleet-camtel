@@ -32,7 +32,11 @@ import java.util.function.Supplier;
 final class Vehicle360View extends ScrollPane {
 
     /** Événement de l'historique, quelle que soit sa source. */
-    record Event(Instant at, String icon, String tone, String title, String detail, String amount) { }
+    record Event(Instant at, String icon, String tone, String title, String detail, String amount, Runnable open) {
+        Event(Instant at, String icon, String tone, String title, String detail, String amount) {
+            this(at, icon, tone, title, detail, amount, null);
+        }
+    }
 
     private final AppShell shell;
     private final Vehicle v;
@@ -137,10 +141,19 @@ final class Vehicle360View extends ScrollPane {
         detail.setOnAction(e -> openSheet());
         actions.getChildren().add(detail);
         if (can(Permission.VEHICLE_WRITE)) {
-            Button place = new Button("Direction et site", Icons.stroke(Icons.BUILDING, 15, "-nf-text"));
-            place.getStyleClass().add("btn-secondary");
-            place.setOnAction(e -> placementSheet());
-            actions.getChildren().add(place);
+            boolean archived = v.status() == cm.camtel.nextfleet.desktop.data.Models.VehicleStatus.ARCHIVED;
+            if (archived && can(Permission.VEHICLE_ARCHIVE)) {
+                Button restore = new Button("Restaurer", Icons.stroke(Icons.RESTORE, 15, "-nf-accent"));
+                restore.getStyleClass().add("btn-tinted");
+                restore.setOnAction(e -> Corrections.restore(shell, v, shell::openVehicle));
+                actions.getChildren().add(restore);
+            } else if (!archived) {
+                Button edit = new Button("Modifier", Icons.stroke(Icons.PENCIL, 15, "-nf-text"));
+                edit.getStyleClass().add("btn-secondary");
+                edit.setOnAction(e -> Corrections.vehicle(shell, v, after -> shell.openVehicle(after)));
+                edit.setTooltip(new javafx.scene.control.Tooltip("Immatriculation, modèle, direction, site, statut… ou archiver"));
+                actions.getChildren().add(edit);
+            }
         }
         if (can(Permission.REPORT_EXPORT)) {
             Button[] self = new Button[1];
@@ -210,7 +223,7 @@ final class Vehicle360View extends ScrollPane {
     }
 
     void placementForTest() {
-        placementSheet();
+        Corrections.vehicle(shell, v, after -> shell.openVehicle(after));
     }
 
     private void openSheet() {
@@ -276,7 +289,8 @@ final class Vehicle360View extends ScrollPane {
             events.add(new Event(o.doneOn().atTime(12, 0).atZone(Views.DOUALA).toInstant(), Icons.GAUGE, "-nf-blue-text",
                     "Vidange" + (o.oilLabel() == null ? "" : " · " + o.oilLabel()),
                     Views.km(o.odometerKm()) + (o.nextDueKm() == null ? "" : " · prochaine à " + Views.km(o.nextDueKm())),
-                    o.costXaf() == null ? null : Views.xaf(o.costXaf())));
+                    o.costXaf() == null ? null : Views.xaf(o.costXaf()),
+                    can(Permission.MAINTENANCE_WRITE) ? () -> Corrections.oil(shell, o, () -> shell.openVehicle(v)) : null));
         }
         for (Prod.FuelFill f : fills) {
             events.add(new Event(f.filledAt(), Icons.FUEL, "-nf-text", "Plein · " + Views.liters(f.liters()),
@@ -333,6 +347,11 @@ final class Vehicle360View extends ScrollPane {
             amount.setMinWidth(Region.USE_PREF_SIZE);
             amount.setStyle("-fx-padding: 12 0 0 0;");
             row.getChildren().add(amount);
+        }
+        if (e.open() != null) {
+            row.getStyleClass().add("clickable-row");
+            row.setOnMouseClicked(ev -> e.open().run());
+            javafx.scene.control.Tooltip.install(row, new javafx.scene.control.Tooltip("Modifier ou supprimer"));
         }
         return row;
     }

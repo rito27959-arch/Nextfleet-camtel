@@ -190,7 +190,11 @@ public final class ScreenshotTour {
                         javafx.scene.input.MouseButton.PRIMARY, 1, false, false, false, false, true, false, false, true, false, false, null))));
         add(() -> { });
         add(() -> find(Vehicle360View.class).placementForTest());
-        add(() -> shot("35g-direction-et-site"));
+        add(() -> shot("35g-modifier-vehicule"));
+        add(() -> shell().getScene().getRoot().lookupAll(".btn-destructive").stream()
+                .filter(n -> n instanceof javafx.scene.control.Button b && b.getText().startsWith("Archiver ce"))
+                .findFirst().ifPresent(n -> ((javafx.scene.control.Button) n).fire()));
+        add(() -> shot("35h-archiver-vehicule"));
         add(() -> shell().closeSheet());
         add(() -> shell().show(AppShell.Section.OIL));
         add(() -> find(OilView.class).showHistoryForTest());

@@ -147,6 +147,7 @@ public class VehicleService {
                        category = COALESCE(:cat, category), site_label = COALESCE(:site, site_label),
                        direction = COALESCE(:dir, direction),
                        energy = COALESCE(:energy, energy), vin = COALESCE(:vin, vin),
+                       registration = COALESCE(:reg, registration),
                        version = version + 1, updated_at = now()
                  WHERE id = :id AND version = :v""",
                 new MapSqlParameterSource().addValue("make", p.make()).addValue("model", p.model())
@@ -155,6 +156,7 @@ public class VehicleService {
                         .addValue("cat", blankToNull(p.category())).addValue("site", blankToNull(p.siteLabel()))
                         .addValue("dir", blankToNull(p.direction()))
                         .addValue("energy", blankToNull(p.energy())).addValue("vin", blankToNull(p.vin()))
+                        .addValue("reg", blankToNull(p.registration() == null ? null : p.registration().strip().toUpperCase(java.util.Locale.ROOT)))
                         .addValue("id", id).addValue("v", expectedVersion));
         if (n == 0) throw new StaleVersionException("version " + expectedVersion);
         VehicleView after = find(id);
@@ -174,6 +176,22 @@ public class VehicleService {
         if (n == 0) throw new StaleVersionException("version " + expectedVersion);
         VehicleView after = find(id);
         audit.record(access.currentUser().userId(), "ARCHIVE", "vehicle", id.toString(), reason, before, after);
+        return after;
+    }
+
+    /** Annule un archivage : le véhicule revient « Disponible » dans la liste, historique intact. */
+    @Transactional
+    public VehicleView restore(UUID id, long expectedVersion, String reason) {
+        VehicleView before = find(id);
+        access.require("vehicle:archive", before.orgUnitId(), "vehicle", id.toString());
+        if (before.archivedAt() == null) throw new IllegalArgumentException("Ce véhicule n'est pas archivé.");
+        int n = jdbc.update("""
+                UPDATE vehicle SET status = 'AVAILABLE', archived_at = NULL, version = version + 1, updated_at = now()
+                 WHERE id = :id AND version = :v AND archived_at IS NOT NULL """,
+                new MapSqlParameterSource().addValue("id", id).addValue("v", expectedVersion));
+        if (n == 0) throw new StaleVersionException("version " + expectedVersion);
+        VehicleView after = find(id);
+        audit.record(access.currentUser().userId(), "RESTORE", "vehicle", id.toString(), reason, before, after);
         return after;
     }
 

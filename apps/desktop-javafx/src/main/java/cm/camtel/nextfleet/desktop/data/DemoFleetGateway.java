@@ -423,6 +423,70 @@ public final class DemoFleetGateway implements FleetGateway {
         return archived;
     }
 
+    @Override
+    public Vehicle updateVehicle(Vehicle v, Prod.VehicleUpdate u) {
+        pause();
+        Session s = require(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_WRITE);
+        Vehicle cur = vehicle(v.id());
+        if (cur.version() != v.version()) {
+            throw new GatewayException(GatewayException.Kind.CONFLICT, "Le véhicule a été modifié par un autre utilisateur. Rechargez-le avant de recommencer.");
+        }
+        if (u.reason() == null || u.reason().strip().length() < 5) throw new GatewayException(GatewayException.Kind.VALIDATION, "Indiquez le motif (5 caractères au moins).");
+        String reg = u.registration() == null || u.registration().isBlank() ? cur.registration() : u.registration().strip().toUpperCase(Locale.ROOT);
+        String norm = reg.replaceAll("[^A-Z0-9]", "");
+        if (vehicles.stream().anyMatch(x -> !x.id().equals(cur.id()) && x.registration().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "").equals(norm))) {
+            throw new GatewayException(GatewayException.Kind.CONFLICT, "Cette immatriculation existe déjà (y compris archivée).");
+        }
+        String site = blankOr(u.siteLabel(), cur.siteLabel());
+        Vehicle after = new Vehicle(cur.id(), reg, blankOr(u.make(), cur.make()), blankOr(u.model(), cur.model()),
+                u.modelYear() == null ? cur.modelYear() : u.modelYear(), blankOr(u.energy(), cur.energy()),
+                u.status() == null || u.status() == VehicleStatus.ARCHIVED ? cur.status() : u.status(), cur.driverName(), cur.fuelLevelPercent(),
+                site, cur.odometerKm(), u.tankCapacityLiters() == null ? cur.tankCapacityLiters() : u.tankCapacityLiters(), cur.nextMaintenance(),
+                blankOr(u.category(), cur.category()), cur.version() + 1, blankOr(u.direction(), cur.direction()), site);
+        vehicles.replaceAll(x -> x.id().equals(cur.id()) ? after : x);
+        ops().record(s, "VEHICLE_UPDATED", after.registration(), "Motif : " + u.reason().strip());
+        return after;
+    }
+
+    private static String blankOr(String v, String fallback) {
+        return v == null || v.isBlank() ? fallback : v.strip();
+    }
+
+    @Override
+    public Vehicle restoreVehicle(Vehicle v, String reason) {
+        pause();
+        Session s = require(cm.camtel.nextfleet.domain.security.Permission.VEHICLE_ARCHIVE);
+        Vehicle cur = vehicle(v.id());
+        if (cur.status() != VehicleStatus.ARCHIVED) throw new GatewayException(GatewayException.Kind.VALIDATION, "Ce véhicule n'est pas archivé.");
+        Vehicle after = new Vehicle(cur.id(), cur.registration(), cur.make(), cur.model(), cur.modelYear(), cur.energy(), VehicleStatus.AVAILABLE,
+                cur.driverName(), cur.fuelLevelPercent(), cur.lastKnownPlace(), cur.odometerKm(), cur.tankCapacityLiters(), cur.nextMaintenance(),
+                cur.category(), cur.version() + 1, cur.direction(), cur.siteLabel());
+        vehicles.replaceAll(x -> x.id().equals(cur.id()) ? after : x);
+        ops().record(s, "VEHICLE_RESTORED", cur.registration(), "Motif : " + reason);
+        return after;
+    }
+
+    @Override
+    public Prod.OilChange updateOilChange(UUID id, Prod.OilChangeEdit d, String reason) {
+        pause();
+        Session s = require(cm.camtel.nextfleet.domain.security.Permission.MAINTENANCE_WRITE);
+        return prod().updateOil(id, d, s.displayName());
+    }
+
+    @Override
+    public void deleteOilChange(UUID id, String reason) {
+        pause();
+        require(cm.camtel.nextfleet.domain.security.Permission.MAINTENANCE_WRITE);
+        prod().deleteOil(id);
+    }
+
+    @Override
+    public Prod.WorkOrder updateWork(Prod.WorkOrder w, String title, String categoryCode, String garageLabel, String reason) {
+        pause();
+        require(cm.camtel.nextfleet.domain.security.Permission.MAINTENANCE_WRITE);
+        return prod().update(w, title, categoryCode, garageLabel);
+    }
+
     // ------------------------------------------------------------------ conducteurs et échéances (parité ancien NexFleet)
 
     @Override

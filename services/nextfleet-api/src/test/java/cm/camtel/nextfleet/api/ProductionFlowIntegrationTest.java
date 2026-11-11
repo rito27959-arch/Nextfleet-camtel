@@ -35,7 +35,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -382,6 +384,67 @@ class ProductionFlowIntegrationTest {
                 {"direction":"DRLT","siteLabel":"CTT Douala","reason":"Réaffectation à la direction du Littoral"}""")
                 .andExpect(status().isOk()).andExpect(jsonPath("$.direction").value("DRLT")).andExpect(jsonPath("$.siteLabel").value("CTT Douala"));
         call(get("/api/v1/vehicles/directions"), mgr, null).andExpect(jsonPath("$[0]").value("DRLT"));
+
+        // ------------------------------------------------------------ corrections et suppressions (motif obligatoire, audit)
+        JsonNode oils = json(call(get("/api/v1/oil-changes"), shop, null));
+        String oilId = oils.get(0).get("id").asText();
+        int oilCount = oils.size();
+        String oilBody = """
+                {"doneOn":"%s","odometerKm":12700,"oilLabel":"10W40","oilLiters":6.5,"oilFilter":true,"airFilter":true,
+                 "intervalKm":5000,"intervalMonths":6,"costXaf":47000,"garageLabel":"Atelier central"%s}""";
+        call(put("/api/v1/oil-changes/" + oilId), shop, oilBody.formatted(today, "")).andExpect(status().isBadRequest());
+        call(put("/api/v1/oil-changes/" + oilId), driver, oilBody.formatted(today, ",\"reason\":\"Erreur de saisie\""))
+                .andExpect(status().isForbidden());
+        call(put("/api/v1/oil-changes/" + oilId), shop, oilBody.formatted(today, ",\"reason\":\"Kilométrage mal recopié\""))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.odometerKm").value(12700.0)).andExpect(jsonPath("$.nextDueKm").value(17700.0))
+                .andExpect(jsonPath("$.oilLabel").value("10W40")).andExpect(jsonPath("$.costXaf").value(47000.0));
+        assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM vehicle_odometer WHERE source = 'MAINTENANCE' AND value_km = 12700", Long.class),
+                "le relevé kilométrique de la vidange suit la correction");
+        assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM vehicle_odometer WHERE source = 'MAINTENANCE' AND value_km = 12600", Long.class));
+        call(delete("/api/v1/oil-changes/" + oilId), shop, null).andExpect(status().isBadRequest());   // motif manquant
+        call(delete("/api/v1/oil-changes/" + oilId).param("reason", "Doublon"), driver, null).andExpect(status().isForbidden());
+        call(delete("/api/v1/oil-changes/" + oilId).param("reason", "Vidange saisie deux fois"), shop, null).andExpect(status().isNoContent());
+        assertEquals(oilCount - 1, json(call(get("/api/v1/oil-changes"), shop, null)).size());
+        assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM vehicle_odometer WHERE source = 'MAINTENANCE' AND value_km = 12700", Long.class));
+        assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM audit_event WHERE action = 'DELETE' AND object_type = 'oil_change' AND reason IS NOT NULL", Long.class));
+        call(delete("/api/v1/oil-changes/" + oilId).param("reason", "Vidange saisie deux fois"), shop, null).andExpect(status().isNotFound());
+
+        JsonNode docs = json(call(get("/api/v1/vehicles/" + veh + "/documents"), mgr, null));
+        String docId = docs.get(0).get("id").asText();
+        call(put("/api/v1/vehicle-documents/" + docId), mgr, """
+                {"docType":"ASSURANCE","reference":"POL-779","validFrom":"%s","validUntil":"%s","reason":"Nouvelle police d'assurance"}"""
+                .formatted(today, today.plusYears(1))).andExpect(status().isOk()).andExpect(jsonPath("$.reference").value("POL-779"));
+        call(put("/api/v1/vehicle-documents/" + docId), driver, """
+                {"docType":"ASSURANCE","validUntil":"%s","reason":"Tentative du conducteur"}""".formatted(today)).andExpect(status().isForbidden());
+        call(delete("/api/v1/vehicle-documents/" + docId).param("reason", "Document saisi par erreur"), mgr, null).andExpect(status().isNoContent());
+        assertEquals(docs.size() - 1, json(call(get("/api/v1/vehicles/" + veh + "/documents"), mgr, null)).size());
+
+        JsonNode closed = json(call(get("/api/v1/maintenance-orders/" + moId), shop, null));
+        call(patch("/api/v1/maintenance-orders/" + moId).header("If-Match", "\"" + closed.get("version").asLong() + "\""), shop, """
+                {"title":"Autre titre","reason":"Correction après clôture"}""").andExpect(status().isBadRequest());
+        JsonNode open = json(call(post("/api/v1/maintenance-orders"), shop, """
+                {"vehicleId":"%s","categoryCode":"AUTRE","title":"Rétroviseur"}""".formatted(veh)).andExpect(status().isCreated()));
+        call(patch("/api/v1/maintenance-orders/" + open.get("id").asText()).header("If-Match", "\"" + open.get("version").asLong() + "\""), shop, """
+                {"title":"Remplacement du rétroviseur gauche","categoryCode":"TOLERIE","garageLabel":"Garage du centre","reason":"Diagnostic précisé"}""")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Remplacement du rétroviseur gauche"))
+                .andExpect(jsonPath("$.categoryCode").value("TOLERIE"));
+
+        JsonNode spare = json(call(post("/api/v1/vehicles"), mgr, """
+                {"registration":"LT 5555 CE","make":"Nissan","model":"Navara","energy":"DIESEL","orgUnitId":"%s"}""".formatted(org))
+                .andExpect(status().isCreated()));
+        String spareId = spare.get("id").asText();
+        call(patch("/api/v1/vehicles/" + spareId).header("If-Match", "\"" + spare.get("version").asLong() + "\""), mgr, """
+                {"registration":"LT 1234 CE","reason":"Correction de plaque"}""").andExpect(status().isConflict());
+        JsonNode fixed = json(call(patch("/api/v1/vehicles/" + spareId).header("If-Match", "\"" + spare.get("version").asLong() + "\""), mgr, """
+                {"registration":"lt 5556 ce","make":"Nissan","model":"Navara NP300","modelYear":2021,"category":"Pick-up","reason":"Plaque et modèle mal recopiés"}""")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.registration").value("LT 5556 CE")).andExpect(jsonPath("$.model").value("Navara NP300")));
+        JsonNode archived = json(call(post("/api/v1/vehicles/" + spareId + "/archive").param("reason", "Véhicule réformé")
+                .header("If-Match", "\"" + fixed.get("version").asLong() + "\""), mgr, null).andExpect(status().isOk()));
+        call(post("/api/v1/vehicles/" + spareId + "/restore").param("reason", "Archivé par erreur")
+                .header("If-Match", "\"" + archived.get("version").asLong() + "\""), driver, null).andExpect(status().isForbidden());
+        call(post("/api/v1/vehicles/" + spareId + "/restore").param("reason", "Archivé par erreur")
+                .header("If-Match", "\"" + archived.get("version").asLong() + "\""), mgr, null)
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("AVAILABLE")).andExpect(jsonPath("$.archivedAt").isEmpty());
 
         // ------------------------------------------------------------ messagerie
         JsonNode contacts = json(call(get("/api/v1/conversations/contacts"), mgr, null).andExpect(status().isOk()));

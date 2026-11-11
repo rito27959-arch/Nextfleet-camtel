@@ -115,6 +115,7 @@ public final class VehiclesView extends BorderPane {
         addChip(chips, "Disponible", VehicleStatus.AVAILABLE);
         addChip(chips, "Entretien", VehicleStatus.MAINTENANCE);
         addChip(chips, "Hors service", VehicleStatus.OUT_OF_SERVICE);
+        addChip(chips, "Archivés", VehicleStatus.ARCHIVED);
         javafx.scene.control.ScrollPane chipScroll = new javafx.scene.control.ScrollPane(chips);
         chipScroll.setFitToHeight(true);
         chipScroll.setVbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.NEVER);

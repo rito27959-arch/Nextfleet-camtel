@@ -55,7 +55,8 @@ public class VehicleController {
                                @Pattern(regexp = "DIESEL|ESSENCE|HYBRIDE|ELECTRIQUE|GPL|AUTRE") String energy,
                                @Size(max = 32) String vin,
                                @NotBlank @Size(min = 5, max = 500) String reason,
-                               @Size(max = 120) String direction) { }
+                               @Size(max = 120) String direction,
+                               @Size(min = 4, max = 20) String registration) { }
 
     public record Page<T>(List<T> items, int page, int size, long total) { }
 
@@ -103,6 +104,13 @@ public class VehicleController {
     public VehicleView archive(@PathVariable UUID id, @RequestHeader("If-Match") String ifMatch,
                                @RequestParam @Size(min = 5, max = 500) String reason) {
         return service.archive(id, parseVersion(ifMatch), reason);
+    }
+
+    /** Remet en service un véhicule archivé par erreur (vehicle:archive), avec motif. */
+    @PostMapping("/{id}/restore")
+    public VehicleView restore(@PathVariable UUID id, @RequestHeader("If-Match") String ifMatch,
+                               @RequestParam @Size(min = 5, max = 500) String reason) {
+        return service.restore(id, parseVersion(ifMatch), reason);
     }
 
     private static long parseVersion(String ifMatch) {

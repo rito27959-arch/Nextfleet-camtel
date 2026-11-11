@@ -102,6 +102,14 @@ final class VehicleSheet extends VBox {
                         open.setOnAction(e -> Files.open(shell, d.fileId(), docLabel(d.docType()).toLowerCase(Locale.FRANCE)));
                         row.getChildren().add(open);
                     }
+                    if (canWrite) {
+                        Button change = new Button(null, Icons.stroke(Icons.PENCIL, 13, "-nf-muted"));
+                        change.getStyleClass().add("btn-plain");
+                        change.setAccessibleText("Modifier ou supprimer " + docLabel(d.docType()));
+                        change.setTooltip(new javafx.scene.control.Tooltip("Modifier ou supprimer"));
+                        change.setOnAction(e -> documentSheet(v, shell, d));
+                        row.getChildren().add(change);
+                    }
                     docs.getChildren().add(row);
                 }
             }, err -> docs.getChildren().setAll(Ui.label("DOCUMENTS", "sheet-section"), Ui.label(err.getMessage(), "muted", "t-12")));
@@ -111,7 +119,7 @@ final class VehicleSheet extends VBox {
             Button doc = new Button("Ajouter un document", Icons.stroke(Icons.DOC, 15, "-nf-accent"));
             doc.getStyleClass().add("btn-tinted");
             doc.setMaxWidth(Double.MAX_VALUE);
-            doc.setOnAction(e -> documentSheet(v, shell));
+            doc.setOnAction(e -> documentSheet(v, shell, null));
             Button assign = new Button(v.driverName() == null ? "Affecter un conducteur" : "Changer de conducteur", Icons.stroke(Icons.USER, 15, "-nf-accent"));
             assign.getStyleClass().add("btn-tinted");
             assign.setMaxWidth(Double.MAX_VALUE);
@@ -147,7 +155,7 @@ final class VehicleSheet extends VBox {
         };
     }
 
-    private static void documentSheet(Vehicle v, AppShell shell) {
+    private static void documentSheet(Vehicle v, AppShell shell, cm.camtel.nextfleet.desktop.data.Prod.VehicleDocument existing) {
         var type = FormSheet.combo(java.util.List.of("ASSURANCE", "VIGNETTE", "CONTROLE_TECHNIQUE", "CARTE_GRISE", "AUTRE"));
         type.setConverter(new javafx.util.StringConverter<>() {
             @Override
@@ -161,19 +169,37 @@ final class VehicleSheet extends VBox {
             }
         });
         var ref = FormSheet.text("Ex. numéro de police");
-        var from = FormSheet.date(null);
-        var until = FormSheet.date(Views.today().plusYears(1));
-        FormSheet.FilePick file = new FormSheet.FilePick("Joindre le document");
-        FormSheet f = new FormSheet("Nouveau document", "Enregistrer", shell::closeSheet).intro(v.registration() + " · " + v.label()
-                        + ". L'échéance apparaît aussitôt dans les échéances et les notifications.")
+        var from = FormSheet.date(existing == null ? null : existing.validFrom());
+        var until = FormSheet.date(existing == null ? Views.today().plusYears(1) : existing.validUntil());
+        if (existing != null) {
+            type.setValue(existing.docType());
+            ref.setText(existing.reference() == null ? "" : existing.reference());
+        }
+        FormSheet.FilePick file = new FormSheet.FilePick(existing != null && existing.fileId() != null ? "Remplacer le justificatif" : "Joindre le document");
+        var why = FormSheet.text("Ex. Date de fin mal saisie");
+        FormSheet f = new FormSheet(existing == null ? "Nouveau document" : "Modifier le document", "Enregistrer", shell::closeSheet)
+                .intro(v.registration() + " · " + v.label() + ". L'échéance apparaît aussitôt dans les échéances et les notifications.")
                 .field("Type *", type).field("Référence", ref).row("Valable du", from, "au *", until).field("Justificatif", file);
+        if (existing != null) {
+            f.field("Motif *", why).dangerAction("Supprimer ce document…", () -> Corrections.confirm(shell, "Supprimer le document", "Supprimer",
+                    docLabel(existing.docType()) + " de " + v.registration() + ". Son échéance disparaît ; le contenu reste dans le journal d'audit.",
+                    "Ex. Document saisi sur le mauvais véhicule", r -> {
+                        shell.gateway().deleteVehicleDocument(existing.id(), r);
+                        return Boolean.TRUE;
+                    }, "Document supprimé", () -> shell.openVehicles(v.registration())));
+        }
         f.onSubmit(() -> {
-            java.util.UUID fileId = file.path() == null ? null : shell.gateway().upload("VEHICLE_DOCUMENT", v.id(), file.path()).id();
-            return shell.gateway().addVehicleDocument(v.id(), FormSheet.pick(type, "Type"), FormSheet.opt(ref), from.getValue(),
-                    FormSheet.day(until, "Fin de validité", true), fileId);
+            String r = existing == null ? null : Corrections.reason(why);
+            java.util.UUID fileId = file.path() == null ? (existing == null ? null : existing.fileId())
+                    : shell.gateway().upload("VEHICLE_DOCUMENT", v.id(), file.path()).id();
+            return existing == null
+                    ? shell.gateway().addVehicleDocument(v.id(), FormSheet.pick(type, "Type"), FormSheet.opt(ref), from.getValue(),
+                            FormSheet.day(until, "Fin de validité", true), fileId)
+                    : shell.gateway().updateVehicleDocument(existing.id(), FormSheet.pick(type, "Type"), FormSheet.opt(ref), from.getValue(),
+                            FormSheet.day(until, "Fin de validité", true), fileId, r);
         }, (cm.camtel.nextfleet.desktop.data.Prod.VehicleDocument d) -> {
             shell.closeSheet();
-            shell.toasts().success("Document enregistré", docLabel(d.docType()) + " · " + v.registration());
+            shell.toasts().success(existing == null ? "Document enregistré" : "Document modifié", docLabel(d.docType()) + " · " + v.registration());
         });
         shell.openSheet(f, 460);
     }

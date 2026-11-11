@@ -64,6 +64,23 @@ public class MaintenanceController {
         return service.oilChanges(vehicleId);
     }
 
+    @org.springframework.web.bind.annotation.PutMapping("/api/v1/oil-changes/{id}")
+    public MaintenanceService.OilChangeView updateOil(@PathVariable UUID id, @RequestBody MaintenanceService.OilChangeUpdate u) {
+        return service.updateOilChange(id, u);
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/api/v1/oil-changes/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteOil(@PathVariable UUID id, @RequestParam String reason) {
+        service.deleteOilChange(id, reason);
+    }
+
+    @org.springframework.web.bind.annotation.PatchMapping("/api/v1/maintenance-orders/{id}")
+    public MaintenanceService.OrderView updateOrder(@PathVariable UUID id, @RequestHeader("If-Match") String ifMatch,
+                                                    @RequestBody MaintenanceService.OrderUpdate u) {
+        return service.updateOrder(id, version(ifMatch), u);
+    }
+
     @GetMapping("/api/v1/oil-changes/status")
     public List<MaintenanceService.OilStatus> oilStatus(@RequestParam(required = false) String direction) {
         return service.oilStatus(direction);
