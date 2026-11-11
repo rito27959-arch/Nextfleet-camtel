@@ -444,7 +444,7 @@ class ProductionFlowIntegrationTest {
                 .header("If-Match", "\"" + archived.get("version").asLong() + "\""), driver, null).andExpect(status().isForbidden());
         call(post("/api/v1/vehicles/" + spareId + "/restore").param("reason", "Archivé par erreur")
                 .header("If-Match", "\"" + archived.get("version").asLong() + "\""), mgr, null)
-                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("AVAILABLE")).andExpect(jsonPath("$.archivedAt").isEmpty());
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("AVAILABLE")).andExpect(jsonPath("$.archivedAt").doesNotExist());
 
         // ------------------------------------------------------------ messagerie
         JsonNode contacts = json(call(get("/api/v1/conversations/contacts"), mgr, null).andExpect(status().isOk()));
