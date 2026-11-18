@@ -201,6 +201,7 @@ public final class HttpFleetGateway implements FleetGateway {
         putIf(b, "energy", u.energy());
         putIf(b, "category", u.category());
         if (u.tankCapacityLiters() != null) b.put("tankCapacityLiters", u.tankCapacityLiters());
+        if (u.odometerKm() != null && (v.odometerKm() == null || u.odometerKm().compareTo(v.odometerKm()) != 0)) b.put("odometerKm", u.odometerKm());
         putIf(b, "direction", u.direction());
         putIf(b, "siteLabel", u.siteLabel());
         if (u.status() != null && u.status() != v.status() && u.status() != VehicleStatus.ARCHIVED) b.put("status", u.status().name());

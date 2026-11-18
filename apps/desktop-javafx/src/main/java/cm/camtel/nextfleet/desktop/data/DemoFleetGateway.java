@@ -441,7 +441,7 @@ public final class DemoFleetGateway implements FleetGateway {
         Vehicle after = new Vehicle(cur.id(), reg, blankOr(u.make(), cur.make()), blankOr(u.model(), cur.model()),
                 u.modelYear() == null ? cur.modelYear() : u.modelYear(), blankOr(u.energy(), cur.energy()),
                 u.status() == null || u.status() == VehicleStatus.ARCHIVED ? cur.status() : u.status(), cur.driverName(), cur.fuelLevelPercent(),
-                site, cur.odometerKm(), u.tankCapacityLiters() == null ? cur.tankCapacityLiters() : u.tankCapacityLiters(), cur.nextMaintenance(),
+                site, u.odometerKm() == null ? cur.odometerKm() : u.odometerKm(), u.tankCapacityLiters() == null ? cur.tankCapacityLiters() : u.tankCapacityLiters(), cur.nextMaintenance(),
                 blankOr(u.category(), cur.category()), cur.version() + 1, blankOr(u.direction(), cur.direction()), site);
         vehicles.replaceAll(x -> x.id().equals(cur.id()) ? after : x);
         ops().record(s, "VEHICLE_UPDATED", after.registration(), "Motif : " + u.reason().strip());

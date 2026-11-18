@@ -56,7 +56,8 @@ public class VehicleController {
                                @Size(max = 32) String vin,
                                @NotBlank @Size(min = 5, max = 500) String reason,
                                @Size(max = 120) String direction,
-                               @Size(min = 4, max = 20) String registration) { }
+                               @Size(min = 4, max = 20) String registration,
+                               @DecimalMin("0") @jakarta.validation.constraints.DecimalMax("9999999") BigDecimal odometerKm) { }
 
     public record Page<T>(List<T> items, int page, int size, long total) { }
 

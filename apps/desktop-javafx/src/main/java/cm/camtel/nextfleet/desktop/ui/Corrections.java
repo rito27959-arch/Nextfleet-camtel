@@ -61,6 +61,8 @@ final class Corrections {
         energy.setValue(v.energy() != null && ENERGIES.contains(v.energy()) ? v.energy() : null);
         ComboBox<String> category = FormSheet.combo(CATEGORIES);
         category.setValue(v.category() != null && CATEGORIES.contains(v.category()) ? v.category() : null);
+        TextField km = FormSheet.text("Ex. 42850");
+        km.setText(v.odometerKm() == null ? "" : v.odometerKm().stripTrailingZeros().toPlainString());
         TextField tank = FormSheet.text("Litres");
         tank.setText(v.tankCapacityLiters() == null ? "" : v.tankCapacityLiters().stripTrailingZeros().toPlainString());
         ComboBox<String> dir = new ComboBox<>();
@@ -93,9 +95,11 @@ final class Corrections {
         status.setDisable(v.status() == VehicleStatus.ON_MISSION);
         TextField why = FormSheet.text("Ex. Plaque mal recopiée lors de la reprise");
         FormSheet f = new FormSheet("Modifier le véhicule", "Enregistrer", shell::closeSheet)
-                .intro("Les modifications sont enregistrées avec leur motif ; l'ancienne valeur reste consultable dans le journal d'audit.")
+                .intro("Les modifications sont enregistrées avec leur motif ; l'ancienne valeur reste consultable dans le journal d'audit. "
+                        + "Un kilométrage corrigé devient le relevé actuel (prochaines vidanges recalculées).")
                 .row("Immatriculation *", reg, "Année", year).row("Marque *", make, "Modèle *", model)
-                .row("Énergie", energy, "Catégorie", category).row("Réservoir (L)", tank, "Statut", status)
+                .row("Kilométrage", km, "Statut", status)
+                .row("Énergie", energy, "Catégorie", category).field("Réservoir (L)", tank)
                 .section("Affectation").row("Direction", dir, "Site", site)
                 .field("Motif *", why);
         if (shell.session().can(Permission.VEHICLE_ARCHIVE)) {
@@ -106,7 +110,8 @@ final class Corrections {
             String d = dir.getEditor().getText() == null ? null : dir.getEditor().getText().strip().toUpperCase(Locale.ROOT);
             return shell.gateway().updateVehicle(v, new Prod.VehicleUpdate(FormSheet.req(reg, "Immatriculation"), null,
                     FormSheet.req(make, "Marque"), FormSheet.req(model, "Modèle"), y, energy.getValue(), category.getValue(),
-                    FormSheet.dec(tank, "Réservoir", false), d, FormSheet.opt(site), status.getValue(), reason(why)));
+                    FormSheet.dec(tank, "Réservoir", false), d, FormSheet.opt(site), status.getValue(), reason(why),
+                    FormSheet.dec(km, "Kilométrage", false)));
         }, (Vehicle saved) -> {
             shell.closeSheet();
             shell.toasts().success("Véhicule modifié", saved.registration() + " · " + saved.label());

@@ -196,6 +196,12 @@ public final class ScreenshotTour {
                 .findFirst().ifPresent(n -> ((javafx.scene.control.Button) n).fire()));
         add(() -> shot("35h-archiver-vehicule"));
         add(() -> shell().closeSheet());
+        add(() -> UpdateDialog.show(app.stage(), new cm.camtel.nextfleet.desktop.data.Updater.Info("0.11.0", null, null,
+                "https://github.com/rito27959-arch/Nextfleet-camtel/releases"), false));
+        add(() -> { });
+        add(() -> shotWindow("36-mise-a-jour"));
+        add(() -> javafx.stage.Window.getWindows().stream().filter(w -> w != app.stage()).toList().forEach(w -> ((javafx.stage.Stage) w).close()));
+        add(() -> shell().closeSheet());
         add(() -> shell().show(AppShell.Section.OIL));
         add(() -> find(OilView.class).showHistoryForTest());
         add(() -> shot("35b-vidanges-historique"));
@@ -306,6 +312,19 @@ public final class ScreenshotTour {
 
     private void shot(String name) {
         WritableImage img = app.scene().snapshot(null);
+        try {
+            ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", dir.resolve(name + ".png").toFile());
+            System.out.println("capture " + name + ".png");
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** Capture de la fenêtre secondaire ouverte (dialogue de mise à jour). */
+    private void shotWindow(String name) {
+        javafx.stage.Window w = javafx.stage.Window.getWindows().stream().filter(x -> x != app.stage() && x.isShowing())
+                .findFirst().orElse(app.stage());
+        WritableImage img = w.getScene().snapshot(null);
         try {
             ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", dir.resolve(name + ".png").toFile());
             System.out.println("capture " + name + ".png");

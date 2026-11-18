@@ -159,6 +159,14 @@ public class VehicleService {
                         .addValue("reg", blankToNull(p.registration() == null ? null : p.registration().strip().toUpperCase(java.util.Locale.ROOT)))
                         .addValue("id", id).addValue("v", expectedVersion));
         if (n == 0) throw new StaleVersionException("version " + expectedVersion);
+        // kilométrage corrigé : nouveau relevé « SAISIE » daté de maintenant, motif en justification (l'ancien reste dans l'historique)
+        if (p.odometerKm() != null && (before.odometerKm() == null || p.odometerKm().compareTo(before.odometerKm()) != 0)) {
+            jdbc.update("""
+                    INSERT INTO vehicle_odometer(vehicle_id, read_at, value_km, source, author_id, justification)
+                    VALUES (:v, now(), :km, 'SAISIE', :u, :why) """,
+                    new MapSqlParameterSource("v", id).addValue("km", p.odometerKm()).addValue("u", access.currentUser().userId())
+                            .addValue("why", "Correction du kilométrage : " + p.reason().strip()));
+        }
         VehicleView after = find(id);
         audit.record(access.currentUser().userId(), "UPDATE", "vehicle", id.toString(), p.reason(), before, after);
         return after;

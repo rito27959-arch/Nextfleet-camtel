@@ -12,6 +12,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- mise à jour automatique : l'APK annoncé par le serveur est remis à l'installateur Android (confirmation par l'utilisateur) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Pas d'ACCESS_BACKGROUND_LOCATION : aucune collecte hors du service de mission. -->
 
     <uses-feature android:glEsVersion="0x00030000" android:required="true" />
@@ -40,6 +42,13 @@
             </intent-filter>
         </activity>
         <activity android:name=".ui.MainActivity" android:exported="false" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.updates"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_paths" />
+        </provider>
         <activity android:name=".ui.ThreadActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ui.ModelViewerActivity" android:exported="false" />
         <activity android:name=".ui.FieldActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />

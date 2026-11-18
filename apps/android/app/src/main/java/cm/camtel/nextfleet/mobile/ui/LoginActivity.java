@@ -59,6 +59,7 @@ public final class LoginActivity extends Activity {
             open();
             return;
         }
+        AppUpdater.check(this);   // mise à jour annoncée par le serveur, avant même la connexion
         LinearLayout col = Ui.column(this, 14);
         col.setPadding(Ui.dp(this, 24), Ui.dp(this, 28), Ui.dp(this, 24), Ui.dp(this, 24));
 

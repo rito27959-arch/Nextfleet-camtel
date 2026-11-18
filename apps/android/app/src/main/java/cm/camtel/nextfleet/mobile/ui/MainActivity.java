@@ -126,6 +126,7 @@ public final class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         TrackingService.drain(this);   // points de la mission précédente encore en tampon
+        AppUpdater.check(this);        // nouvelle version annoncée par le serveur : téléchargement puis installation
         if (TrackingState.of(this).active() && NexFleetApp.get().session() != null) TrackingService.start(this);
         if (current >= 0) pages.get(current).onShow();
     }

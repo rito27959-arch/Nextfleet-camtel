@@ -57,7 +57,7 @@ public final class Prod {
     /** Correction complète d'un véhicule depuis sa fiche ; seuls les champs renseignés sont envoyés. */
     public record VehicleUpdate(String registration, String vin, String make, String model, Integer modelYear, String energy,
                                 String category, BigDecimal tankCapacityLiters, String direction, String siteLabel,
-                                cm.camtel.nextfleet.desktop.data.Models.VehicleStatus status, String reason) { }
+                                cm.camtel.nextfleet.desktop.data.Models.VehicleStatus status, String reason, BigDecimal odometerKm) { }
 
     /** Conducteur tel que le serveur le renvoie pour une correction (avec sa version). */
     public record DriverDetail(UUID id, String staffNumber, String fullName, String phone, String email, String idCardNumber,

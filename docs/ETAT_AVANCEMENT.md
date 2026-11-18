@@ -1,6 +1,6 @@
-# État réel d'avancement — version 0.10.0 (corrections et suppressions)
+# État réel d'avancement — version 0.11.0 (mise à jour automatique, kilométrage)
 
-**11 novembre 2026.** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
+**18 novembre 2026.** Ce document distingue ce qui a été exécuté et vérifié de ce qui est seulement écrit.
 Aucune autorisation CAMTEL, aucun avis DSIR ou DS et aucune mise en production ne sont revendiqués.
 
 ## Ce qui fonctionne réellement (preuves exécutées)
@@ -25,6 +25,13 @@ résultats sont lisibles dans l'onglet Actions (annotations « bilan »).
 | Contrats OpenAPI | CI | `openapi.yaml` et `openapi-lot2.yaml` (0.3.0, alignés sur l'implémentation) valides |
 | **Refonte « Liquid Glass teinté » (iOS 26)** | CI + `docs/RECHERCHE_DESIGN_IOS26.md` | Bureau et Android redessinés écran par écran (verre teinté sur la navigation seulement, capsules, rayons concentriques, typographie iOS, alertes iOS 26, réglage « Réduire la transparence »). Contrastes du verre au pire cas vérifiés par `tools/check_contrast.py` ; captures bureau dans `docs/design-reference/captures-v2-ios26/` ; captures Android prises sur émulateur (Pixel 7, API 34) par la CI, branche `captures-android` |
 | Captures | `tools/screenshots.sh` | Lot 2 : 22 captures + 2 GIF, dont `23-catalogue-3d.png` (rendu 3D JavaFX réel) |
+
+### Mise à jour automatique et kilométrage (0.11.0)
+
+- Kilométrage modifiable depuis « Modifier le véhicule » : `PATCH /vehicles/{id}` avec `odometerKm` ajoute un relevé `SAISIE` daté, motif en justification (l'ancien relevé reste). Test d'intégration.
+- `GET /api/v1/app/update` (public) : version du serveur (build-info Maven) et liens des paquets de cette version (`NF_UPDATE_BASE_URL`, `NF_UPDATE_ANDROID_APK`). Test d'intégration.
+- Bureau : vérification au démarrage et à la connexion ; Windows (MSI par utilisateur, `--win-upgrade-uuid` fixe) : `msiexec /i … /passive` puis relance ; Ubuntu : `pkexec apt-get install` puis relance ; version portable : lien de téléchargement. Tests unitaires (comparaison de versions, mode d'installation) ; fenêtre vérifiée en capture (36). **Non vérifié en conditions réelles** : l'installation MSI par-dessus une version installée sur un poste Windows CAMTEL, et `pkexec` sur un poste Ubuntu de bureau.
+- Android : téléchargement de l'APK puis installateur système (`REQUEST_INSTALL_PACKAGES`, FileProvider limité au dossier des mises à jour). Inactif tant que `NF_UPDATE_ANDROID_APK` n'est pas renseigné : il faut des APK signés avec une clé stable (secrets `NF_KEYSTORE_*` de la CI).
 
 ### Corrections et suppressions (0.10.0)
 

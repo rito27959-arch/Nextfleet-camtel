@@ -70,6 +70,7 @@ public class NextfleetDesktopApp extends Application {
             showLogin(null);
         }
         stage.show();
+        if (shots == null && !demo) checkForUpdate();
 
         if (shots != null) {
             ScreenshotTour tour = new ScreenshotTour(this, java.nio.file.Path.of(shots));
@@ -101,6 +102,21 @@ public class NextfleetDesktopApp extends Application {
 
     private void openShell(cm.camtel.nextfleet.desktop.data.Models.Session session) {
         setRoot(new AppShell(gateway, session, this::logout, this::toggleTheme, () -> dark));
+        if (!gateway.isDemo()) checkForUpdate();   // le serveur choisi à la connexion peut annoncer une version plus récente
+    }
+
+    private boolean updateOffered;
+
+    /** Mise à jour automatique : si le serveur annonce une version plus récente, elle se télécharge et s'installe. */
+    private void checkForUpdate() {
+        if (updateOffered || !(gateway instanceof HttpFleetGateway http)) return;
+        URI server = http.base();
+        Thread.ofVirtual().start(() -> cm.camtel.nextfleet.desktop.data.Updater.check(server, AppVersion.CURRENT)
+                .ifPresent(info -> javafx.application.Platform.runLater(() -> {
+                    if (updateOffered) return;
+                    updateOffered = true;
+                    cm.camtel.nextfleet.desktop.ui.UpdateDialog.show(stage, info, dark);
+                })));
     }
 
     private void logout() {

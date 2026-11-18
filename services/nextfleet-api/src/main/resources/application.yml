@@ -80,3 +80,9 @@ nextfleet.bootstrap:
   demo-password: ${NF_DEMO_PASSWORD:}
 nextfleet.demo:
   simulator: ${NF_DEMO_SIMULATOR:false}
+
+# Mise à jour automatique des applications (voir AppUpdateController)
+nextfleet.update:
+  base-url: ${NF_UPDATE_BASE_URL:https://github.com/rito27959-arch/Nextfleet-camtel/releases/download/v{version}/}
+  android-apk: ${NF_UPDATE_ANDROID_APK:}
+  version: ${NF_UPDATE_VERSION:}

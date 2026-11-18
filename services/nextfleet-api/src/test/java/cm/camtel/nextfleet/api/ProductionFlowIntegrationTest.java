@@ -386,6 +386,19 @@ class ProductionFlowIntegrationTest {
         call(get("/api/v1/vehicles/directions"), mgr, null).andExpect(jsonPath("$[0]").value("DRLT"));
 
         // ------------------------------------------------------------ corrections et suppressions (motif obligatoire, audit)
+        JsonNode km0 = json(call(get("/api/v1/vehicles/" + veh), mgr, null));
+        call(patch("/api/v1/vehicles/" + veh).header("If-Match", "\"" + km0.get("version").asLong() + "\""), mgr, """
+                {"odometerKm":25123,"reason":"Relevé du compteur au retour de mission"}""")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.odometerKm").value(25123.0));
+        assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM vehicle_odometer WHERE source = 'SAISIE' AND value_km = 25123"
+                + " AND justification LIKE 'Correction du kilométrage%'", Long.class));
+        // mise à jour des applications : public, version du serveur, liens vers les paquets de cette version
+        String upd = mvc.perform(get("/api/v1/app/update")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        JsonNode u = mapper.readTree(upd);
+        String v = u.get("version").asText();
+        assertTrue(v.matches("\\d+\\.\\d+\\.\\d+"), upd);
+        assertTrue(u.get("windowsMsi").asText().endsWith("/v" + v + "/NexFleet-" + v + ".msi"), upd);
+        assertTrue(u.get("linuxDeb").asText().endsWith("nexfleet_" + v + "_amd64.deb"), upd);
         JsonNode oils = json(call(get("/api/v1/oil-changes"), shop, null));
         String oilId = oils.get(0).get("id").asText();
         int oilCount = oils.size();
