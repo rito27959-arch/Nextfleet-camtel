@@ -394,11 +394,11 @@ class ProductionFlowIntegrationTest {
                 + " AND justification LIKE 'Correction du kilométrage%'", Long.class));
         // mise à jour des applications : public, version du serveur, liens vers les paquets de cette version
         String upd = mvc.perform(get("/api/v1/app/update")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        JsonNode u = mapper.readTree(upd);
-        String v = u.get("version").asText();
-        assertTrue(v.matches("\\d+\\.\\d+\\.\\d+"), upd);
-        assertTrue(u.get("windowsMsi").asText().endsWith("/v" + v + "/NexFleet-" + v + ".msi"), upd);
-        assertTrue(u.get("linuxDeb").asText().endsWith("nexfleet_" + v + "_amd64.deb"), upd);
+        JsonNode updNode = mapper.readTree(upd);
+        String appVer = updNode.get("version").asText();
+        assertTrue(appVer.matches("\\d+\\.\\d+\\.\\d+"), upd);
+        assertTrue(updNode.get("windowsMsi").asText().endsWith("/v" + appVer + "/NexFleet-" + appVer + ".msi"), upd);
+        assertTrue(updNode.get("linuxDeb").asText().endsWith("nexfleet_" + appVer + "_amd64.deb"), upd);
         JsonNode oils = json(call(get("/api/v1/oil-changes"), shop, null));
         String oilId = oils.get(0).get("id").asText();
         int oilCount = oils.size();
