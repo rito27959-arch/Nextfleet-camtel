@@ -62,7 +62,11 @@ public final class AppUpdater {
             c.setRequestProperty("Accept", "application/json");
             if (c.getResponseCode() != 200) return null;
             try (InputStream in = c.getInputStream()) {
-                JSONObject o = new JSONObject(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+                java.io.ByteArrayOutputStream body = new java.io.ByteArrayOutputStream();
+                byte[] buf = new byte[4096];
+                int n;
+                while ((n = in.read(buf)) > 0 && body.size() < 64 * 1024) body.write(buf, 0, n);
+                JSONObject o = new JSONObject(new String(body.toByteArray(), StandardCharsets.UTF_8));
                 String apk = o.optString("androidApk", "");
                 if (apk.isEmpty() || "null".equals(apk) || !apk.startsWith("https://")) return null;
                 return new String[]{o.optString("version", ""), apk};
