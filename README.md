@@ -1,79 +1,132 @@
-# NexFleet CAMTEL
+<div align="center">
 
-Plateforme de gestion du parc automobile CAMTEL : API Java 21 / Spring Boot, PostgreSQL + PostGIS, client bureau JavaFX
-(Windows, Linux) et application Android Java avec collecte GPS de mission et vues 3D Filament. Référence : cahier des charges V4.0 et document d'architecture V5.0.
+# NexFleet · CAMTEL
 
-> **Version 0.11.0 — mise à jour automatique et kilométrage** : le kilométrage se corrige depuis la fiche du véhicule (nouveau relevé avec motif, vidanges recalculées). Les applications se mettent à jour seules : le serveur annonce sa version (`GET /api/v1/app/update`) ; le poste Windows télécharge et installe le MSI sans droits administrateur puis redémarre, le poste Ubuntu installe le .deb (mot de passe système), le téléphone Android télécharge l'APK et ouvre l'installateur (un appui, imposé par Android ; nécessite des APK signés avec la même clé). Mettre le serveur à jour suffit désormais à mettre à jour les postes.
->
-> **Version 0.10.0 — corriger et supprimer** : véhicule modifiable en entier depuis sa fiche (immatriculation, modèle, énergie, catégorie, réservoir, direction, site, statut), archivé et restaurable (jamais effacé, pour la traçabilité) ; vidanges modifiables et supprimables (le relevé kilométrique suit) ; documents du véhicule modifiables et supprimables ; conducteurs modifiables et archivables ; interventions ouvertes modifiables. Motif obligatoire, ancienne et nouvelle valeur au journal d'audit. Les pleins de carburant restent non modifiables (contrôle anti-fraude).
->
-> **Version 0.9.0 — directions, vidanges, exports PDF** : chaque véhicule porte sa direction (DG, DRCT, DRLT…, reprise de l'ancien parc) et son site, modifiables avec motif ; liste des véhicules filtrable par direction ; nouvel écran **Vidanges** (prochaine vidange au km ou à la date, en retard / à prévoir / à jour, historique) ; **tous les rapports exportables en PDF** (A4 paysage, totaux, pagination) ou CSV, filtrables par direction ou par véhicule, nouveaux rapports « Vidanges » et « État des vidanges ».
->
-> **Version 0.8.0 — refonte « NexFleet Pro »** (voir [`docs/RECHERCHE_REFERENCE_MARCHE.md`](docs/RECHERCHE_REFERENCE_MARCHE.md)) : bureau ouvert sur une file « À traiter » classée par urgence, santé expliquée de chaque véhicule, fiche véhicule 360° avec historique unifié, navigation regroupée, palette neutre à un seul accent ; Android : carte de mission selon sa phase (horloge vivante, trajet, compteurs), grandes tuiles terrain, papiers du véhicule pour un contrôle routier.
-> **Depuis 0.7.2** : création et autorisation des missions par le gestionnaire de flotte.
-> Le même gestionnaire peut créer puis autoriser une mission ; le conducteur affecté la démarre ensuite sur son téléphone.
-> Un gestionnaire peut lier une fiche à un compte Conducteur actif ou sélectionner ce compte directement dans Nouvelle mission.
-> L'import privé de `parc.db` et `console.db` conserve les historiques et intègre les dépenses aux coûts.
-> Voir [`docs/MIGRATION_SQLITE.md`](docs/MIGRATION_SQLITE.md) pour l'import, les pièces manquantes et l'activation des anciens comptes.
-> Les clients utilisent par défaut `https://api-production-a1d8.up.railway.app` ; la publication des paquets ne vaut pas déploiement serveur.
-> Voir [`docs/ETAT_AVANCEMENT.md`](docs/ETAT_AVANCEMENT.md) pour ce qui est prouvé et ce qui reste à essayer sur le terrain.
-> Aucune homologation ni avis DSIR/DS n'est revendiqué.
+**Fleet management for CAMTEL — vehicles, fuel, missions and live GPS, on desktop and in the field.**
 
-## Arborescence
+[![CI](https://github.com/rito27959-arch/Nextfleet-camtel/actions/workflows/ci.yml/badge.svg)](https://github.com/rito27959-arch/Nextfleet-camtel/actions/workflows/ci.yml)
+![Version](https://img.shields.io/badge/version-0.11.0-0F9D8A?style=flat-square)
+![Java](https://img.shields.io/badge/Java-21-0B1F2A?style=flat-square&logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-API-0B1F2A?style=flat-square&logo=springboot&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL%2016-PostGIS-0B1F2A?style=flat-square&logo=postgresql&logoColor=white)
+![Clients](https://img.shields.io/badge/clients-Windows%20%C2%B7%20Linux%20%C2%B7%20Android-0F9D8A?style=flat-square)
 
+[**Build**](docs/BUILD.md) &nbsp;·&nbsp; [**Install**](docs/INSTALLATION.md) &nbsp;·&nbsp; [**Mobile**](docs/MOBILE.md) &nbsp;·&nbsp; [**Progress**](docs/ETAT_AVANCEMENT.md) &nbsp;·&nbsp; [**Design**](docs/DESIGN_ET_MOUVEMENT.md)
+
+<br>
+
+<img src="docs/design-reference/captures-v2-ios26/02-tableau-de-bord.png" width="900" alt="NexFleet desktop overview: active vehicles, upcoming maintenance, average consumption, monthly costs and an attention queue (demo data)">
+
+<sub>Desktop overview, demo data.</sub>
+
+</div>
+
+<br>
+
+## Overview
+
+NexFleet replaces CAMTEL's legacy fleet tool with a single source of truth: a Java 21 / Spring Boot API on PostgreSQL + PostGIS, a JavaFX desktop client for Windows and Linux, and a native Android app for drivers with mission GPS collection and 3D vehicle views (Filament). It implements specification **V4.0** and architecture document **V5.0**.
+
+```mermaid
+flowchart LR
+    subgraph Clients
+        D["🖥️ Desktop · JavaFX<br/><sub>Windows MSI · Ubuntu .deb</sub>"]
+        A["📱 Android<br/><sub>missions · encrypted GPS</sub>"]
+    end
+    subgraph Server
+        API["nextfleet-api<br/><sub>Spring Boot</sub>"]
+        GPS["gps-traccar-adapter"]
+        CHAT["chat-realtime<br/><sub>WebSocket</sub>"]
+        DB[("PostgreSQL 16<br/>+ PostGIS")]
+    end
+    T["Traccar"] --> GPS
+    D --> API
+    A --> API
+    A -- "mission-token batches" --> GPS
+    D & A <--> CHAT
+    API --> DB
+    GPS --> DB
+    CHAT --> DB
+    classDef c fill:#0F9D8A,stroke:#0F9D8A,color:#fff
+    classDef s fill:#0B1F2A,stroke:#2b4a5a,color:#fff
+    class D,A c
+    class API,GPS,CHAT,DB,T s
 ```
-apps/desktop-javafx/       Client bureau JavaFX : 6 profils, parc, échéances, missions, messagerie, assistant, comptes, audit, catalogue 3D — paquets DEB et EXE
-apps/android/              Application Android Java : missions, collecteur GPS chiffré, messagerie, catalogue 3D (Filament) — APK
-services/nextfleet-domain/ Noyau métier sans dépendance (plein-à-plein, bons, règles CAR, GPS, accès) — compilé et testé
-services/nextfleet-api/    API Spring Boot : identité, parc, carburant, missions + jeton GPS, messagerie, assistant, administration, audit — testée (Testcontainers)
-services/gps-traccar-adapter/ Passerelle GPS : forward JSON de Traccar, lots Android à jeton de mission, relais OsmAnd — testée sur PostgreSQL
-services/chat-realtime/    Messagerie temps réel pilote (WebSocket) — testée sur PostgreSQL
-shared/api-contract/       Contrats OpenAPI 3 des lots 1 et 2 — validés
-shared/assets3d/           Modèles 3D GLB redistribuables et leurs licences
-shared/ui-tokens/          Jetons du design system (p. 17 / p. 18)
-infra/db/migrations/       Migrations Flyway V1–V10 — testées sur PostgreSQL 16 + PostGIS
-infra/db/tests/            Campagne de tests de la base (63 tests + concurrence) et jeu fictif d'intégration
-infra/deploy/camtel/       Kit d'hébergement CAMTEL : Docker Compose, HTTPS (Caddy), sauvegardes — éprouvé en CI
-infra/docker/              Images API, passerelle GPS, Traccar (publiées sur ghcr.io)
-infra/traccar/             Configuration Traccar (forward JSON vers NexFleet)
-docs/                      Audit, registre de parité avec l'ancien NexFleet, design et mouvement, état d'avancement, captures et GIF
-tools/                     Construction hors ligne, captures, contrôle des contrastes
-```
 
-## Démarrage rapide (sans Maven)
+## What's new
+
+| Version | Highlights |
+|:--|:--|
+| **0.11** | **Self-updating clients.** The server announces its version (`GET /api/v1/app/update`); Windows installs the MSI without admin rights, Ubuntu installs the `.deb`, Android downloads the APK and opens the installer. Updating the server now updates every workstation. Odometer corrections from the vehicle sheet, with reason and recalculated oil changes. |
+| **0.10** | **Correct, never erase.** Vehicles, oil changes, documents, drivers and open interventions are editable; vehicles and drivers are archived and restorable for traceability. Mandatory reason, old and new value in the audit log. Fuel fills stay immutable (anti-fraud). |
+| **0.9** | Directorates and sites per vehicle, a dedicated **Oil changes** screen, and **every report exportable to PDF** (A4 landscape, totals, pagination) or CSV. |
+| **0.8** | **“NexFleet Pro” redesign** — a desk that opens on a *To handle* queue ranked by urgency, explained vehicle health, a 360° vehicle sheet; on Android, a mission card that follows its phase and large field tiles. |
+
+## Six roles, six workspaces
+
+| Role | Home workspace |
+|:--|:--|
+| Fleet manager | Overview, missions, messages, assistant |
+| Driver | My missions — started with clear location notice |
+| Maintenance | Workshop |
+| Controller | Overview, trips, assistant |
+| Technical administrator | Accounts and roles — no business data |
+| Auditor | Hash-chained audit log, read-only |
+
+`--demo` opens an offline demonstration of all six profiles with fictitious data and a visible **DEMO** badge.
+
+## Rules enforced in code
+
+> [!IMPORTANT]
+> These are non-negotiable, and they live in the code — not in a policy document.
+
+- The server is the only source of truth; clients never touch the database.
+- A requester cannot approve their own fuel voucher; voucher balances are consumed atomically.
+- Fuel consumption is computed full-to-full only, with inputs exposed — *“insufficient data”* rather than an invented value.
+- No GPS position is accepted outside an active, authorised mission; no stale position is ever shown as *live*.
+- An anomaly is a lead to investigate: no “fraud” status, no automatic sanction.
+- No 3D asset is published without a reviewed licence that allows redistribution.
+- Demo data is refused in production; no secret and no real data in the repository.
+
+## Quick start
+
+No Maven installation required:
 
 ```bash
-infra/db/tests/run_db_tests.sh      # base : migrations + tests
-tools/build-offline.sh              # noyau, passerelles, bureau : compilation + tests
-tools/run-integration-tests.sh      # GPS et messagerie de bout en bout sur PostgreSQL
-tools/screenshots.sh                # parcours visuel et captures
+infra/db/tests/run_db_tests.sh      # database: migrations + tests
+tools/build-offline.sh              # domain, gateways, desktop: compile + tests
+tools/run-integration-tests.sh      # GPS and messaging end-to-end on PostgreSQL
+tools/screenshots.sh                # visual walkthrough and captures
 ```
 
-Construction : [`docs/BUILD.md`](docs/BUILD.md) · installation des paquets DEB / EXE / APK : [`docs/INSTALLATION.md`](docs/INSTALLATION.md) · mobile : [`docs/MOBILE.md`](docs/MOBILE.md).
+## Repository layout
 
-## Règles non négociables appliquées dans le code
+| Path | Contents |
+|:--|:--|
+| `apps/desktop-javafx/` | Desktop client — fleet, deadlines, missions, messaging, assistant, accounts, audit, 3D catalogue · DEB and EXE packages |
+| `apps/android/` | Android app — missions, encrypted GPS collector, messaging, 3D catalogue (Filament) · APK |
+| `services/nextfleet-domain/` | Dependency-free business core — full-to-full, vouchers, rules, GPS, access |
+| `services/nextfleet-api/` | Spring Boot API — tested with Testcontainers |
+| `services/gps-traccar-adapter/` | GPS gateway: Traccar JSON forward, Android mission-token batches, OsmAnd relay |
+| `services/chat-realtime/` | Real-time messaging (WebSocket) |
+| `shared/api-contract/` | OpenAPI 3 contracts |
+| `shared/assets3d/` | Redistributable GLB models and their licences |
+| `shared/ui-tokens/` | Design-system tokens |
+| `infra/db/` | Flyway migrations and the database test campaign |
+| `infra/deploy/camtel/` | On-premise kit: Docker Compose, HTTPS (Caddy), backups |
+| `infra/docker/` | API, GPS gateway and Traccar images (published to ghcr.io) |
+| `docs/` | Audit, parity register, design and motion, progress, captures |
 
-- Le serveur est la seule source de vérité ; les clients n'accèdent jamais à la base.
-- Un demandeur ne valide pas son propre bon ; le solde d'un bon est consommé de façon atomique.
-- Consommation uniquement plein-à-plein, entrées exposées ; « données insuffisantes » plutôt qu'une valeur inventée.
-- Aucune position GPS acceptée hors mission active autorisée ; aucune position périmée affichée « en direct ».
-- Une anomalie est un indice à instruire : aucun statut « fraude », aucune sanction automatique.
-- Aucun actif 3D publié sans licence revue autorisant la redistribution.
-- Données de démonstration refusées en production ; aucun secret ni donnée réelle dans le dépôt.
+## Status
 
-## Licences tierces embarquées
+[`docs/ETAT_AVANCEMENT.md`](docs/ETAT_AVANCEMENT.md) separates what is proven from what still needs field trials. Publishing packages is not a server deployment. **No certification or regulatory approval is claimed.** Migration from the legacy SQLite databases is described in [`docs/MIGRATION_SQLITE.md`](docs/MIGRATION_SQLITE.md).
 
-Modèles 3D : `shared/assets3d/LICENCES.md` (créations originales et Khronos Toy Car CC0). Police Inter (SIL OFL 1.1) : `apps/desktop-javafx/src/main/resources/cm/camtel/nextfleet/desktop/fonts/OFL-1.1-Inter.txt`.
+## Third-party licences
 
-## Mode démonstration : six comptes
+3D models: [`shared/assets3d/LICENCES.md`](shared/assets3d/LICENCES.md) — original creations and Khronos *Toy Car* (CC0). Inter typeface (SIL OFL 1.1) bundled with the desktop client.
 
-Le client bureau se connecte par défaut au serveur de production. `--demo` ouvre la démonstration hors ligne (données fictives, badge DÉMO, mot de passe commun : `demo`).
+<br>
 
-| Identifiant | Profil | Espace d'accueil |
-|---|---|---|
-| `gestionnaire` | Gestionnaire flotte | Vue d'ensemble, missions, messages, assistant |
-| `conducteur` | Agent ou conducteur | Mes missions (démarrage avec information sur la localisation) |
-| `maintenance` | Maintenance | Atelier |
-| `controleur` | Contrôleur | Vue d'ensemble, trajets, assistant |
-| `admin` | Administrateur technique | Comptes et rôles (aucune donnée métier) |
-| `auditeur` | Auditeur | Journal d'audit chaîné (lecture seule) |
+<div align="center">
+<sub>Designed and built in Yaoundé, Cameroon.</sub>
+</div>
